@@ -226,7 +226,7 @@ NGN.Models = class Models {
     const key = family + ':' + (element || '');
     if (!this.towerMats.has(key)) {
       const glowHex = (NGN.ELEMENT_COLOR && element && NGN.ELEMENT_COLOR[element]) || 0xFFFFFF;
-      this.towerMats.set(key, new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true, emissive: glowHex, emissiveIntensity: 0.07 }));
+      this.towerMats.set(key, new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true, emissive: glowHex, emissiveIntensity: 0.1 })); // 0.07 → 0.1(2026-09-06 진하게). 0.2 를 넘기면 명암이 날아간다(실측)
     }
     return this.towerMats.get(key);
   }
@@ -242,16 +242,37 @@ NGN.Models = class Models {
     obj.userData.pivot = new THREE.Vector3(P.x || 0, y + (P.y || 0), P.z || 0); // 머리가 도는 축(조각 바닥 중심)
     return { obj, top: y + (P.y || 0) + t.size.y * s, height: t.size.y * s };
   }
+  // 부품 표에 없는 계열(뽑기로 얻는 20종 — 2026-09-06 gacha.json towerPool. 전용 실루엣은 다음 차례)은 같은 속성의 기본 계열 실루엣을 빌린다.
+  //   같은 속성 + 같은 역할 > 같은 속성 > 같은 공격 타입 > 첫 번째. 등급(NGN.FAMILY_INFO.grade)에 따라 색·크기를 달리해 구별한다(borrowStyle)
+  borrowFamily(family) {
+    if (this.parts.towers[family]) return family;
+    const I = NGN.FAMILY_INFO || {}; const me = I[family]; if (!me) return null;
+    const cands = Object.keys(this.parts.towers).filter((k) => !k.startsWith('_') && I[k]);
+    return cands.find((k) => I[k].element === me.element && I[k].role === me.role) || cands.find((k) => I[k].element === me.element) || cands.find((k) => I[k].attackType === me.attackType) || cands[0] || null;
+  }
+  // 등급별 변형: 고급 = 색상을 살짝 돌리고 받침을 밝게 · 희귀(수호자) = 받침이 은빛, 꼭대기는 속성 원색 · 전설 = 금빛이 섞인 꼭대기 + 12% 크게
+  borrowStyle(family) {
+    const g = ((NGN.FAMILY_INFO || {})[family] || {}).grade || 'basic';
+    if (g === 'uncommon') return { hue: -0.05, stoneMix: 0.2, stone: 0xCFC7B8, scale: 1 };
+    if (g === 'rare') return { hue: 0, stoneMix: 0.55, stone: 0xDCE3EA, scale: 1.04 };
+    if (g === 'legendary') return { hue: 0, stoneMix: 0.15, stone: 0x6E5A2A, gold: 0.45, scale: 1.12 };
+    return { hue: 0, stoneMix: 0.2, stone: 0xB4AEA4, scale: 1 };
+  }
   // 타워 조립: 계열·단 → { body, head } 메시가 든 그룹. 같은 계열·단은 지오메트리를 한 번만 만들어 나눠 쓴다(카드 그림·미리보기가 여러 번 불러도 비용 0)
   buildTower(family, tier, opts = {}) {
-    const spec = this.parts.towers[family];
+    const src0 = this.borrowFamily(family);
+    const spec = src0 ? this.parts.towers[src0] : null;
     if (!spec || !this.atlas) return null;
     const key = family + ':' + tier;
     this.towerGeo = this.towerGeo || new Map();
     if (!this.towerGeo.has(key)) {
       const stack = (spec.stack[String(tier)] || spec.stack['3']).map((e) => (typeof e === 'string' ? { p: e } : e));
-      const accent = new THREE.Color(spec.tint), stone = new THREE.Color(0xB4AEA4);
-      const base = accent.clone().lerp(stone, 0.35);
+      const st = this.borrowStyle(family);
+      // 몸통 속성색을 진하게(2026-09-06 화면 설계 2판): 받침의 돌빛 섞임 35% → 20%. 빌린 계열은 등급 스타일대로
+      const accent = new THREE.Color(spec.tint), stone = new THREE.Color(st.stone);
+      if (st.hue) accent.offsetHSL(st.hue, 0.05, 0);
+      if (st.gold) accent.lerp(new THREE.Color(0xFFD54A), st.gold);
+      const base = accent.clone().lerp(stone, st.stoneMix);
       const g = new THREE.Group();
       let y = 0, top = 0; const fx = []; let headAnim = null, headTop = 0;
       for (let i = 0; i < stack.length; i++) {
@@ -266,11 +287,11 @@ NGN.Models = class Models {
         y += placed.height * r;
       }
       const merged = this.mergeGroup(g, { accent, base, recolor: spec.recolor });
-      this.towerGeo.set(key, { body: merged.body, head: merged.head, headPivot: merged.headPivot, material: this.towerMaterial(family, opts.element), height: top, headAnim, headTop, fx });
+      this.towerGeo.set(key, { body: merged.body, head: merged.head, headPivot: merged.headPivot, material: this.towerMaterial(family, opts.element), height: top, headAnim, headTop, fx, gradeScale: st.scale });
     }
     const src = this.towerGeo.get(key);
     const out = new THREE.Group();
-    const scale = opts.scale || this.parts.towerScale;
+    const scale = (opts.scale || this.parts.towerScale) * (src.gradeScale || 1);
     if (src.body) { const mesh = new THREE.Mesh(src.body, src.material); mesh.castShadow = true; mesh.receiveShadow = true; out.add(mesh); out.userData.bodyMesh = mesh; }
     if (src.head) {
       const pivot = new THREE.Group(); pivot.position.copy(src.headPivot);

@@ -143,7 +143,8 @@ NGN.Renderer = class Renderer {
     this.flashMat = (c) => this.cachedMat('flash', c, () => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
     // 상시 발광 테두리(J-3, 2026-09-06): 참고 게임(레이드 러시)의 노란 발광 테두리를 속성색으로. 같은 지오메트리를 1.06배 키워 뒷면만 밝은 속성색으로 한 번 더 그린다(+1 그리기).
     // 🛑 OutlinePass 는 쓰지 않는다 — 씬을 2번 더 그려 +7~12ms(checklist J-3). 어두운 먹선(×0.42)이었던 것을 밝게(흰색 쪽으로 35%) 바꿨다
-    this.outlineMat = (c) => this.cachedMat('outline', c, () => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).lerp(new THREE.Color(0xFFFFFF), 0.35), side: THREE.BackSide, transparent: true, opacity: 0.92, depthWrite: false }));
+    // 2026-09-06 화면 설계 2판: 테두리를 지금보다 뚜렷하게 — 흰색 쪽 35% → 18%(속성색이 진하게), 불투명, 껍질 1.06 → 1.09배(update 의 숨쉬기도 1.08~1.11)
+    this.outlineMat = (c) => this.cachedMat('outline', c, () => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).lerp(new THREE.Color(0xFFFFFF), 0.18), side: THREE.BackSide, depthWrite: false }));
     this.glowTex = null;
     this.foeMat = { basic: lam(0x7B3FB5), fast: lam(0xE8A23A), tank: lam(0x3F5566), swarm: lam(0x5FA85A), flyer: lam(0xE6E1D3), boss: lam(0x8B1E2B) };
     this.defMat = {};
@@ -246,7 +247,7 @@ NGN.Renderer = class Renderer {
     // 발광 테두리(J-3): 몸통·머리 각각 같은 지오메트리(바깥면만 남긴 것)를 1.06배 키워 뒷면만 밝은 속성색으로. 몸통보다 먼저 그려 뒤에서 테두리만 남는다.
     // 머리 껍질은 머리 축(pivot)의 자식이라 머리가 돌면 같이 돈다
     const hulls = [];
-    const shell = (m, parent) => { const h = new THREE.Mesh(m.geometry.userData.outline || m.geometry, this.outlineMat(ec)); h.position.copy(m.position); h.scale.set(1.06, 1.04, 1.06); h.position.y -= 0.01; h.renderOrder = -1; parent.add(h); hulls.push(h); };
+    const shell = (m, parent) => { const h = new THREE.Mesh(m.geometry.userData.outline || m.geometry, this.outlineMat(ec)); h.position.copy(m.position); h.scale.set(1.09, 1.05, 1.09); h.position.y -= 0.01; h.renderOrder = -1; parent.add(h); hulls.push(h); };
     if (body.userData.bodyMesh) shell(body.userData.bodyMesh, body); else body.children.forEach((m) => { if (m.isMesh) shell(m, body); });
     if (body.userData.headMesh) shell(body.userData.headMesh, body.userData.head);
     const glowSize = 4.2 + tier * 0.3, glowColor = ec; // 발밑 빛은 오버레이 인스턴스가 매 프레임 그린다(update)
@@ -296,6 +297,8 @@ NGN.Renderer = class Renderer {
       if (!inst.def.aura) this.setBadge(g, inst.level - 1, inst.branch);
     }
     for (const [id, g] of this.towerMeshes) if (!seen.has(id)) { this.world.root.remove(g); this.towerMeshes.delete(id); }
+    // 자리 상태를 세계에 알린다 — 빈 자리만 금테가 숨 쉰다(world.breatheSlots)
+    if (this.world.setSlotBuilt && game.slots) for (let i = 0; i < NGN.map.SLOTS.length; i++) this.world.setSlotBuilt(i, !!game.slots[i]);
   }
   // 사거리: 반투명 원판 + 굵은 테두리(속성색). 그전에는 폭 0.12 짜리 흰 선 하나(투명도 0.35)라 폰에서 안 보였다(사장님 지적 2026-09-06 "사거리 범위도 안 나오고").
   // 지어진 타워를 눌렀을 때와, 카드를 고르고 자리를 눌러 미리 볼 때 둘 다 이걸 쓴다. ghost 를 주면 그 자리에 지을 타워의 반투명 모형도 함께
@@ -646,7 +649,7 @@ NGN.Renderer = class Renderer {
       else if (u.head && u.headAnim === 'spin') u.head.rotation.y += dt * 1.1; // 수정·눈꽃: 천천히 돈다
       else if (!u.head && u.aim !== undefined) { let d = u.aim - u.body.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); u.body.rotation.y += d * Math.min(1, dt * 10); }
       // 발광 테두리가 숨 쉬듯 1.05~1.08 배 사이를 오간다(J-3 "상시 발광")
-      if (u.hulls) { const s = 1.065 + Math.sin(this.time * 3 + g.position.x * 0.7) * 0.015; for (const h of u.hulls) h.scale.set(s, 1.03 + (s - 1.065), s); }
+      if (u.hulls) { const s = 1.095 + Math.sin(this.time * 3 + g.position.x * 0.7) * 0.015; for (const h of u.hulls) h.scale.set(s, 1.05 + (s - 1.095), s); }
       if (u.anim.spin) u.anim.spin.rotation.z += dt * 1.5;
       // 상시 효과(부품 표의 fx): 어둠화덕 불꽃 · 폭풍기둥 스파크 · 유령 안개 · 스킹크 홀씨
       if (this.time - u.fxAt > 0.09) { u.fxAt = this.time; this.idleFx(g, u); }

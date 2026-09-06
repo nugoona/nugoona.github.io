@@ -353,7 +353,8 @@ NGN.UI = class UI {
       this.cdWave = wv;
       $('cdFoes').innerHTML = this.foeIcons(Object.assign({}, wv, { special: null })) + (wv.kind === 'boss' ? '<span class="spc boss">보스</span>' : '') + (wv.special ? `<span class="spc" style="background:${esc(wv.special.color || '#888')}">${esc(wv.special.이름)}</span>` : '');
     }
-    if (s !== this.cdSec) { this.cdSec = s; const el = $('cdSec'); el.textContent = `다음 ${s}초`; el.classList.toggle('soon', s <= 3); }
+    // 3초 전부터는 색만이 아니라 "!" 표시와 커지는 펄스로(색만으로 정보를 주지 않는다 — 글자 규칙 3)
+    if (s !== this.cdSec) { this.cdSec = s; const el = $('cdSec'); el.textContent = s <= 3 ? `! ${s}초` : `다음 ${s}초`; el.classList.toggle('soon', s <= 3); }
     if (bonus !== this.cdBonus || first) {
       this.cdBonus = bonus;
       const chip = $('waveBtn').querySelector('.bonus');
@@ -431,7 +432,10 @@ NGN.UI = class UI {
     const g = this.game; const wv = g.wave ? g.wave.def : g.waveAt(g.stats.reachedWave + 1); const def = wv ? wv.defense : 'ZOD';
     for (const b of $('towerBar').children) {
       const t = g.byFamily[b.dataset.fam][0];
-      b.classList.toggle('poor', g.gold < g.costToBuild(b.dataset.fam)); b.classList.toggle('sel', this.pickFam === b.dataset.fam);
+      const poor = g.gold < g.costToBuild(b.dataset.fam);
+      b.classList.toggle('poor', poor); b.classList.toggle('sel', this.pickFam === b.dataset.fam);
+      // 골드가 모자라면 회색만이 아니라 자물쇠도(색만으로 정보를 주지 않는다 — 글자 규칙 3)
+      const pr = b.querySelector('.pr'); if (pr && pr.dataset.poor !== String(poor)) { pr.dataset.poor = String(poor); pr.innerHTML = (poor ? SVG.lock : SVG.coin) + g.costToBuild(b.dataset.fam); }
       b.querySelector('.affslot').innerHTML = this.affBadge(t.attackType, def);
     }
   }
@@ -467,7 +471,6 @@ NGN.UI = class UI {
     $('buildCancel').addEventListener('click', () => { this.clearPreview(); this.pickFam = null; this.refreshTowerBar(); this.cb.onPick(null); });
   }
   clearPreview() { if (this.previewSlot === null) return; this.previewSlot = null; this.selectedSlot = null; $('pop').hidden = true; this.cb.onSelect(null, null, 0); }
-  popSlot() { if (this.popInst) return this.popInst.slot; if (this.previewSlot !== null) return NGN.map.SLOTS[this.previewSlot]; return null; }
   clearSelection() { this.selectedSlot = null; this.previewSlot = null; this.hidePop(); this.cb.onSelect(null, null, 0); }
   afterBuild() { this.selectedSlot = null; this.previewSlot = null; $('pop').hidden = true; this.refreshHud(); this.cb.onSelect(null, null, 0); if (this.pickFam && this.game.gold < this.game.costToBuild(this.pickFam)) { this.pickFam = null; this.refreshTowerBar(); this.cb.onPick(null); } }
   // 카드 상세: 돌아가는 3D 모형 + 속성·역할 + 한 줄 설명 + 3단 카드(그림·피해·사거리·주기·값) + 승급하면 어떻게 되는지 + 3단 갈래
@@ -490,8 +493,8 @@ NGN.UI = class UI {
     $('codeClose').addEventListener('click', close);
     $('tdPick').addEventListener('click', () => { close(); if (this.pickFam !== fam) this.pickTower(fam); });
   }
-  showPop(inst) { this.popInst = inst; this.popDetail = false; this.popBag = false; $('pop').hidden = false; this.renderPop(); }
-  hidePop() { this.popInst = null; this.popBag = false; $('pop').hidden = true; }
+  showPop(inst) { this.popInst = inst; this.popDetail = false; this.popBag = false; this.popSell = false; $('pop').hidden = false; this.renderPop(); }
+  hidePop() { this.popInst = null; this.popBag = false; this.popSell = false; $('pop').hidden = true; }
   gradeClass(item) { return 'g-' + (item.등급 || 'common'); }
   // 아이템 칸(타워당 3칸): 찬 칸은 이름(누르면 뺀다), 빈 칸은 + (누르면 가방이 열린다). 오라 타워는 칸이 없다
   itemSlotsHtml(inst) {
@@ -526,33 +529,31 @@ NGN.UI = class UI {
     else if (next && next.tier >= 3 && !next.aura && branches.length) actions = branches.map((k) => { const b = g.branchDef(k); return `<button class="btn brn up" data-branch="${k}" ${g.gold >= upCost ? '' : 'disabled'} style="background:${esc(b.color)};border-color:rgba(0,0,0,.35);--sh:rgba(0,0,0,.35)">${SVG.up} ${esc(b.name)}<small>${esc(b.설명)}</small><small>${upCost}골드</small></button>`; }).join('');
     else if (next) actions = `<button class="btn green up" ${g.gold >= upCost ? '' : 'disabled'}>${SVG.up} 승급<small>${upCost}</small></button>`;
     else actions = '<button class="btn gray" disabled>최고 단계</button>';
+    // 팔기(2026-09-06 화면 설계 2판 — 사장님 "타워를 실수로 지우는 경우가 되게 많아"): 세 겹으로 막는다.
+    //   ⑴ 팝업은 화면 아래 고정(CSS #pop) — 타워 위에 안 겹친다 ⑵ [팔기]는 작고 회색으로 왼쪽 구석, 승급은 크게 가운데 ⑶ 누르면 한 번 더 묻는다("이 타워를 파시겠어요? +N골드" [팔기][취소])
+    const sellRow = this.popSell
+      ? `<div class="row confirm"><span class="q">이 타워를 파시겠어요? <b>${SVG.coin} +${refund}</b></span><button class="btn red sellYes">${SVG.sell} 팔기</button><button class="btn gray sellNo">취소</button></div>`
+      : `<div class="row">${actions}</div><div class="row side"><button class="btn gray tiny sell" title="팔기">${SVG.sell} 팔기 +${refund}</button><span class="grow"></span><button class="btn gray tiny more">${SVG.info} ${this.popDetail ? '숫자 닫기' : '숫자'}</button><button class="btn gray tiny close">✕</button></div>`;
     $('pop').innerHTML = `
       <div class="panel title"><b>${esc(d.name)}</b> <span style="color:#6B5A48">${d.tier}단</span>${branchChip}${s.attackType ? ` · 초당 <b>${Math.round(s.dps)}</b>` : ''}${affTxt}${lvl}</div>
       ${this.popDetail ? `<div class="panel detail">${this.detailText(inst, s)}</div>` : ''}
       ${this.popBag ? this.bagHtml() : this.itemSlotsHtml(inst)}
-      <div class="row">
-        ${actions}
-        <button class="btn red sell">${SVG.sell} 팔기<small>+${refund}</small></button>
-        <button class="btn gray more">${SVG.info}</button>
-      </div>`;
+      ${sellRow}`;
     const pop = $('pop');
     pop.querySelectorAll('.up').forEach((b) => b.addEventListener('click', () => this.cb.onUpgrade(inst, b.dataset.branch || null)));
     if (inst.branchPending) pop.querySelectorAll('.brn').forEach((b) => b.addEventListener('click', () => this.cb.onChooseBranch(inst, b.dataset.branch)));
-    pop.querySelector('.sell').addEventListener('click', () => this.cb.onSell(inst));
-    pop.querySelector('.more').addEventListener('click', () => { this.popDetail = !this.popDetail; this.renderPop(); });
+    const on = (sel, fn) => { const el = pop.querySelector(sel); if (el) el.addEventListener('click', fn); };
+    on('.sell', () => { this.popSell = true; this.renderPop(); });
+    on('.sellYes', () => { this.popSell = false; this.cb.onSell(inst); });
+    on('.sellNo', () => { this.popSell = false; this.renderPop(); });
+    on('.more', () => { this.popDetail = !this.popDetail; this.renderPop(); });
+    on('.close', () => this.clearSelection());
     pop.querySelectorAll('.islot.empty').forEach((b) => b.addEventListener('click', () => { if (!g.inventory.length) { this.toast('가방이 비었다 — 적을 잡으면 떨어진다'); return; } this.popBag = true; this.renderPop(); }));
     pop.querySelectorAll('.islot[data-uid]').forEach((b) => b.addEventListener('click', () => this.cb.onUnequip(inst, Number(b.dataset.uid))));
     pop.querySelectorAll('.islot[data-bag]').forEach((b) => b.addEventListener('click', () => { this.popBag = false; this.cb.onEquip(inst, Number(b.dataset.bag)); }));
     pop.querySelectorAll('.islot[data-bagclose]').forEach((b) => b.addEventListener('click', () => { this.popBag = false; this.renderPop(); }));
   }
-  // 팝은 타워 아래쪽에(위에 띄우면 타워와 사거리 원판을 가린다). 화면 아래 40% 에 있는 타워는 카드 줄과 겹치니 위에 띄운다
-  placePop(x, y, yBase) {
-    const p = $('pop'); if (p.hidden) return;
-    const below = (yBase === undefined ? y : yBase) < innerHeight * 0.6;
-    p.classList.toggle('below', below);
-    p.style.left = Math.max(150, Math.min(innerWidth - 150, x)) + 'px';
-    p.style.top = (below ? (yBase === undefined ? y : yBase) + 14 : Math.max(70, y)) + 'px';
-  }
+  // 팝은 화면 아래 고정(CSS #pop) — 타워 위에 띄우면 타워를 다시 누르려다 [팔기]를 눌렀다(2026-09-06). 자리 계산이 없다
   detailText(inst, s) {
     const d = inst.def;
     return [
@@ -572,7 +573,7 @@ NGN.UI = class UI {
   banner(text, special = null, wv = null, cls = '', sub = '', subCls = '') {
     const old = document.getElementById('banner'); if (old) old.remove(); // 겹치면(클리어 직후 보스 등장 등) 앞 것을 치운다
     const b = document.createElement('div'); b.id = 'banner'; if (cls) b.className = cls;
-    b.innerHTML = esc(text) + (sub ? `<div class="sub ${subCls}">${sub}</div>` : '') + (wv ? `<div>${this.foeIcons(Object.assign({}, wv, { special: null }))}</div>` : '') + (special ? `<div class="spcline"><span class="spc big" style="background:${esc(special.color || '#888')}">${esc(special.이름)}</span></div>` : '');
+    b.innerHTML = `<span class="bt">${esc(text)}</span>` + (sub ? `<div class="sub ${subCls}">${sub}</div>` : '') + (wv ? `<div>${this.foeIcons(Object.assign({}, wv, { special: null }))}</div>` : '') + (special ? `<div class="spcline"><span class="spc big" style="background:${esc(special.color || '#888')}">${esc(special.이름)}</span></div>` : '');
     document.body.appendChild(b); setTimeout(() => b.remove(), cls === 'boss' ? 2100 : 1700);
   }
   toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(this._tt); this._tt = setTimeout(() => { t.hidden = true; }, 1500); }
@@ -599,8 +600,15 @@ NGN.UI = class UI {
     st.innerHTML = [1, 2, 3].map((k) => NGN.starOf(diff, true).replace('class="i "', `class="${k <= settle.stars ? 'on' : ''}" style="animation-delay:${0.25 + k * 0.35}s"`)).join('');
     const nextTier = result.cleared ? this.meta.starTiers(stage, result.startLives).find((t) => t.star === settle.stars + 1) : null;
     $('endTitle').textContent = result.cleared ? (isLast ? '모든 스테이지 클리어!' : `스테이지 ${stage.id} 클리어!`) : `스테이지 ${stage.id} — 웨이브 ${result.fellAt}에서 무너졌다`;
+    // 진전 눈금(2026-09-06 2차 밸런스 설계): "지난번 12웨이브 → 이번 15웨이브, 최고 기록!" — 반복하는 조카에게 "나아가고 있다"를 보여 준다
+    const P = settle.progress; let prog = '';
+    if (P && !P.firstTry) {
+      if (result.cleared) prog = P.prevCleared ? '' : `<span class="newBest">지난번 ${P.prevWave}웨이브 → 이번 클리어!</span><br>`;
+      else prog = P.best ? `<span class="newBest">지난번 ${P.prevWave}웨이브 → 이번 ${P.wave}웨이브 · 최고 기록!</span><br>` : `<span style="color:#6B5A48">지난번 ${P.prevWave}웨이브 · 이번 ${P.wave}웨이브</span><br>`;
+    }
     $('endBody').innerHTML = `<b>${esc(stage.name)}</b> · <span class="spc" style="background:${NGN.DIFF_COLOR[diff]};color:#fff;text-shadow:none">${esc(D.name)}</span><br>`
-      + (result.cleared ? `남은 생명 ${result.lives}/${result.startLives} · 쓴 골드 ${Math.round(result.spent).toLocaleString()}${settle.stars < 3 && nextTier ? ` <span style="color:#6B5A48">(${nextTier.lives} 이상 남기면 ★${nextTier.star})</span>` : ''}<br>` : `남은 생명 0 · 별 없음<br>`)
+      + (result.cleared ? `남은 생명 ${result.lives}/${result.startLives} · 쓴 골드 ${Math.round(result.spent).toLocaleString()}${settle.stars < 3 && nextTier ? ` <span style="color:#6B5A48">(${nextTier.lives} 이상 남기면 ★${nextTier.star})</span>` : ''}<br>` : `웨이브 <b>${P ? P.wave : result.wave}</b>/${stage.waves} 막음 · 별 없음<br>`)
+      + prog
       + (settle.gained > 0 ? `<span class="newBest">${settle.newRecord ? '신기록! ' : ''}${NGN.starOf(diff)} +${settle.gained} ${esc(D.star)}</span><br>` : (result.cleared && settle.prevStars >= settle.stars && settle.prevStars > 0 ? `<span style="color:#6B5A48">이미 ${esc(D.star)} ${settle.prevStars}개 — 더 잘 깨면 차액을 받는다</span><br>` : ''))
       + (settle.unlocked ? `<b style="color:#2E7D32">새 타워 계열 해금: ${esc(NGN.FAMILY_NAMES[settle.unlocked])}</b><br>` : '')
       + (result.cleared && diff === 'normal' && settle.prevStars === 0 ? `<b style="color:#9E2B22">이 스테이지의 어려움(붉은별)이 열렸다!</b><br>` : '')

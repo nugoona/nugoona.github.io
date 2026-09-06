@@ -196,7 +196,8 @@ NGN.serverNow = async function serverNow() {
   renderer.onLeak = () => castleHit(1);
   // 경고(④): 적이 출구 가까이 오면 렌더러가 true 로 부른다 → 가장자리 붉은 비네트
   renderer.onDanger = (on) => ui.setDanger(!!on);
-  const gachaUi = new NGN.GachaUI(meta, data, () => { if (!game) ui.showMenu(meta); { const gd = document.getElementById('gachaDot'); if (gd) gd.hidden = meta.state.tickets < 1; } });
+  // 뽑기 화면: 타워 그림(카드 캐시)·돌아가는 3D 모형(전설 연출)을 쓴다
+  const gachaUi = new NGN.GachaUI(meta, data, () => { if (!game) ui.showMenu(meta); { const gd = document.getElementById('gachaDot'); if (gd) gd.hidden = meta.state.tickets < 1; } }, { towerImage: (def) => ui.cb.towerImage(def), preview });
 
   // 공통: 엔진 한 판 만들기. 강화 나무·뽑기 보상은 meta.perks() 하나로 합쳐져 effectiveStats() 한 통로로 들어간다.
   // perks 를 직접 주면(오늘의 판 = 전부 0) 그것을 쓴다
@@ -291,7 +292,7 @@ NGN.serverNow = async function serverNow() {
       slowmo = 0.25; slowmoLeft = 0.9;
       if (typeof world.shake === 'function') world.shake(1.0);
     } else { ui.banner(mode !== 'infinite' && wv.wave === game.waves.length ? `마지막 웨이브 ${wv.wave}` : `웨이브 ${wv.wave}`, wv.special || null, wv); NGN.sound && NGN.sound.play('wave'); }
-    if (wv.special) ui.toast(`${wv.special.이름}: ${wv.special._설명}`);
+    // 성질 설명 문장은 전투에서 뺐다(글자 규칙 4 — 설명은 도감으로, 전투엔 이름 칩만. 배너·카운트다운 줄의 색 칩이 이름을 보여 준다)
     renderer.waveStart();
     ui.refreshHud();
     acc = 0;
@@ -322,7 +323,7 @@ NGN.serverNow = async function serverNow() {
     const result = { cleared: stopped, stopped, wave: Math.max(0, clearedWaves), fellAt: game.stats.reachedWave, lives: Math.max(0, game.lives), gold: game.gold, spent: game.spent };
     if (mode === 'stage') {
       result.startLives = game.balance.lives + game.perks.lives; // 별 비율의 분모 = 실제 시작 생명(스테이지 정가 + 강화)
-      const settle = meta.settleStage(curStage, curDiff, stopped, result.lives, result.startLives, result.spent);
+      const settle = meta.settleStage(curStage, curDiff, stopped, result.lives, result.startLives, result.spent, result.wave); // result.wave = 막은 웨이브 — 실패해도 기록·보상에 남는다
       const isLast = !meta.stageAfter(curStage.id);
       ui.showStageEnd(curStage, curDiff, result, settle, isLast);
       window.stageResult = { stage: curStage.id, diff: curDiff, cleared: stopped, lives: result.lives, stars: settle.stars, gained: settle.gained, unlocked: settle.unlocked, tickets: settle.tickets.lines };
@@ -425,7 +426,6 @@ NGN.serverNow = async function serverNow() {
       // 다음 엔진 틱까지 얼마나 왔나 → 적 위치를 그 비율로 이어 그린다(A1). 웨이브 밖이면 1. 슬로우모 중엔 연출 시간도 같이 느리게
       renderer.update(dt * slowmo, game, game.wave ? acc / NGN.DT : 1);
       if (speed <= 4) flushFloaters();
-      const ps = ui.popSlot(); if (ps) { const p = toScreen(ps.x, ps.y, 3.2), b = toScreen(ps.x, ps.y, 0); ui.placePop(p.x, p.y - 8, b.y); }
       if (tutorialStep === 1) { const b = document.querySelector('.tcard'); const r = b.getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top + 18, ''); } // 화살표 끝이 카드 그림에 걸치게(카드 위로 한 줄 더 안 먹게)
       else if (tutorialStep === 2 && ui.previewSlot !== null) { const r = document.getElementById('buildBtn').getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top - 6, '짓기를 누르세요'); }
       else if (tutorialStep === 2) { const s = NGN.map.SLOTS.reduce((a, c) => (NGN.map.coverageFor(c.id, 800, false) > NGN.map.coverageFor(a.id, 800, false) ? c : a), NGN.map.SLOTS[0]); const p = toScreen(s.x, s.y, 0.5); ui.hint(p.x, p.y - 10, '여기에 놓으세요'); }

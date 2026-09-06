@@ -43,7 +43,7 @@ NGN.Meta = class Meta {
   constructor(gacha, stages, families) {
     this.gacha = gacha; this.stages = stages; this.families = families || [];
     this.KEY = 'ngn-td-meta';
-    this.state = this.load() || { tickets: 0, pulls: 0, sinceLegendary: 0, sinceEpic: 0, items: [], unlocked: [], best: null, games: 0 };
+    this.state = this.load() || { tickets: 0, pulls: 0, sinceLegendary: 0, sinceRare: 0, items: [], unlocked: [], famLevel: {}, best: null, games: 0 };
     this.migrate();
   }
   // 옛 저장을 지금 모양으로. 옛 stars(난이도 없음)는 보통(금별)로 옮긴다. 쉬움(은별)은 폐지 — 별·기록 전부 버린다(강화에 쓴 별이 모자라면 나무를 되돌린다)
@@ -55,6 +55,8 @@ NGN.Meta = class Meta {
     if (s.starsBy.easy) delete s.starsBy.easy;
     if (Array.isArray(s.records)) s.records = s.records.filter((r) => r.d !== 'e');
     if (Array.isArray(s.friends)) s.friends = s.friends.filter((r) => r.d !== 'e');
+    s.famLevel = s.famLevel || {};    // 뽑기 중복 → 계열 레벨(2026-09-06 뽑기 개편, design.md 12-13)
+    if (s.sinceRare === undefined) { s.sinceRare = s.sinceEpic || 0; delete s.sinceEpic; } // 옛 등급 이름(epic) → rare
     s.tree = s.tree || {};            // 강화 갈래 → 찍은 칸 수
     s.records = s.records || [];      // 내 기록(판 단위, 종목마다 최고 하나)
     s.friends = s.friends || [];      // 친구 기록(코드로 받은 것)
@@ -116,25 +118,38 @@ NGN.Meta = class Meta {
     for (const t of this.starTiers(stage, startLives)) if (lives >= t.lives) best = Math.max(best, t.star);
     return best;
   }
-  // 스테이지 한 판 끝. 별은 그 난이도의 최고 기록만 남기고 차액만 더해진다(★1 → ★3 = +2). 티켓: 한 판 +perGame, (어느 난이도든) 첫 클리어 +firstClearTickets
-  settleStage(stage, diff, cleared, lives, startLives, spent) {
+  // 스테이지 한 판 끝. 별은 그 난이도의 최고 기록만 남기고 차액만 더해진다(★1 → ★3 = +2).
+  // 티켓(2026-09-06 2차 밸런스 설계 고침 A — 실패에도 값을 매긴다):
+  //   첫 클리어 = 한 판 1 + firstClearTickets · 다시 깨서 등급 오름 = 1 + 별 차액 · 등급 그대로 = 1 + 막은 웨이브 everyWaves(5)마다 perMilestone(1)장(gacha.json 에 있던 규칙 — 전엔 스테이지 정산에서 안 쓰였다)
+  //   실패 = 막은 웨이브 ÷ 3 내림 + 1장(20웨이브 판에서 15까지 갔으면 6장). 전엔 웨이브 18까지 버티나 1에서 죽으나 똑같이 1장이었다
+  // 기록: 🔴 전엔 실패하면 w 가 무조건 0 이었다(`Math.max(0, lives > 0 ? 0 : 0)`) — 웨이브 18까지 갔어도 기록이 0. 이제 실패한 판도 막은 웨이브(wavesHeld)를 남긴다.
+  //   progress = 지난 기록과 이번의 눈금("지난번 12웨이브 → 이번 15웨이브, 최고 기록!") — 결과 화면이 띄운다
+  settleStage(stage, diff, cleared, lives, startLives, spent, wavesHeld = 0) {
     const T = this.gacha.tickets; const lines = [];
     const give = (n, why) => { if (n > 0) { this.state.tickets += n; lines.push({ n, why }); } };
     this.state.games++;
-    give(T.perGame, '한 판 했다');
     const prevStars = this.starsFor(stage.id, diff);
     const stars = cleared ? this.starsForLives(lives, stage, startLives) : 0;
     const gained = Math.max(0, stars - prevStars);
     const firstClear = cleared && !this.clearedAny(stage.id);
-    if (gained > 0) this.state.starsBy[diff][stage.id] = stars;
-    if (firstClear) give(stage.firstClearTickets || 0, `스테이지 ${stage.id} 첫 클리어`);
+    const prevRec = this.myRecord('s', stage.id, NGN.DIFF_SHORT[diff]);
+    const held = cleared ? stage.waves : Math.max(0, Math.min(stage.waves, Math.floor(wavesHeld) || 0));
+    if (!cleared) give(Math.floor(held / 3) + 1, held > 0 ? `웨이브 ${held}까지 막았다 (${held}÷3+1)` : '한 판 했다');
+    else {
+      give(T.perGame, '한 판 했다');
+      if (gained > 0) this.state.starsBy[diff][stage.id] = stars;
+      if (firstClear) give(stage.firstClearTickets || 0, `스테이지 ${stage.id} 첫 클리어`);
+      else if (gained <= 0) { const m = Math.floor(held / T.everyWaves); give(m * T.perMilestone, `웨이브 ${T.everyWaves}마다 (${m}번)`); }
+    }
     let unlocked = null;
     const fam = this.stages.unlockFamily[String(stage.id)];
     if (cleared && fam && !this.isUnlocked(fam)) { this.state.unlocked.push(fam); unlocked = fam; }
-    // 내 기록(종목 = 스테이지 × 난이도). 별 → 생명 → 쓴 골드 적은 순으로 더 좋은 것만 남긴다
-    const rec = this.addRecord({ m: 's', k: stage.id, d: NGN.DIFF_SHORT[diff], w: cleared ? stage.waves : Math.max(0, lives > 0 ? 0 : 0), l: cleared ? lives : 0, g: cleared ? Math.round(spent) : null, c: cleared ? 1 : 0, s: stars });
+    // 내 기록(종목 = 스테이지 × 난이도). 웨이브 → 별 → 생명 → 쓴 골드 적은 순으로 더 좋은 것만 남긴다(실패 기록은 클리어 기록을 절대 못 이긴다 — 클리어는 w 가 판의 웨이브 수)
+    const rec = this.addRecord({ m: 's', k: stage.id, d: NGN.DIFF_SHORT[diff], w: held, l: cleared ? lives : 0, g: cleared ? Math.round(spent) : null, c: cleared ? 1 : 0, s: stars });
+    const prevWave = prevRec ? (prevRec.w || 0) : null;
+    const progress = { firstTry: prevWave === null, prevWave, prevCleared: !!(prevRec && prevRec.c), wave: held, best: prevWave === null || held > prevWave };
     this.save();
-    return { stars, prevStars, gained, newRecord: gained > 0 && prevStars > 0, firstClear, unlocked, tickets: { lines, total: this.state.tickets }, rec };
+    return { stars, prevStars, gained, newRecord: gained > 0 && prevStars > 0, firstClear, unlocked, tickets: { lines, total: this.state.tickets }, rec, progress };
   }
 
   // ---------- 강화 나무(별을 쓰는 곳) ----------
@@ -172,15 +187,20 @@ NGN.Meta = class Meta {
       else if (it.type === 'sellRatio') p.sellRatio = Math.max(p.sellRatio || 0, it.value);
       else if (it.type === 'bossDmg') p.bossDmg += it.value;
     }
+    // 뽑기 중복 → 계열 레벨(피해 +dupLevelDmg × 레벨) — 같은 familyDmg 칸으로 들어간다(엔진 effectiveStats 한 통로)
+    for (const f of Object.keys(this.state.famLevel || {})) { const b = this.famLevelDmg(f); if (b) p.familyDmg[f] = (p.familyDmg[f] || 0) + b; }
     // 강화 나무(별): 같은 칸에 합산한다 — 엔진 통로는 하나뿐
     for (const k of this.treeKeys()) { const e = this.treeEffect(k); for (const key of Object.keys(e)) if (key in p && typeof p[key] === 'number') p[key] += e[key]; }
     return p;
   }
+  famLevel(f) { return (this.state.famLevel && this.state.famLevel[f]) || 0; }
+  famLevelDmg(f) { const TP = this.gacha.towerPool; return this.famLevel(f) * ((TP && TP.dupLevelDmg) || 0); }
   // 사람이 읽는 요약
   summary(familyName) {
     const p = this.perks(); const out = [];
     if (p.allDmg) out.push(`모든 타워 피해 +${Math.round(p.allDmg * 100)}%`);
-    for (const f of Object.keys(p.familyDmg)) out.push(`${familyName[f]} +${Math.round(p.familyDmg[f] * 100)}%`);
+    for (const f of Object.keys(this.state.famLevel || {})) if (this.famLevel(f)) out.push(`${familyName[f]} Lv.${this.famLevel(f)} (+${Math.round(this.famLevelDmg(f) * 100)}%)`);
+    for (const f of Object.keys(p.familyDmg)) { const rest = p.familyDmg[f] - this.famLevelDmg(f); if (rest > 1e-9) out.push(`${familyName[f]} +${Math.round(rest * 100)}%`); }
     if (p.rangeMul) out.push(`사거리 +${Math.round(p.rangeMul * 100)}%`);
     if (p.startGold) out.push(`시작 골드 +${p.startGold}`);
     if (p.lives) out.push(`생명 +${p.lives}`);
@@ -250,7 +270,10 @@ NGN.Meta = class Meta {
   dailySettle(date, result, src = 's') {
     const D = this.stages.daily; const lines = [];
     this.state.games++;
-    if (D.tickets) { this.state.tickets += D.tickets; lines.push({ n: D.tickets, why: '오늘의 판' }); }
+    // 오늘의 판 = 티켓 3장, 깨면 +2(2026-09-06 2차 밸런스 설계 — 강화가 안 통하는 유일한 판 = 뒤처진 아이의 무대). stages.json daily.tickets 는 데이터 담당 몫이라 1 이면 코드가 3 으로 올린다
+    const base = Math.max(NGN.DAILY_TICKETS, D.tickets || 0);
+    this.state.tickets += base; lines.push({ n: base, why: '오늘의 판' });
+    if (result.cleared) { this.state.tickets += NGN.DAILY_CLEAR_BONUS; lines.push({ n: NGN.DAILY_CLEAR_BONUS, why: '오늘의 판 클리어' }); }
     this.state.daily[date] = { done: true, wave: result.wave, lives: result.lives, spent: Math.round(result.spent), cleared: result.cleared ? 1 : 0, src };
     const rec = this.addRecord({ m: 'd', k: date, d: null, w: result.wave, l: result.cleared ? result.lives : 0, g: result.cleared ? Math.round(result.spent) : null, c: result.cleared ? 1 : 0, cs: src });
     this.save();
@@ -349,36 +372,44 @@ NGN.Meta = class Meta {
     return { ok: true, stars: this.totalStars(), games: this.state.games || 0 };
   }
 
-  // ---------- 뽑기 한 번 ----------
-  // 등급 → 천장 → 풀에서 하나. 무작위는 여기서만 쓴다(rng 를 넣으면 시험 가능)
+  // ---------- 뽑기 한 번 (2026-09-06 개편, design.md 12-13) ----------
+  // 등급(흔함 52 · 고급 28 · 희귀 15 · 전설 5) → 천장(전설 40회 · 희귀 8회) → 고급·희귀·전설은 towerPool 의 새 계열, 흔함은 pool.common 의 숫자 상품.
+  // 이미 가진 계열이 또 나오면 그 계열 레벨 +1(피해 +dupLevelDmg, 상한 dupLevelMax). 그 등급의 계열을 다 모으고 레벨도 꽉 찼으면 숫자 상품으로.
+  // 돌아오는 값: { kind: 'tower', grade, family, isNew, level } 또는 { kind: 'perk', grade, id, name, type, value }. 무작위는 여기서만 쓴다(rng 를 넣으면 시험 가능)
   pull(rng = Math.random) {
     if (this.state.tickets <= 0) return null;
     this.state.tickets--; this.state.pulls++;
-    const G = this.gacha;
+    const P = this.gacha.pity;
     let grade = this.rollGrade(rng);
-    // 천장
-    if (this.state.sinceLegendary + 1 >= G.pity.pityLegendary) grade = 'legendary';
-    else if (grade !== 'legendary' && this.state.sinceEpic + 1 >= G.pity.pityEpic && grade !== 'epic') grade = 'epic';
+    if (this.state.sinceLegendary + 1 >= P.pityLegendary) grade = 'legendary';
+    else if (grade !== 'legendary' && grade !== 'rare' && this.state.sinceRare + 1 >= P.pityRare) grade = 'rare';
     if (grade === 'legendary') this.state.sinceLegendary = 0; else this.state.sinceLegendary++;
-    if (grade === 'epic' || grade === 'legendary') this.state.sinceEpic = 0; else this.state.sinceEpic++;
-
-    const pool = G.pool[grade];
-    let base = pool[Math.floor(rng() * pool.length)];
-    let item = { ...base, grade };
-    if (item.type === 'familyDmg') { const fams = Object.keys(NGN.FAMILY_NAMES); item.family = fams[Math.floor(rng() * fams.length)]; item.name = `${NGN.FAMILY_NAMES[item.family]} 강화 +${Math.round(item.value * 100)}%`; }
-    if (item.type === 'unlock') {
-      if (this.isUnlocked(item.family)) { item = { id: 'family_dmg_dup', grade, name: `${NGN.FAMILY_NAMES[item.family]} 강화 +${Math.round(G.unlockFallbackFamilyDmg * 100)}% (이미 열려 있어서)`, type: 'familyDmg', family: item.family, value: G.unlockFallbackFamilyDmg }; }
-      else { this.state.unlocked.push(item.family); item.name = `새 계열: ${NGN.FAMILY_NAMES[item.family]}`; }
-    }
-    this.state.items.push({ id: item.id, grade, type: item.type, value: item.value, family: item.family, name: item.name, at: Date.now() });
+    if (grade === 'rare' || grade === 'legendary') this.state.sinceRare = 0; else this.state.sinceRare++;
+    const item = (grade === 'common' ? null : this.pullTower(grade, rng)) || this.pullPerk(grade, rng);
     this.save();
     return item;
   }
   rollGrade(rng) {
-    const R = this.gacha.rates; const r = rng() * 100;
-    if (r < R.legendary) return 'legendary';
-    if (r < R.legendary + R.epic) return 'epic';
-    if (r < R.legendary + R.epic + R.rare) return 'rare';
+    const R = this.gacha.rates; const r = rng() * 100; let acc = 0;
+    for (const g of ['legendary', 'rare', 'uncommon']) { acc += R[g] || 0; if (r < acc) return g; }
     return 'common';
   }
+  pullTower(grade, rng) {
+    const TP = this.gacha.towerPool; if (!TP) return null;
+    const max = TP.dupLevelMax || 10;
+    const cands = (TP[grade] || []).filter((f) => this.families.includes(f) && (!this.isUnlocked(f) || this.famLevel(f) < max));
+    if (!cands.length) return null;
+    const f = cands[Math.floor(rng() * cands.length)];
+    if (!this.isUnlocked(f)) { this.state.unlocked.push(f); return { kind: 'tower', grade, family: f, isNew: true, level: 0, name: `새 타워: ${NGN.FAMILY_NAMES[f]}` }; }
+    const lv = this.famLevel(f) + 1; this.state.famLevel[f] = lv;
+    return { kind: 'tower', grade, family: f, isNew: false, level: lv, name: `${NGN.FAMILY_NAMES[f]} Lv.${lv} (피해 +${Math.round(lv * TP.dupLevelDmg * 100)}%)` };
+  }
+  pullPerk(grade, rng) {
+    const pool = this.gacha.pool.common; const base = pool[Math.floor(rng() * pool.length)];
+    const item = { kind: 'perk', grade, id: base.id, name: base.name, type: base.type, value: base.value };
+    this.state.items.push({ id: item.id, grade, type: item.type, value: item.value, name: item.name, at: Date.now() });
+    return item;
+  }
 };
+NGN.GRADES = ['common', 'uncommon', 'rare', 'legendary'];
+NGN.DAILY_TICKETS = 3; NGN.DAILY_CLEAR_BONUS = 2;

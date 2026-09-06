@@ -15,20 +15,22 @@ window.NGN = window.NGN || {};
 
 NGN.SCALE = 1 / 100;
 
+// 명도 세 층(2026-09-06 화면 설계 2판 — 사장님 "뿌옇고 길이 또렷하게 안 보여"): 길(road) = 가장 밝게 + 어두운 테두리(roadEdge) · 판 안 잔디(grass) = 중간 · 판 밖(outer) = 어둡게.
+// 전에는 길과 잔디의 명도가 거의 같았다(풀밭 흙길 0xA8814D vs 잔디 0x6BA34A · 눈은 둘 다 흰색). 테마마다 세 층의 밝기 차가 확실히 나게 골랐다
 NGN.C = {
-  sky: 0xA8CFE0, fog: 0xB4D3DF,
-  grass: 0x6BA34A, grassAlt: 0x5A8F3C, cliff: 0x9A8462,
-  road: 0xA8814D, roadEdge: 0x7E5F35,
-  stone: 0x8F8A80, stoneDark: 0x6B6760, slot: 0x9C9587, slotHover: 0xE8C34A,
+  sky: 0x4A6B3F, fog: 0xB4D3DF,
+  grass: 0x7FA76A, grassAlt: 0x789F63, outer: 0x4A6B3F, outerAlt: 0x45643B, cliff: 0x8A7452,
+  road: 0xF2EAD6, roadEdge: 0x4E3A22,
+  stone: 0x8F8A80, stoneDark: 0x6B6760, slot: 0xFFFFFF, slotEdge: 0xE8C34A, slotHover: 0xFFE27A,
   wood: 0x7A5A3A, leaf: 0x437A2E, leafAlt: 0x356524, trunk: 0x6B4E33,
   air: 0xD9EEF7, flagIn: 0x4FA36B, flagOut: 0xC94B3D,
   shot: 0xFFD34D, spark: 0xFFE9A8, water: 0x5FA8D8,
 };
 NGN.THEMES = {
   grass: {},
-  snow: { sky: 0xC9DDEA, fog: 0xD6E4EE, grass: 0xE9F1F6, grassAlt: 0xD7E4EC, cliff: 0x9FB3C4, road: 0xB9C6D0, roadEdge: 0x8FA3B4, leaf: 0x4F7A62, leafAlt: 0x3E6650, trunk: 0x5A4634, slot: 0xB4BFC8, air: 0xFFFFFF, water: 0x8FC4E8 },
-  desert: { sky: 0xF2D9B0, fog: 0xF0DCC0, grass: 0xE0C287, grassAlt: 0xD2B276, cliff: 0xB0603A, road: 0xC48A5A, roadEdge: 0x8E5A36, leaf: 0x7FA34A, leafAlt: 0x6B8E3C, trunk: 0x7A5A3A, slot: 0xB89C78, air: 0xFFF3E0, water: 0x5FA8D8 },
-  lava: { sky: 0x3A2A33, fog: 0x4A3038, grass: 0x5A4650, grassAlt: 0x4C3A44, cliff: 0x2A1E24, road: 0xE0602A, roadEdge: 0x8A2E10, leaf: 0x6A3A2A, leafAlt: 0x502A20, trunk: 0x3A2420, slot: 0x8A7A80, air: 0xFFB070, water: 0xFF7A30 },
+  snow: { sky: 0x6C8293, fog: 0xD6E4EE, grass: 0xC4D2DB, grassAlt: 0xBECDD7, outer: 0x6C8293, outerAlt: 0x667C8D, cliff: 0x8FA3B4, road: 0xF7F9FB, roadEdge: 0x4E6274, leaf: 0x4F7A62, leafAlt: 0x3E6650, trunk: 0x5A4634, air: 0xFFFFFF, water: 0x8FC4E8 },
+  desert: { sky: 0x8E6B3F, fog: 0xF0DCC0, grass: 0xD6B978, grassAlt: 0xD0B372, outer: 0x8E6B3F, outerAlt: 0x88663B, cliff: 0xA0562F, road: 0xFBF1D8, roadEdge: 0x6B4426, leaf: 0x7FA34A, leafAlt: 0x6B8E3C, trunk: 0x7A5A3A, air: 0xFFF3E0, water: 0x5FA8D8 },
+  lava: { sky: 0x2A1F26, fog: 0x4A3038, grass: 0x6E5866, grassAlt: 0x695361, outer: 0x2A1F26, outerAlt: 0x271C23, cliff: 0x1E1418, road: 0xF6A860, roadEdge: 0x6E2208, leaf: 0x6A3A2A, leafAlt: 0x502A20, trunk: 0x3A2420, air: 0xFFB070, water: 0xFF7A30 },
 };
 NGN.ELEMENT_COLOR = { nature: 0x4FA36B, fire: 0xE0612F, ice: 0x6FC3E8, darkness: 0x6B3FA0, iron: 0x8E9AA5, astral: 0xE8C34A, storm: 0x3D6FD6 };
 NGN.ELEMENT_KO = { nature: '자연', fire: '불', ice: '얼음', darkness: '어둠', iron: '강철', astral: '천체', storm: '폭풍' };
@@ -89,7 +91,9 @@ NGN.World = class World {
     this.isMobile = ('ontouchstart' in window) || innerWidth < 700;
     this.quality = 3; // 3 최고 … 0 최저
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xB4D3DF, 60, 120);
+    // 🔴 안개를 끈다(2026-09-06 화면 설계 2판). 카메라가 판에서 229 떨어져 있는데 안개가 263 부터 껴서 판 뒤쪽이 하늘색 안개에 잠겼다(배포본 실측 234~407).
+    //    땅이 화면 끝까지 채우므로 안개 없이도 지평선이 안 보인다. 판이 안개에 잠기면 안 된다
+    this.scene.fog = null;
 
     // 화각 22° — 좁은 화각 + 멀리서 당겨 찍기(망원). 42° 였을 때는 화면 위쪽 줄이 거의 수직으로 내려다보여 납작하고 작게,
     // 아래쪽 줄은 옆이 보여 크게 나왔다(사장님 지적 2026-09-06 "앞쪽 타워는 왜 작게 나와"). 좁히면 판 전체가 같은 각도로 보인다
@@ -100,12 +104,14 @@ NGN.World = class World {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputEncoding = THREE.sRGBEncoding;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.86;
+    // 🔴 톤매핑을 끈다(2026-09-06 화면 설계 2판). ACES 는 실사 영화용 — 색을 부드럽게 뭉개서 카툰풍엔 정반대였고 노출 0.86 으로 전체가 어두웠다.
+    //    끄면 꼭짓점 색(속성색)이 그대로 나온다. "노출 1.0~1.1" 은 톤매핑이 없으면 적용이 안 되니 조명 세기를 그만큼 올린다(0.46→0.55 · 0.92→1.0)
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
     stage.appendChild(this.renderer.domElement);
 
-    this.scene.add(new THREE.HemisphereLight(0xCDE6F2, 0x46552F, 0.46));
-    const sun = new THREE.DirectionalLight(0xFFF0D2, 0.92);
+    this.scene.add(new THREE.HemisphereLight(0xE4F0F8, 0x46552F, 0.55));
+    const sun = new THREE.DirectionalLight(0xFFF0D2, 1.0);
     sun.position.set(20, 30, 14);
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.isMobile ? 1024 : 2048, this.isMobile ? 1024 : 2048);
@@ -145,10 +151,10 @@ NGN.World = class World {
     const C = Object.assign({}, NGN.C, NGN.THEMES[map.theme] || {});
     this.C = C; this.theme = NGN.THEMES[map.theme] ? map.theme : 'grass';
     this.scene.background = new THREE.Color(C.sky);
-    this.scene.fog.color = new THREE.Color(C.fog);
+    if (this.scene.fog) this.scene.fog.color = new THREE.Color(C.fog);
     const mat = (color, opts) => new THREE.MeshLambertMaterial(Object.assign({ color }, opts || {}));
     this.M = {
-      grass: mat(C.grass), grassAlt: mat(C.grassAlt), cliff: mat(C.cliff), road: mat(C.road), roadEdge: mat(C.roadEdge),
+      grass: mat(C.grass), grassAlt: mat(C.grassAlt), outer: mat(C.outer), outerAlt: mat(C.outerAlt), cliff: mat(C.cliff), road: mat(C.road), roadEdge: mat(C.roadEdge),
       stone: mat(C.stone), stoneDark: mat(C.stoneDark), slot: mat(C.slot), wood: mat(C.wood),
       leaf: mat(C.leaf), leafAlt: mat(C.leafAlt), trunk: mat(C.trunk),
       air: new THREE.MeshBasicMaterial({ color: C.air, transparent: true, opacity: 0.55 }),
@@ -226,16 +232,26 @@ NGN.World = class World {
   // 지형: 바닥 한 장 + 체커 타일(인스턴스 1회) + 가장자리 언덕(창고 절벽 블록 인스턴스 1회 — 없으면 상자 2회).
   // 땅은 판보다 훨씬 넓게(가로 +40 · 세로 +70 칸) — 세로 폰에서 정사각 판은 가로에 막혀 위아래가 남는데, 거기가 하늘색으로 비면 "지도가 작다"로 보인다.
   // 참고 게임(레이드 러시)처럼 땅이 화면을 끝까지 채우게 한다(2026-09-06)
+  // 명도 세 층(2026-09-06): 판 밖 큰 땅은 어둡게(outer), 판(BOUNDS + 여백 2.4칸)은 중간 밝기(grass)로 0.25 올려 무대처럼 떠 보이게, 판 가장자리에 어두운 테두리.
+  // 체커 타일은 판 안은 grassAlt, 판 밖은 outerAlt — 둘 다 인스턴스 1회씩
   buildGround() {
     const W = this.width + 40, D = this.depth + 70;
-    const ground = new THREE.Mesh(new THREE.BoxGeometry(W, 1, D), this.M.grass);
+    const ground = new THREE.Mesh(new THREE.BoxGeometry(W, 1, D), this.M.outer);
     ground.position.y = -0.5; ground.receiveShadow = true; this.root.add(ground);
-    const TILE = 3, tiles = [];
+    const PAD = this.boardPad = 2.4, BW = this.width + PAD * 2, BD = this.depth + PAD * 2;
+    // 판 테두리(어두운 띠 0.35칸) → 그 위에 판. 판 윗면 y=0 이 길·자리·타워의 바닥
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(BW + 0.7, 0.32, BD + 0.7), this.M.roadEdge);
+    rim.position.y = -0.18; rim.receiveShadow = true; this.root.add(rim);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(BW, 0.3, BD), this.M.grass);
+    board.position.y = -0.15; board.receiveShadow = true; this.root.add(board);
+    const TILE = 3, tiles = [], outerTiles = [];
     for (let x = -W / 2 + TILE / 2; x < W / 2; x += TILE) for (let z = -D / 2 + TILE / 2; z < D / 2; z += TILE) {
       if ((Math.round(x / TILE) + Math.round(z / TILE)) % 2) continue;
-      tiles.push({ x, y: 0.03, z });
+      const inside = Math.abs(x) < BW / 2 - TILE * 0.6 && Math.abs(z) < BD / 2 - TILE * 0.6;
+      (inside ? tiles : outerTiles).push({ x, y: inside ? 0.02 : -0.47, z });
     }
     instanced(new THREE.BoxGeometry(TILE, 0.06, TILE), this.M.grassAlt, tiles, this.root);
+    instanced(new THREE.BoxGeometry(TILE, 0.06, TILE), this.M.outerAlt, outerTiles, this.root);
     const hillsA = [], hillsB = [], blocks = []; this.hillSpots = [];
     for (let i = 0; i < 60; i++) {
       const ang = i / 60 * Math.PI * 2;
@@ -247,10 +263,10 @@ NGN.World = class World {
       this.hillSpots.push({ x, y: h, z });
     }
     // 창고 절벽 블록(풀 뚜껑 + 흙 옆면)을 테마 색으로 — 눈 테마는 돌 블록
-    const C = this.C, cliffP = this.theme === 'snow' ? { p: 'nature/cliff_block_stone', recolor: { grass: hexOf(C.grassAlt), stone: hexOf(C.cliff) } } : { p: 'nature/cliff_block_rock', recolor: { grass: hexOf(C.grassAlt), dirt: hexOf(C.cliff) } };
+    const C = this.C, cliffP = this.theme === 'snow' ? { p: 'nature/cliff_block_stone', recolor: { grass: hexOf(C.outerAlt), stone: hexOf(C.cliff) } } : { p: 'nature/cliff_block_rock', recolor: { grass: hexOf(C.outerAlt), dirt: hexOf(C.cliff) } };
     const cliff = this.piece(cliffP);
     if (cliff) instanced(cliff.g.geometry, cliff.g.material, blocks, this.root);
-    else { const hill = new THREE.BoxGeometry(TILE, 1, TILE); instanced(hill, this.M.cliff, hillsA, this.root); instanced(hill, this.M.grassAlt, hillsB, this.root); }
+    else { const hill = new THREE.BoxGeometry(TILE, 1, TILE); instanced(hill, this.M.cliff, hillsA, this.root); instanced(hill, this.M.outerAlt, hillsB, this.root); }
   }
 
   // 길: 폴리라인 구간마다 상자(구간 수만큼) + 진행 화살표 데칼(인스턴스 2회 — 입구 쪽 3개는 진하게) + 길 위 잔돌(인스턴스 1회) + 공중 점선(인스턴스 1회)
@@ -261,10 +277,11 @@ NGN.World = class World {
       const a = this.toWorld(road[i][0], road[i][1]), b = this.toWorld(road[i + 1][0], road[i + 1][1]);
       const len = a.distanceTo(b);
       const rot = -Math.atan2(b.z - a.z, b.x - a.x);
+      // 길 = 가장 밝은 색, 그 밑에 폭 +0.7 의 어두운 테두리(2026-09-06 — 길이 잔디와 명도가 같아 어디가 길인지 안 보였다)
       const seg = new THREE.Mesh(new THREE.BoxGeometry(len + ROAD_W, 0.12, ROAD_W), this.M.road);
       seg.position.copy(a).lerp(b, 0.5); seg.position.y = 0.06; seg.rotation.y = rot; seg.receiveShadow = true; this.root.add(seg);
-      const edge = new THREE.Mesh(new THREE.BoxGeometry(len + ROAD_W + 0.5, 0.08, ROAD_W + 0.5), this.M.roadEdge);
-      edge.position.copy(seg.position); edge.position.y = 0.02; edge.rotation.y = rot; edge.receiveShadow = true; this.root.add(edge);
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(len + ROAD_W + 0.7, 0.09, ROAD_W + 0.7), this.M.roadEdge);
+      edge.position.copy(seg.position); edge.position.y = 0.03; edge.rotation.y = rot; edge.receiveShadow = true; this.root.add(edge);
       segs.push({ a, b, len, dx: (b.x - a.x) / len, dz: (b.z - a.z) / len, ry: rot });
     }
     this.roadSegs = segs;
@@ -302,26 +319,47 @@ NGN.World = class World {
     this.root.add(pole, cloth);
   }
 
-  // 자리: 원판(개별 — 선택 색이 바뀐다) + 금색 점(인스턴스 1회, 길을 덮는 정도 1~3개)
+  // 자리(2026-09-06 화면 설계 2판): 흰 원판 + 금색 테두리 링. 원판은 InstancedMesh 하나(색으로 선택 표시), 금테는 조명을 안 받는 Basic 재질 InstancedMesh 하나 — 자리 수와 무관하게 그리기 2회.
+  // 비어 있는 자리는 금테가 은은히 숨 쉰다(render 에서 인스턴스 색 밝기를 사인파로) — "여기 지으라고". 타워가 서면(setSlotBuilt) 숨쉬기를 멈추고 얌전한 금색으로
   buildSlots() {
     this.slotMeshes = [];
-    const geo = new THREE.CylinderGeometry(1.5, 1.65, 0.3, 10);
-    const pips = [];
+    const geo = new THREE.CylinderGeometry(1.5, 1.65, 0.3, 14);
+    const pips = [], discs = [], rings = [];
+    this.slotBuilt = []; this.slotHi = [];
     for (const s of NGN.map.SLOTS) {
-      const m = new THREE.Mesh(geo, this.M.slot.clone());
-      m.position.copy(this.toWorld(s.x, s.y, 0.15));
-      m.castShadow = true; m.receiveShadow = true; m.userData.slotId = s.id;
+      const p = this.toWorld(s.x, s.y, 0.15);
+      discs.push({ x: p.x, y: p.y, z: p.z, cast: true }); rings.push({ x: p.x, y: 0.32, z: p.z });
+      this.slotBuilt[s.id] = false; this.slotHi[s.id] = false;
       const cover = NGN.map.coverageFor(s.id, 800, false);
       const n = cover > 2600 ? 3 : cover > 1900 ? 2 : 1;
-      for (let i = 0; i < n; i++) pips.push({ x: m.position.x + (i - (n - 1) / 2) * 0.45, y: 0.34, z: m.position.z + 0.95 });
-      this.root.add(m); this.slotMeshes.push(m);
+      for (let i = 0; i < n; i++) pips.push({ x: p.x + (i - (n - 1) / 2) * 0.45, y: 0.34, z: p.z + 0.95 });
     }
+    this.slotDisc = instanced(geo, this.M.slot, discs, this.root);
+    const ringGeo = new THREE.RingGeometry(1.32, 1.62, 40); ringGeo.rotateX(-Math.PI / 2);
+    this.slotRing = instanced(ringGeo, new THREE.MeshBasicMaterial({ color: 0xFFFFFF }), rings, this.root);
+    if (this.slotRing) this.slotRing.castShadow = false;
+    const white = new THREE.Color(0xFFFFFF), gold = new THREE.Color(this.C.slotEdge);
+    for (let i = 0; i < discs.length; i++) { if (this.slotDisc) this.slotDisc.setColorAt(i, white); if (this.slotRing) this.slotRing.setColorAt(i, gold); }
+    if (this.slotDisc && this.slotDisc.instanceColor) this.slotDisc.instanceColor.needsUpdate = true;
+    if (this.slotRing && this.slotRing.instanceColor) this.slotRing.instanceColor.needsUpdate = true;
     instanced(new THREE.CylinderGeometry(0.16, 0.16, 0.08, 8), this.M.pip, pips, this.root);
+    this._slotC = new THREE.Color();
   }
   setSlotHighlight(slotId, on) {
-    const m = this.slotMeshes[slotId]; if (!m) return;
-    m.material.color.setHex(on ? NGN.C.slotHover : this.C.slot);
-    m.material.emissive.setHex(on ? 0x443300 : 0x000000);
+    if (!this.slotDisc || slotId >= this.slotBuilt.length) return;
+    this.slotHi[slotId] = !!on;
+    this.slotDisc.setColorAt(slotId, this._slotC.setHex(on ? NGN.C.slotHover : 0xFFFFFF)); this.slotDisc.instanceColor.needsUpdate = true;
+  }
+  // 렌더러(syncTowers)가 판의 자리 상태를 알려 준다 — 빈 자리만 숨 쉰다
+  setSlotBuilt(slotId, built) { if (this.slotBuilt) this.slotBuilt[slotId] = !!built; }
+  breatheSlots(now) {
+    if (!this.slotRing || !this.slotRing.instanceColor) return;
+    const gold = this.C.slotEdge, c = this._slotC; let any = false;
+    for (let i = 0; i < this.slotBuilt.length; i++) {
+      const k = this.slotHi[i] ? 1.25 : this.slotBuilt[i] ? 0.85 : 0.72 + 0.4 * (0.5 + 0.5 * Math.sin(now * 0.0028 + i * 0.9));
+      c.setHex(gold).multiplyScalar(k); this.slotRing.setColorAt(i, c); any = true;
+    }
+    if (any) this.slotRing.instanceColor.needsUpdate = true;
   }
 
   // ---------- 성(출구)·동굴(입구) ----------
@@ -432,8 +470,10 @@ NGN.World = class World {
     const set = this.models && this.parts && this.parts.scenery && (this.parts.scenery[this.theme] || this.parts.scenery.grass);
     if (set && set.length) this.buildKenneyScenery(set, ponds, rnd);
     else this.buildSceneryFallback(ponds, rnd);
-    this.buildPathStones(rnd);
+    // 길 위 잔돌은 뺐다(2026-09-06) — 길을 또렷하게 하는 데 노이즈였다. 판 안에는 장식을 하나도 안 둔다
   }
+  // 판 안(BOUNDS + 여백)인가 — 장식은 판 안에 놓지 않는다(2026-09-06 "장식 570개가 판 안에도 있어 산만하다")
+  insideBoard(x, z, extra = 0) { const pad = (this.boardPad || 2.4) + extra; return Math.abs(x) < this.width / 2 + pad && Math.abs(z) < this.depth / 2 + pad; }
   // 길과 자리와 성·동굴에서 떨어졌나(세계 단위). 길은 폴리라인 구간까지의 거리로 잰다
   roadDist(x, z) {
     let d = Infinity;
@@ -505,21 +545,16 @@ NGN.World = class World {
       return true;
     };
     // 자리 만들기
-    const genEdge = () => { const x = -hw - 3.5 + rnd() * (2 * hw + 7), z = -hd - 3.5 + rnd() * (2 * hd + 7); return freeAt(x, z, 0.5) ? { x, z, zone: 'edge' } : null; };
+    // 🔴 판 안에는 장식을 하나도 놓지 않는다(2026-09-06). 판 둘레(edge)는 판 테두리 바깥 0.4~6.5칸 띠, 먼 땅(far)은 그 밖.
+    //    길 옆(road) 장식은 전부 판 안이라 뺐다 — 울타리·가로등·수레가 타워 자리와 뒤섞여 어디가 자리인지 헷갈리게 했다. 개수(230+300)는 그대로라 안 산만해진다
+    const EDGE_W = 6.5;
+    const genEdge = () => { const x = -hw - EDGE_W + rnd() * (2 * hw + 2 * EDGE_W), z = -hd - EDGE_W + rnd() * (2 * hd + 2 * EDGE_W); if (this.insideBoard(x, z, 0.4)) return null; return freeAt(x, z, 0.5) ? { x, z, zone: 'edge' } : null; };
     const genFar = () => {
       const x = -(hw + 18) + rnd() * (2 * hw + 36), z = -(hd + 33) + rnd() * (2 * hd + 66);
-      if (Math.abs(x) < hw + 3.5 && Math.abs(z) < hd + 3.5) return null; // 판 둘레는 edge 몫
+      if (Math.abs(x) < hw + EDGE_W && Math.abs(z) < hd + EDGE_W) return null; // 판 둘레는 edge 몫
       return freeAt(x, z, 0.5) ? { x, z, zone: 'far' } : null;
     };
     const roadSpots = [];
-    this.roadSegs.forEach((sg, i) => {
-      const nx = -sg.dz, nz = sg.dx;
-      for (let t = 1.6; t < sg.len - 1.6; t += 2.4 + rnd() * 0.8) for (const side of [1, -1]) {
-        const off = side * (1.1 + 1.0 + rnd() * 0.5), x = sg.a.x + sg.dx * t + nx * off, z = sg.a.z + sg.dz * t + nz * off;
-        if (this.roadDist(x, z) < 1.9 || !freeAt(x, z, 0.4, true)) continue;
-        roadSpots.push({ x, z, ry: sg.ry, zone: 'road' });
-      }
-    });
     const waterSpots = [], pondSpots = [];
     for (const p of pondsW) {
       for (let i = 0; i < 14; i++) { const a = rnd() * Math.PI * 2, d = p.r * 1.25 + 0.4 + rnd() * 1.0; const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; if (freeAt(x, z, 0.3)) waterSpots.push({ x, z, zone: 'water', faceRy: headingRy(p.x - x, p.z - z), bridgeX: p.x + Math.cos(a) * p.r * 1.05, bridgeZ: p.z + Math.sin(a) * p.r * 1.05 }); }
@@ -542,22 +577,6 @@ NGN.World = class World {
     while (hillSpots.length) { const sp = hillSpots.pop(); if (rnd() > 0.6) continue; const it = pick(pools.hill); if (!it) break; put(it, sp); }
     this.sceneryMeshes = col.flush(null, true); // 장식 전체 = 메시 2개(그림자 있는 판 둘레 / 없는 먼 땅)
     this.sceneryCount = placed;
-  }
-  // 길 위 잔돌(nature/path_stone, 길 색에 맞춰 — 흙길에 질감). 구간마다 2.2칸 간격으로 절반 확률. 인스턴스 1회. 모델 없으면 건너뛴다
-  buildPathStones(rnd) {
-    if (!this.models) return;
-    const C = this.C, road = new THREE.Color(C.road), light = road.clone().offsetHSL(0, -0.05, 0.08), dark = new THREE.Color(C.roadEdge);
-    const P = { p: 'nature/path_stone', recolor: { stone: hexOf(light), stoneDark: hexOf(dark), _defaultMat: hexOf(road) } };
-    const items = [];
-    this.roadSegs.forEach((sg, i) => {
-      const last = i === this.roadSegs.length - 1, nx = -sg.dz, nz = sg.dx;
-      for (let t = i === 0 ? 3.0 : 1.2; t < sg.len - (last ? 3.6 : 0.8); t += 2.2) {
-        if (rnd() > 0.5) continue;
-        const off = (rnd() - 0.5) * 1.1;
-        items.push({ x: sg.a.x + sg.dx * t + nx * off, y: 0.125, z: sg.a.z + sg.dz * t + nz * off, ry: sg.ry + (rnd() - 0.5) * 0.7, s: 1.0 + rnd() * 0.4 });
-      }
-    });
-    const r = this.piece(P); if (r) instanced(r.g.geometry, r.g.material, items, this.root);
   }
   // 옛 코드 도형 장식(모델이 없을 때): 침엽수·둥근 나무·바위·꽃. 길·자리와 안 겹치는 곳에 고정 시드로. 전부 인스턴스
   buildSceneryFallback(ponds, rnd) {
@@ -649,8 +668,8 @@ NGN.World = class World {
     this.camera.lookAt(look);
     this.camBase.copy(this.camera.position); // 흔들림(shake)의 기준 위치
     this.dist = dist;
-    // 안개는 판 너머(카메라 거리의 1.15배)부터 — 판 위 물체는 안개에 안 먹는다. 카메라 거리로 정해야 화각을 바꿔도 뿌예지지 않는다
-    this.scene.fog.near = dist * (this.quality <= 0 ? 1.05 : 1.15); this.scene.fog.far = dist * (this.quality <= 0 ? 1.5 : 2.0);
+    // 안개는 껐다(2026-09-06). 남겨 두면(fog 가 있으면) 판 너머(카메라 거리의 1.15배)부터만
+    if (this.scene.fog) { this.scene.fog.near = dist * (this.quality <= 0 ? 1.05 : 1.15); this.scene.fog.far = dist * (this.quality <= 0 ? 1.5 : 2.0); }
     this.camera.near = Math.max(1, dist * 0.05); this.camera.far = dist * 3;
     this.camera.updateProjectionMatrix();
   }
@@ -686,6 +705,7 @@ NGN.World = class World {
       if (this.gateMesh) this.gateMesh.rotation.y = Math.sin(now * 0.05) * 0.14 * k;
       for (const f of this.flagMeshes) f.rotation.z = Math.sin(now * 0.04) * 0.22 * k;
     }
+    this.breatheSlots(now); // 빈 자리 금테가 숨 쉰다(인스턴스 색만 갱신 — 그리기 횟수 0 증가)
     this.renderer.render(this.scene, this.camera);
   }
 };

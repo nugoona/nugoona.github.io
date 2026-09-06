@@ -33,7 +33,8 @@ NGN.shapeData = function shapeData(raw) {
   for (const t of raw.towers.towers) (byFamily[t.family] ||= [])[t.tier - 1] = t;
   const families = Object.keys(byFamily);
   NGN.FAMILY_NAMES = {};
-  for (const f of families) NGN.FAMILY_NAMES[f] = byFamily[f][0].familyName;
+  NGN.FAMILY_INFO = {}; // 계열 → { element, role, grade } — 3D 부품 표(kenney_parts.json)에 없는 새 계열(뽑기 20종, 2026-09-06)이 같은 속성의 실루엣을 빌릴 때 models.js 가 읽는다
+  for (const f of families) { const t = byFamily[f][0]; NGN.FAMILY_NAMES[f] = t.familyName; NGN.FAMILY_INFO[f] = { element: t.element, role: t.role, grade: t.등급 || 'basic', attackType: t.attackType }; }
   // 지도들: maps.json 의 정의 → 지도 객체(sim/map.js 의 createMap). 고른 지도가 NGN.map 이 된다
   const maps = NGN.buildIndex(raw.maps.maps);
   return {
