@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>조카 디펜스</title>
+<title>P의 디펜스</title>
 <link rel="icon" href="data:,">
 <style>@font-face {
   font-family: 'Jua';
@@ -1071,7 +1071,7 @@
 <!-- 메인 메뉴: 배경은 3D 지도(다음 스테이지)가 천천히 돈다. 큰 [▶ 스테이지 N], 그 아래 [무한](스테이지 10 뒤 열림), 가장자리에 뽑기·기록·설정 -->
 <section id="menu" class="overlay" hidden>
   <div class="menu-top"><span class="pill" id="menuTickets"></span><span class="pill" id="menuStars"></span><span class="spacer"></span><span class="pill" id="menuBest"></span></div>
-  <h1 class="title">조카 디펜스</h1>
+  <h1 class="title">P의 디펜스</h1>
   <div class="menu-side">
     <button class="rbtn" id="menuGacha"><span class="circ"><svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M20 7h-2.2A3 3 0 0 0 13 3.3 3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3h18V8a1 1 0 0 0-1-1zM8.3 5.5c.8 0 2 .7 2.9 1.5H8.5a1 1 0 0 1-.2-1.5zm7.4 0a1 1 0 0 1-.2 1.5h-2.7c.9-.8 2.1-1.5 2.9-1.5zM4 13v7a1 1 0 0 0 1 1h6v-8H4zm9 8h6a1 1 0 0 0 1-1v-7h-7v8z"/></svg></span>뽑기<span class="dot" id="menuGachaDot" hidden></span></button>
     <button class="rbtn" id="menuRecords"><span class="circ"><svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M5 21V10h4v11H5zm5 0V3h4v18h-4zm5 0v-7h4v7h-4z"/></svg></span>기록</button>
@@ -7472,7 +7472,7 @@ NGN.UI = class UI {
       <div class="row"><button class="btn green" data-k="export" style="flex:1">내보내기</button><button class="btn blue" data-k="import" style="flex:1">가져오기</button></div>
       <div class="row"><span class="grow">홈 화면에 추가 <span class="sub" style="color:#6B5A48">아이폰은 7일 안 들어오면 저장이 지워져요 — 홈 화면 앱은 안 지워져요</span></span><button class="btn gray" data-k="a2hs">방법</button></div>
       <div class="row"><span class="grow">기록 지우기</span><button class="btn red" data-k="reset">지우기</button></div>
-      <div class="row"><span class="grow sub" style="color:#6B5A48">조카 디펜스 · 밸런스는 YouTD 2(MIT), 그래픽은 Kenney(CC0), 압축은 lz-string(MIT)</span></div>`;
+      <div class="row"><span class="grow sub" style="color:#6B5A48">P의 디펜스 · 밸런스는 YouTD 2(MIT), 그래픽은 Kenney(CC0), 압축은 lz-string(MIT)</span></div>`;
     $('settingList').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => this.onSettingLocal(b.dataset.k)));
   }
   async onSettingLocal(k) {
