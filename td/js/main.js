@@ -74,7 +74,7 @@ NGN.serverNow = async function serverNow() {
   const SPEEDS = [1, 2, 3];
   let tutorialStep = 0;
   // 웨이브 자동 시작(①): nextWaveAt = 다음 웨이브까지 남은 초(null 이면 카운트다운 없음). frame() 이 실제 시간으로 줄인다 — 배속과 무관, 일시정지·튜토리얼 중엔 멈춤
-  const PREP_SEC = 12, BETWEEN_SEC = 10;
+  const PREP_SEC = 12, BETWEEN_SEC = 10, FIRST_PREP_SEC = 20;
   let nextWaveAt = null;
   let paused = false; // 일시정지(②): 엔진 틱·카운트다운·연출 시간이 전부 멈춘다(화면은 그대로 그린다)
   let slowmo = 1, slowmoLeft = 0; // 보스 등장 슬로우모션(③): acc 에 곱하는 계수. speed 는 안 건드린다(버튼 배속이 그대로 살아 있게)
@@ -144,7 +144,7 @@ NGN.serverNow = async function serverNow() {
       if (game.build(slotId, fam)) {
         renderer.syncTowers(game); ui.afterBuild(slotId); ui.toast(`${game.slots[slotId].def.name} 지음`); NGN.sound && NGN.sound.play('build');
         // 튜토리얼 3단계: 첫 타워를 지었다 → 멈춰 있던 카운트다운이 흐른다. 너무 짧게 남았으면 8초는 준다(조카가 화면을 읽을 시간)
-        if (tutorialStep === 2) { tutorialStep = 3; if (nextWaveAt !== null && nextWaveAt < 8) nextWaveAt = 8; setTimeout(() => ui.toast('곧 적이 와요 — ▶ 를 누르면 바로 시작(골드 보너스)'), 900); }
+        if (tutorialStep === 2) { tutorialStep = 3; if (nextWaveAt !== null && nextWaveAt < 6) nextWaveAt = 6; setTimeout(() => ui.toast('곧 적이 와요 — ▶ 를 누르면 바로 시작(골드 보너스)'), 900); }
       }
       else ui.toast(`골드가 모자라요 (${game.byFamily[fam][0].cost} 필요)`);
     },
@@ -195,7 +195,7 @@ NGN.serverNow = async function serverNow() {
     world.warmup = 0;
     resetBattleFx(); lastLives = game.lives;
     castleUpdate();
-    scheduleWave(PREP_SEC); // 준비 시간 뒤 1웨이브가 저절로 온다(AI 플레이는 startInfinite 가 즉시 startWave)
+    scheduleWave(tutorialStep === 1 ? FIRST_PREP_SEC : PREP_SEC); // 준비 시간 뒤 1웨이브가 저절로 온다(첫 판은 20초 — 카드를 고르고 짓는 법을 읽을 시간. AI 플레이는 startInfinite 가 즉시 startWave)
     window.game = game;
   }
   // ---------- 웨이브 자동 시작(①) ----------
@@ -380,7 +380,8 @@ NGN.serverNow = async function serverNow() {
     // 보스 슬로우모션(③): 0.9초 뒤 원래 배속으로. speed 변수는 안 건드린다
     if (slowmoLeft > 0) { slowmoLeft -= dt; if (slowmoLeft <= 0) { slowmoLeft = 0; slowmo = 1; } }
     // 카운트다운(①): 실제 시간으로 줄인다(배속 무관). 첫 판 튜토리얼 1·2단계(타워 하나를 짓기 전)엔 멈춘다 — 3단계(지은 뒤)부턴 흐른다
-    if (game && !game.wave && !ended && nextWaveAt !== null && dt > 0 && !(tutorialStep === 1 || tutorialStep === 2)) {
+    // 🔴 튜토리얼(첫 판) 중에도 멈추지 않는다 — 멈추게 두었더니 첫 판(저장에 판 수 0)에서 '다음 12초'가 영영 안 줄었다(코디네이터 폰 실측 2026-09-06). 대신 첫 판은 준비 시간을 20초로 준다
+    if (game && !game.wave && !ended && nextWaveAt !== null && dt > 0) {
       nextWaveAt -= dt;
       if (nextWaveAt <= 0) startWave();
       else { const wv = nextWave(); if (wv) ui.setCountdown(nextWaveAt, wv, callBonus(nextWaveAt, wv)); }
