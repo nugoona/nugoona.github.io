@@ -71,8 +71,17 @@ class Game {
   baseTierIndex() { return Math.max(0, Math.min(2, Math.round(this.perks.baseTier || 0))); }
   // 지금 지으면 실제로 세워지는 정의(기본기 반영). 값은 costToBuild 가 따로 — 늘 1단 값이다
   buildDef(familyKey) { const chain = this.byFamily[familyKey]; return chain[Math.min(this.baseTierIndex(), chain.length - 1)]; }
-  // 🛑 기본기가 있어도 값은 1단 값. 제값(2단 140)을 받으면 타워를 4개밖에 못 지어 오히려 스테이지 10에서 실패한다(조사자 실측, checklist I-6)
-  costToBuild(familyKey) { return this.byFamily[familyKey][0].cost; }
+  // 기본기로 올라간 단의 값 = 1단 값과 제값의 사이(balance.upgrade.baseTierPay, 기본 0.5).
+  // 🛑 제값(2단 140)을 다 받으면 타워를 4개밖에 못 지어 오히려 실패한다(checklist I-6).
+  // 🛑 그렇다고 1단 값(30)만 받으면 4.6배 이득이라 **그 한 칸이 강화 나무 전체보다 세진다**(2026-09-06 실측:
+  //    별 5개까지 스테이지 12 클리어율 0% → 6개에서 체력 3배에도 만점). 절반만 깎아 계단을 경사로로 편다.
+  costToBuild(familyKey) {
+    const chain = this.byFamily[familyKey];
+    const i = Math.min(this.baseTierIndex(), chain.length - 1);
+    if (i === 0) return chain[0].cost;
+    const pay = (this.balance.upgrade && this.balance.upgrade.baseTierPay != null) ? this.balance.upgrade.baseTierPay : 0.5;
+    return Math.round(chain[0].cost + (chain[i].cost - chain[0].cost) * pay);
+  }
   costToUpgrade(inst) {
     const next = this.byFamily[inst.def.family][inst.def.tier];
     if (!next) return Infinity;

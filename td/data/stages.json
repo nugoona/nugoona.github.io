@@ -947,7 +947,7 @@
     ]
   },
   "upgradeTree": {
-    "_설명": "별을 쓰는 곳. 언제든 무료로 전부 되돌릴 수 있다(리스펙). 전부 찍으려면 91별(네 갈래 85 + 기본기 6 — 기본기 2칸은 뺐다, 아래 _주의). 난이도 둘(보통·어려움)을 다 하면 별 120개를 벌 수 있어 여유가 1.3배 남는다(쉬움을 폐지하기 전 180 → 120, 2026-09-06). 킹덤 러시(130 중 65)보다 빡빡하지만 전부 찍고도 29별이 남는다. 40별짜리였을 때는 스테이지 14~18 에서 성장이 끝나 남은 판이 무의미했다(checklist I-4). 기본기는 '짧은 판에서 타워가 안 자라는' 문제의 해법(checklist I-6).",
+    "_설명": "별을 쓰는 곳. 언제든 무료로 전부 되돌릴 수 있다(리스펙). 전부 찍으려면 91별 / 벌 수 있는 별 120. 🔴 2026-09-06 개편: 기본기 한 칸이 3배 효과이고 나머지 30칸이 거의 0이라 '조금씩 강해지는' 감각이 물리적으로 불가능했다. 기본기 값 할인을 절반으로 줄이고(balance.upgrade.baseTierPay) 나머지 칸을 세게 만들어(공격 5→8% · 사거리 4→5% · 골드 35→50 · 생명 2→3) 계단을 경사로로 폈다.",
     "basics": {
       "name": "기본기",
       "icon": "🏗️",
@@ -978,7 +978,7 @@
         5
       ],
       "perStep": {
-        "allDmg": 0.05
+        "allDmg": 0.08
       }
     },
     "range": {
@@ -994,7 +994,7 @@
         5
       ],
       "perStep": {
-        "rangeMul": 0.04
+        "rangeMul": 0.05
       }
     },
     "gold": {
@@ -1011,7 +1011,7 @@
         5
       ],
       "perStep": {
-        "startGold": 35
+        "startGold": 50
       }
     },
     "life": {
@@ -1027,7 +1027,7 @@
         5
       ],
       "perStep": {
-        "lives": 2
+        "lives": 3
       }
     }
   },
@@ -1039,7 +1039,7 @@
         "preset": "serpent"
       },
       "waves": 8,
-      "hpMul": 1.47,
+      "hpMul": 0.68,
       "startGold": 100,
       "lives": 10,
       "firstClearTickets": 3
@@ -1051,7 +1051,7 @@
         "preset": "corridor"
       },
       "waves": 8,
-      "hpMul": 1.37,
+      "hpMul": 0.72,
       "startGold": 100,
       "lives": 10,
       "firstClearTickets": 3
@@ -1063,7 +1063,7 @@
         "preset": "crossing"
       },
       "waves": 8,
-      "hpMul": 1.72,
+      "hpMul": 0.97,
       "startGold": 100,
       "lives": 10,
       "firstClearTickets": 3
@@ -1075,7 +1075,7 @@
         "preset": "spiral"
       },
       "waves": 8,
-      "hpMul": 3.57,
+      "hpMul": 1.8,
       "startGold": 100,
       "lives": 10,
       "firstClearTickets": 3
@@ -1087,7 +1087,7 @@
         "preset": "snow"
       },
       "waves": 12,
-      "hpMul": 2.31,
+      "hpMul": 1.67,
       "startGold": 115,
       "lives": 12,
       "firstClearTickets": 3
@@ -1099,7 +1099,7 @@
         "preset": "desert"
       },
       "waves": 12,
-      "hpMul": 2.46,
+      "hpMul": 1.89,
       "startGold": 115,
       "lives": 12,
       "firstClearTickets": 3
@@ -1111,7 +1111,7 @@
         "seed": 3
       },
       "waves": 12,
-      "hpMul": 3.03,
+      "hpMul": 2.92,
       "startGold": 115,
       "lives": 12,
       "firstClearTickets": 3
@@ -1123,7 +1123,7 @@
         "seed": 7
       },
       "waves": 12,
-      "hpMul": 3.13,
+      "hpMul": 2.62,
       "startGold": 115,
       "lives": 12,
       "firstClearTickets": 3
@@ -1135,7 +1135,7 @@
         "seed": 11
       },
       "waves": 12,
-      "hpMul": 2.9,
+      "hpMul": 3.17,
       "startGold": 115,
       "lives": 12,
       "firstClearTickets": 3
@@ -1147,7 +1147,7 @@
         "seed": 15
       },
       "waves": 16,
-      "hpMul": 2.72,
+      "hpMul": 1.96,
       "startGold": 125,
       "lives": 15,
       "firstClearTickets": 3
@@ -1159,7 +1159,7 @@
         "seed": 23
       },
       "waves": 16,
-      "hpMul": 2.85,
+      "hpMul": 2.46,
       "startGold": 125,
       "lives": 15,
       "firstClearTickets": 3
@@ -1171,7 +1171,7 @@
         "seed": 27
       },
       "waves": 16,
-      "hpMul": 3.7,
+      "hpMul": 4.59,
       "startGold": 125,
       "lives": 15,
       "firstClearTickets": 3
@@ -1183,7 +1183,7 @@
         "seed": 31
       },
       "waves": 16,
-      "hpMul": 3.97,
+      "hpMul": 4.3,
       "startGold": 125,
       "lives": 15,
       "firstClearTickets": 3
@@ -1195,7 +1195,7 @@
         "seed": 19
       },
       "waves": 16,
-      "hpMul": 5.46,
+      "hpMul": 5.69,
       "startGold": 125,
       "lives": 15,
       "firstClearTickets": 3
@@ -1207,7 +1207,7 @@
         "seed": 39
       },
       "waves": 20,
-      "hpMul": 3.63,
+      "hpMul": 3.93,
       "startGold": 135,
       "lives": 18,
       "firstClearTickets": 3
@@ -1231,7 +1231,7 @@
         "seed": 43
       },
       "waves": 20,
-      "hpMul": 4.13,
+      "hpMul": 6.31,
       "startGold": 135,
       "lives": 18,
       "firstClearTickets": 3
@@ -1243,7 +1243,7 @@
         "seed": 47
       },
       "waves": 20,
-      "hpMul": 6.67,
+      "hpMul": 8.33,
       "startGold": 135,
       "lives": 18,
       "firstClearTickets": 3
@@ -1255,7 +1255,7 @@
         "seed": 35
       },
       "waves": 20,
-      "hpMul": 7.3,
+      "hpMul": 9.41,
       "startGold": 135,
       "lives": 18,
       "firstClearTickets": 3
@@ -1267,7 +1267,7 @@
         "preset": "spiral"
       },
       "waves": 30,
-      "hpMul": 4.1,
+      "hpMul": 4.88,
       "startGold": 150,
       "lives": 20,
       "firstClearTickets": 3

@@ -606,6 +606,7 @@
 <!-- 부팅: 스크립트를 하나씩 받으며 로딩 막대를 채운다(0~30%). 그 뒤 데이터·모델은 main.js 가 NGN_LOADING 으로 이어 채운다.
      파일 위치는 window.__NGN_PATHS__(나눔 빌드가 넣는다)로 바꾼다. 번들(단일 HTML)은 __NGN_INLINE__ 을 세워 이 목록을 안 받고 뒤에 인라인된 것을 쓴다.
      SCRIPTS 는 유효한 JSON 배열이어야 한다 — game/build.js·bundle.js 가 이 줄을 읽는다 -->
+<script>window.__NGN_VERSION__ = "9de0be7c2f"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
 <script>
 (function () {
   const P = Object.assign({ sim: '../sim/', vendor: 'vendor/', data: '../data/', assets: '../assets/' }, window.__NGN_PATHS__ || {});
