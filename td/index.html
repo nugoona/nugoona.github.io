@@ -849,12 +849,12 @@
   /* 하단 한 줄: [돌리기] [카드…] [▶]. 카드 = 타워 그림 + 값. 이름은 고른 카드 위에만 뜬다(글자 최소) */
   #bottom { position: fixed; left: 6px; right: 6px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 10; display: flex; gap: 6px; align-items: flex-end; pointer-events: none; }
   #bottom > * { pointer-events: auto; }
-  #towerBar { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; overflow-y: visible; padding: 14px 2px 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  #towerBar { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; overflow-y: visible; padding: 12px 2px 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   #towerBar::-webkit-scrollbar { display: none; }
-  .tcard { flex: 0 0 62px; height: 78px; position: relative; border-radius: 12px; border: 2px solid rgba(255,255,255,.7); box-shadow: 0 3px 0 rgba(0,0,0,.35), inset 0 -14px 0 rgba(0,0,0,.18); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; cursor: pointer; padding: 0 0 3px; font: inherit; color: #fff; text-shadow: var(--stroke); transition: transform .05s; overflow: visible; }
+  .tcard { flex: 0 0 60px; height: 70px; position: relative; border-radius: 12px; border: 2px solid rgba(255,255,255,.7); box-shadow: 0 3px 0 rgba(0,0,0,.35), inset 0 -14px 0 rgba(0,0,0,.18); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; cursor: pointer; padding: 0 0 3px; font: inherit; color: #fff; text-shadow: var(--stroke); transition: transform .05s; overflow: visible; }
   .tcard:active { transform: translateY(2px); }
-  .tcard .art { position: absolute; left: 0; right: 0; top: -8px; height: 60px; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
-  .tcard .art img { width: 62px; height: 62px; filter: drop-shadow(0 3px 2px rgba(0,0,0,.45)); }
+  .tcard .art { position: absolute; left: 0; right: 0; top: -10px; height: 56px; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+  .tcard .art img { width: 58px; height: 58px; filter: drop-shadow(0 3px 2px rgba(0,0,0,.45)); }
   .tcard .art svg { width: 30px; height: 30px; display: block; margin-bottom: 10px; }
   .tcard .pr { font-size: 13px; background: rgba(0,0,0,.5); border-radius: 999px; padding: 0 7px; color: var(--gold); display: inline-flex; align-items: center; gap: 2px; line-height: 17px; }
   .tcard .pr svg { width: 11px; height: 11px; }
@@ -866,7 +866,7 @@
   .tcard .aff svg { width: 12px; height: 12px; }
   .tcard .aff.up { background: var(--green2); } .tcard .aff.down { background: var(--red2); }
   .tcard .bt { position: absolute; top: -6px; right: -5px; font-size: 10px; background: var(--gold); color: #3a2a00; text-shadow: none; border: 2px solid #fff; border-radius: 999px; padding: 0 5px; line-height: 14px; }
-  #waveBtn { width: 64px; height: 64px; border-radius: 50%; padding: 0; min-height: 0; flex: 0 0 auto; font-size: 22px; border-width: 3px; position: relative; }
+  #waveBtn { width: 60px; height: 60px; border-radius: 50%; padding: 0; min-height: 0; flex: 0 0 auto; font-size: 22px; border-width: 3px; position: relative; }
   #waveBtn svg { width: 34px; height: 34px; }
   #waveBtn.running { background: #6B7C86; border-color: #3E4A52; --sh: #3E4A52; box-shadow: 0 5px 0 #3E4A52; }
   #waveBtn .spd { position: absolute; bottom: -6px; right: -4px; background: var(--gold); color: #3a2a00; text-shadow: none; border: 2px solid #fff; border-radius: 999px; font-size: 11px; line-height: 14px; padding: 0 5px; }
@@ -6285,6 +6285,10 @@ NGN.World = class World {
     const B = map.BOUNDS;
     this.cx = (B.minX + B.maxX) / 2; this.cz = (B.minY + B.maxY) / 2;
     this.width = (B.maxX - B.minX) * NGN.SCALE; this.depth = (B.maxY - B.minY) * NGN.SCALE;
+    // 기본 방향: 0° 와 90° 중 판이 더 크게 나오는 쪽(카메라 거리가 짧은 쪽). [돌리기]는 여기에 90° 씩 더한다
+    this.camera.aspect = this.stage.clientWidth / Math.max(1, this.stage.clientHeight) || this.camera.aspect;
+    this.baseAngle = this.camDist(0) <= this.camDist(Math.PI / 2) ? 0 : Math.PI / 2;
+    this.camAngle = this.baseAngle;
     this.buildGround();
     this.buildPaths();
     this.buildSlots();
@@ -6293,9 +6297,11 @@ NGN.World = class World {
   }
   toWorld(x, y, h = 0) { return new THREE.Vector3((x - this.cx) * NGN.SCALE, h, (y - this.cz) * NGN.SCALE); }
 
-  // 지형: 바닥 한 장 + 체커 타일(인스턴스 1회) + 가장자리 언덕(인스턴스 2회)
+  // 지형: 바닥 한 장 + 체커 타일(인스턴스 1회) + 가장자리 언덕(인스턴스 2회).
+  // 땅은 판보다 훨씬 넓게(가로 +40 · 세로 +70 칸) — 세로 폰에서 정사각 판은 가로에 막혀 위아래가 남는데, 거기가 하늘색으로 비면 "지도가 작다"로 보인다.
+  // 참고 게임(레이드 러시)처럼 땅이 화면을 끝까지 채우게 한다(2026-09-06)
   buildGround() {
-    const W = this.width + 14, D = this.depth + 14;
+    const W = this.width + 40, D = this.depth + 70;
     const ground = new THREE.Mesh(new THREE.BoxGeometry(W, 1, D), this.M.grass);
     ground.position.y = -0.5; ground.receiveShadow = true; this.root.add(ground);
     const TILE = 3, tiles = [];
@@ -6386,8 +6392,12 @@ NGN.World = class World {
     }
     const trunks = [], cones1 = [], cones2 = [], rounds1 = [], rounds2 = [], rocks1 = [], rocks2 = [], flowers = [[], [], [], []];
     let placed = 0;
-    for (let i = 0; i < 500 && placed < 110; i++) {
-      const x = B.minX - 300 + rnd() * (B.maxX - B.minX + 600), y = B.minY - 300 + rnd() * (B.maxY - B.minY + 600);
+    // 판 둘레 ±3칸에 110개 + 늘어난 땅(가로 ±20 · 세로 ±35칸)에 140개 더 — 전부 인스턴스라 그리기 횟수는 그대로
+    for (let i = 0; i < 1400 && placed < 250; i++) {
+      const far = placed >= 110;
+      const mx = far ? 2000 : 300, my = far ? 3500 : 300;
+      const x = B.minX - mx + rnd() * (B.maxX - B.minX + 2 * mx), y = B.minY - my + rnd() * (B.maxY - B.minY + 2 * my);
+      if (far && x > B.minX - 300 && x < B.maxX + 300 && y > B.minY - 300 && y < B.maxY + 300) continue; // 먼 쪽은 판 둘레를 피한다
       if (!free(x, y)) continue;
       if (ponds.some(([px, py, pr]) => (x - px) ** 2 + (y - py) ** 2 < (pr + 150) ** 2)) continue;
       placed++;
@@ -6421,13 +6431,29 @@ NGN.World = class World {
   // 판 전체가 화면에 들어오는 가장 가까운 거리를 계산한다. 세로 폰에서는 거의 언제나 가로폭이 한계라(폭 35 단위 ≈ 390px) 그 거리가 된다.
   // 기울기 62°(세로) — 72° 는 너무 수직이라 타워가 원판처럼 보였다. 62° 면 옆면이 보여 "탑"으로 읽힌다.
   // 실측(2026-09-06, 390×844, 20개 지도): 위 줄 대비 아래 줄 타워 폭 비율 1.03~1.10(옛 42°·72° 는 1.04~1.13 에 각도 차이까지 겹쳤다), 판 x 8~382 · y 134~637(HUD·카드 바와 안 겹침)
-  placeCamera() {
-    const fov = this.camera.fov * Math.PI / 180, aspect = this.camera.aspect;
+  // 카메라 방향(camAngle)에 따라 판의 가로·세로 폭이 달라진다 — 네 모서리를 돌려 재고, 그 폭으로 거리를 정한다.
+  // 가로로 긴 지도(스테이지 9·10·14·15 등)는 setMap 이 기본 방향을 90° 돌려 긴 변을 세로로 세운다(세로 폰은 가로가 한계라 그쪽이 더 크게 나온다)
+  boardExtent(angle) {
+    const c = Math.cos(angle), s = Math.sin(angle), hw = this.width / 2, hd = this.depth / 2;
+    let x = 0, z = 0;
+    for (const [px, pz] of [[hw, hd], [hw, -hd], [-hw, hd], [-hw, -hd]]) { x = Math.max(x, Math.abs(px * c - pz * s)); z = Math.max(z, Math.abs(px * s + pz * c)); }
+    return { w: x * 2, d: z * 2 };
+  }
+  camDist(angle) {
+    const fov = this.camera.fov * Math.PI / 180, aspect = this.camera.aspect || 0.5;
     const portrait = aspect < 1;
     const pitch = (portrait ? 62 : 56) * Math.PI / 180;
-    const needV = this.depth * Math.sin(pitch) + (portrait ? 6 : 5), needH = this.width + (portrait ? 3 : 8);
+    const e = this.boardExtent(angle);
+    // 여백: 가로 2.4칸(가장자리 자리 원판이 잘리지 않을 만큼) · 세로 4칸
+    const needV = e.d * Math.sin(pitch) + (portrait ? 4 : 5), needH = e.w + (portrait ? 2.4 : 8);
     const distV = (needV / 2) / Math.tan(fov / 2), distH = (needH / 2) / Math.tan(fov / 2) / aspect;
-    const dist = Math.max(distV, distH) / this.zoom;
+    return Math.max(distV, distH);
+  }
+  placeCamera() {
+    const aspect = this.camera.aspect;
+    const portrait = aspect < 1;
+    const pitch = (portrait ? 62 : 56) * Math.PI / 180;
+    const dist = this.camDist(this.camAngle) / this.zoom;
     const cy = Math.sin(pitch) * dist, cr = Math.cos(pitch) * dist;
     const off = portrait ? 4.5 : 1.5;
     const look = new THREE.Vector3(Math.sin(this.camAngle) * off, 0, Math.cos(this.camAngle) * off);
@@ -7714,7 +7740,8 @@ NGN.UI = class UI {
       `낸 피해 ${fmt(inst.dmgDone)}`, `${NGN.ELEMENT_KO[d.element]} 속성`,
     ].filter(Boolean).join(' · ');
   }
-  hint(x, y, text) { const h = $('hint'); if (x === null) { h.hidden = true; return; } h.hidden = false; h.style.left = x + 'px'; h.style.top = y + 'px'; h.querySelector('.txt').textContent = text; }
+  // 안내 화살표. 글이 비면 화살표만(카드·▶ 위에서는 말풍선이 아래쪽 UI 를 한 줄 더 먹어서 글은 토스트로 준다)
+  hint(x, y, text) { const h = $('hint'); if (x === null) { h.hidden = true; return; } h.hidden = false; h.style.left = x + 'px'; h.style.top = y + 'px'; const t = h.querySelector('.txt'); t.textContent = text; t.hidden = !text; }
   // 웨이브 시작 배너. 상시 예고 줄을 뺀 대신 여기에 적 아이콘·방어 방패를 함께 보여준다. 적 성질이 붙은 웨이브면 그 이름을 색 칩으로(checklist I-8)
   banner(text, special = null, wv = null) {
     const b = document.createElement('div'); b.id = 'banner';
@@ -8552,7 +8579,7 @@ NGN.serverNow = async function serverNow() {
     onGacha() { gachaUi.show(); },
     onMenu(on) {
       menuSpin = on;
-      if (!on) { world.camAngle = 0; world.placeCamera(); }
+      if (!on) { world.camAngle = world.baseAngle || 0; world.placeCamera(); }
       else if (!game && mode !== 'infinite') { const n = meta.nextStage(); showMap(n ? stageMap(n) : data.maps.default); } // 메뉴 배경 = 다음 스테이지 지도
     },
     onPreviewMap(m) { showMap(m); },
@@ -8613,6 +8640,7 @@ NGN.serverNow = async function serverNow() {
     ui.onGameStart(game, mode);
     { const gd = document.getElementById('gachaDot'); if (gd) gd.hidden = meta.state.tickets < 1; }
     tutorialStep = meta.state.games === 0 && !ai ? 1 : 0;
+    if (tutorialStep === 1) setTimeout(() => ui.toast('아래 카드에서 타워를 고르세요'), 600); // 말풍선 대신 토스트(화면을 안 가린다)
     world.warmup = 0;
     window.game = game;
   }
@@ -8759,10 +8787,10 @@ NGN.serverNow = async function serverNow() {
       renderer.update(dt, game, game.wave ? acc / NGN.DT : 1);
       if (speed <= 4) flushFloaters();
       const ps = ui.popSlot(); if (ps) { const p = toScreen(ps.x, ps.y, 3.2), b = toScreen(ps.x, ps.y, 0); ui.placePop(p.x, p.y - 8, b.y); }
-      if (tutorialStep === 1) { const b = document.querySelector('.tcard'); const r = b.getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top - 6, '타워를 고르세요'); }
+      if (tutorialStep === 1) { const b = document.querySelector('.tcard'); const r = b.getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top + 18, ''); } // 화살표 끝이 카드 그림에 걸치게(카드 위로 한 줄 더 안 먹게)
       else if (tutorialStep === 2 && ui.previewSlot !== null) { const r = document.getElementById('buildBtn').getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top - 6, '짓기를 누르세요'); }
       else if (tutorialStep === 2) { const s = NGN.map.SLOTS.reduce((a, c) => (NGN.map.coverageFor(c.id, 800, false) > NGN.map.coverageFor(a.id, 800, false) ? c : a), NGN.map.SLOTS[0]); const p = toScreen(s.x, s.y, 0.5); ui.hint(p.x, p.y - 10, '여기에 놓으세요'); }
-      else if (tutorialStep === 3) { const r = document.getElementById('waveBtn').getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top - 6, '웨이브 시작!'); }
+      else if (tutorialStep === 3) { const r = document.getElementById('waveBtn').getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top + 18, ''); }
       else ui.hint(null);
     } else renderer.update(dt, { towersBuilt: [], enemies: [], events: [] }); // 메뉴에서도 파티클 등은 굴린다
     world.render();
