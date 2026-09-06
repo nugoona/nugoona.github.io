@@ -1,0 +1,18 @@
+{
+  "_설명": "공격 타입 × 방어 타입 배율표. docs/design.md 3장(원본 YouTD 2 그대로). 값을 바꾸면 게임·시뮬레이터가 함께 바뀐다.",
+  "_출처": "원본 확인값 (YouTD 2 코드의 6×6 표)",
+  "attackTypes": ["physical", "decay", "energy", "elemental", "essence", "arcane"],
+  "defenseTypes": ["LUA", "SOL", "HEL", "MYT", "SIF", "ZOD"],
+  "한국어": {
+    "physical": "물리", "decay": "부패", "energy": "에너지", "elemental": "원소", "essence": "정수", "arcane": "비전"
+  },
+  "table": {
+    "physical":  { "LUA": 1.8, "SOL": 1.2, "HEL": 0.9, "MYT": 0.6, "SIF": 0.4, "ZOD": 1.0 },
+    "decay":     { "LUA": 0.6, "SOL": 1.8, "HEL": 1.2, "MYT": 0.9, "SIF": 0.4, "ZOD": 1.0 },
+    "energy":    { "LUA": 0.9, "SOL": 0.6, "HEL": 1.8, "MYT": 1.2, "SIF": 0.4, "ZOD": 1.0 },
+    "elemental": { "LUA": 1.2, "SOL": 0.9, "HEL": 0.6, "MYT": 1.8, "SIF": 0.4, "ZOD": 1.0 },
+    "essence":   { "LUA": 1.0, "SOL": 1.0, "HEL": 1.0, "MYT": 1.0, "SIF": 1.0, "ZOD": 1.0 },
+    "arcane":    { "LUA": 1.5, "SOL": 1.5, "HEL": 1.5, "MYT": 1.5, "SIF": 0.4, "ZOD": 1.0 }
+  },
+  "_비고": "비전(arcane)은 '마법 면역' 적에게 0이 되는 원본 규칙이 있으나, 1차 30종에는 비전 타워가 없어 시뮬레이터가 아직 다루지 않는다."
+}

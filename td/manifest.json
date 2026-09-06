@@ -1,0 +1,17 @@
+{
+  "name": "P의 디펜스",
+  "short_name": "P의 디펜스",
+  "description": "조카를 위한 3D 타워 디펜스 — 스테이지 20개, 타워 30종",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0E1410",
+  "theme_color": "#0E1410",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

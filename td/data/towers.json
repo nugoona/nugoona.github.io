@@ -1,0 +1,1223 @@
+{
+  "_설명": "타워 30종(10계열 × 3단). sim/build-towers.js 가 원본 CSV 에서 생성. 손으로 고치지 말고 build-towers.js 의 CHAINS 나 balance.json 을 고칠 것.",
+  "_출처": "각 타워의 source.원본 = YouTD 2 CSV 확인값, source.정함 = 우리가 정한 값",
+  "_역할": {
+    "single": "단일",
+    "splash": "광역",
+    "bounce": "튕김",
+    "multishot": "연사",
+    "aura": "오라"
+  },
+  "towers": [
+    {
+      "id": "shrub_1",
+      "family": "shrub",
+      "familyName": "덤불",
+      "tier": 1,
+      "name": "작은 덤불",
+      "nameEn": "Tiny Shrub",
+      "element": "nature",
+      "elementKo": "자연",
+      "role": "single",
+      "desc": "빠르고 값싼 기본 화살. 어디에 놓아도 제 몫을 한다.",
+      "upgradeDesc": "단이 오르면 피해가 4배씩 뛰고 사거리도 조금 는다.",
+      "cost": 30,
+      "attackType": "physical",
+      "range": 800,
+      "attackCd": 0.9,
+      "dmgMin": 26,
+      "dmgMax": 26,
+      "dps": 28.9,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "shrub_2",
+      "family": "shrub",
+      "familyName": "덤불",
+      "tier": 2,
+      "name": "덤불",
+      "nameEn": "Shrub",
+      "element": "nature",
+      "elementKo": "자연",
+      "role": "single",
+      "desc": "빠르고 값싼 기본 화살. 어디에 놓아도 제 몫을 한다.",
+      "upgradeDesc": "단이 오르면 피해가 4배씩 뛰고 사거리도 조금 는다.",
+      "cost": 140,
+      "attackType": "physical",
+      "range": 840,
+      "attackCd": 0.9,
+      "dmgMin": 113,
+      "dmgMax": 113,
+      "dps": 125.6,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "shrub_3",
+      "family": "shrub",
+      "familyName": "덤불",
+      "tier": 3,
+      "name": "큰 덤불",
+      "nameEn": "Greater Shrub",
+      "element": "nature",
+      "elementKo": "자연",
+      "role": "single",
+      "desc": "빠르고 값싼 기본 화살. 어디에 놓아도 제 몫을 한다.",
+      "upgradeDesc": "단이 오르면 피해가 4배씩 뛰고 사거리도 조금 는다.",
+      "cost": 400,
+      "attackType": "physical",
+      "range": 880,
+      "attackCd": 0.9,
+      "dmgMin": 299,
+      "dmgMax": 299,
+      "dps": 332.2,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "fiery_1",
+      "family": "fiery",
+      "familyName": "불꽃바위",
+      "tier": 1,
+      "name": "불꽃 자갈",
+      "nameEn": "Fiery Pebble",
+      "element": "fire",
+      "elementKo": "불",
+      "role": "splash",
+      "desc": "불덩이가 터져 주변 적까지 태운다. 떼거리에 강하다.",
+      "upgradeDesc": "3단은 폭발 반경이 넓어지고 주변 피해 비율도 오른다.",
+      "cost": 30,
+      "attackType": "elemental",
+      "range": 900,
+      "attackCd": 1.2,
+      "dmgMin": 31,
+      "dmgMax": 36,
+      "dps": 27.9,
+      "splash": {
+        "radius": 150,
+        "ratio": 0.25
+      },
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "splash"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "fiery_2",
+      "family": "fiery",
+      "familyName": "불꽃바위",
+      "tier": 2,
+      "name": "불꽃 돌",
+      "nameEn": "Fiery Stone",
+      "element": "fire",
+      "elementKo": "불",
+      "role": "splash",
+      "desc": "불덩이가 터져 주변 적까지 태운다. 떼거리에 강하다.",
+      "upgradeDesc": "3단은 폭발 반경이 넓어지고 주변 피해 비율도 오른다.",
+      "cost": 150,
+      "attackType": "elemental",
+      "range": 900,
+      "attackCd": 1.2,
+      "dmgMin": 147,
+      "dmgMax": 171,
+      "dps": 132.5,
+      "splash": {
+        "radius": 160,
+        "ratio": 0.25
+      },
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "splash"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "fiery_3",
+      "family": "fiery",
+      "familyName": "불꽃바위",
+      "tier": 3,
+      "name": "불꽃 바위",
+      "nameEn": "Fiery Rock",
+      "element": "fire",
+      "elementKo": "불",
+      "role": "splash",
+      "desc": "불덩이가 터져 주변 적까지 태운다. 떼거리에 강하다.",
+      "upgradeDesc": "3단은 폭발 반경이 넓어지고 주변 피해 비율도 오른다.",
+      "cost": 400,
+      "attackType": "elemental",
+      "range": 900,
+      "attackCd": 1.2,
+      "dmgMin": 389,
+      "dmgMax": 455,
+      "dps": 351.7,
+      "splash": {
+        "radius": 200,
+        "ratio": 0.35
+      },
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "splash"
+        ]
+      }
+    },
+    {
+      "id": "frost_1",
+      "family": "frost",
+      "familyName": "서리넝쿨",
+      "tier": 1,
+      "name": "서리 뿌리",
+      "nameEn": "Frost Root",
+      "element": "ice",
+      "elementKo": "얼음",
+      "role": "single",
+      "desc": "맞은 적을 얼려 느리게 만든다. 다른 타워가 때릴 시간을 벌어 준다.",
+      "upgradeDesc": "단이 오를수록 더 세게(30%→55%) 얼린다.",
+      "cost": 30,
+      "attackType": "energy",
+      "range": 750,
+      "attackCd": 0.75,
+      "dmgMin": 17,
+      "dmgMax": 21,
+      "dps": 25.3,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": {
+        "ratio": 0.3,
+        "duration": 3.5
+      },
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "slow"
+        ]
+      }
+    },
+    {
+      "id": "frost_2",
+      "family": "frost",
+      "familyName": "서리넝쿨",
+      "tier": 2,
+      "name": "얼음 덩굴",
+      "nameEn": "Ice Weed",
+      "element": "ice",
+      "elementKo": "얼음",
+      "role": "single",
+      "desc": "맞은 적을 얼려 느리게 만든다. 다른 타워가 때릴 시간을 벌어 준다.",
+      "upgradeDesc": "단이 오를수록 더 세게(30%→55%) 얼린다.",
+      "cost": 100,
+      "attackType": "energy",
+      "range": 750,
+      "attackCd": 0.75,
+      "dmgMin": 48,
+      "dmgMax": 67,
+      "dps": 76.7,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": {
+        "ratio": 0.42,
+        "duration": 3.5
+      },
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "slow"
+        ]
+      }
+    },
+    {
+      "id": "frost_3",
+      "family": "frost",
+      "familyName": "서리넝쿨",
+      "tier": 3,
+      "name": "얼어붙은 넝쿨",
+      "nameEn": "Frozen Vines",
+      "element": "ice",
+      "elementKo": "얼음",
+      "role": "single",
+      "desc": "맞은 적을 얼려 느리게 만든다. 다른 타워가 때릴 시간을 벌어 준다.",
+      "upgradeDesc": "단이 오를수록 더 세게(30%→55%) 얼린다.",
+      "cost": 300,
+      "attackType": "energy",
+      "range": 750,
+      "attackCd": 0.75,
+      "dmgMin": 146,
+      "dmgMax": 195,
+      "dps": 227.3,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": {
+        "ratio": 0.55,
+        "duration": 3.5
+      },
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "slow"
+        ]
+      }
+    },
+    {
+      "id": "haunted_1",
+      "family": "haunted",
+      "familyName": "유령폐허",
+      "tier": 1,
+      "name": "유령 잔해",
+      "nameEn": "Haunted Rubble",
+      "element": "darkness",
+      "elementKo": "어둠",
+      "role": "single",
+      "desc": "느리지만 한 방이 무겁다. 단단한 적을 부술 때.",
+      "upgradeDesc": "3단 한 방이 1,000 이 넘는다 — 보스 잡는 타워.",
+      "cost": 34,
+      "attackType": "essence",
+      "range": 900,
+      "attackCd": 2,
+      "dmgMin": 61,
+      "dmgMax": 62,
+      "dps": 30.8,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "haunted_2",
+      "family": "haunted",
+      "familyName": "유령폐허",
+      "tier": 2,
+      "name": "유령 파편",
+      "nameEn": "Haunted Debris",
+      "element": "darkness",
+      "elementKo": "어둠",
+      "role": "single",
+      "desc": "느리지만 한 방이 무겁다. 단단한 적을 부술 때.",
+      "upgradeDesc": "3단 한 방이 1,000 이 넘는다 — 보스 잡는 타워.",
+      "cost": 204,
+      "attackType": "essence",
+      "range": 900,
+      "attackCd": 2,
+      "dmgMin": 368,
+      "dmgMax": 369,
+      "dps": 184.3,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "haunted_3",
+      "family": "haunted",
+      "familyName": "유령폐허",
+      "tier": 3,
+      "name": "유령 폐허",
+      "nameEn": "Haunted Ruins",
+      "element": "darkness",
+      "elementKo": "어둠",
+      "role": "single",
+      "desc": "느리지만 한 방이 무겁다. 단단한 적을 부술 때.",
+      "upgradeDesc": "3단 한 방이 1,000 이 넘는다 — 보스 잡는 타워.",
+      "cost": 566,
+      "attackType": "essence",
+      "range": 900,
+      "attackCd": 2,
+      "dmgMin": 1020,
+      "dmgMax": 1021,
+      "dps": 510.3,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "heap_1",
+      "family": "heap",
+      "familyName": "보급더미",
+      "tier": 1,
+      "name": "고물 더미",
+      "nameEn": "Trash Heap",
+      "element": "iron",
+      "elementKo": "강철",
+      "role": "single",
+      "desc": "쇠 포탄. 사거리가 길고 보스에게 10% 더 아프다.",
+      "upgradeDesc": "단이 오르면 한 방 피해가 크게 오른다.",
+      "cost": 35,
+      "attackType": "physical",
+      "range": 1000,
+      "attackCd": 2.5,
+      "dmgMin": 86,
+      "dmgMax": 96,
+      "dps": 36.4,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0.1,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "dmgToBoss"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "heap_2",
+      "family": "heap",
+      "familyName": "보급더미",
+      "tier": 2,
+      "name": "부품 더미",
+      "nameEn": "Spare Part Heap",
+      "element": "iron",
+      "elementKo": "강철",
+      "role": "single",
+      "desc": "쇠 포탄. 사거리가 길고 보스에게 10% 더 아프다.",
+      "upgradeDesc": "단이 오르면 한 방 피해가 크게 오른다.",
+      "cost": 165,
+      "attackType": "physical",
+      "range": 1000,
+      "attackCd": 2.5,
+      "dmgMin": 398,
+      "dmgMax": 450,
+      "dps": 169.6,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0.1,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "dmgToBoss"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "heap_3",
+      "family": "heap",
+      "familyName": "보급더미",
+      "tier": 3,
+      "name": "보급 더미",
+      "nameEn": "Supply Heap",
+      "element": "iron",
+      "elementKo": "강철",
+      "role": "single",
+      "desc": "쇠 포탄. 사거리가 길고 보스에게 10% 더 아프다.",
+      "upgradeDesc": "단이 오르면 한 방 피해가 크게 오른다.",
+      "cost": 350,
+      "attackType": "physical",
+      "range": 1000,
+      "attackCd": 2.5,
+      "dmgMin": 838,
+      "dmgMax": 968,
+      "dps": 361.2,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0.1,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "dmgToBoss"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "sun_1",
+      "family": "sun",
+      "familyName": "태양기둥",
+      "tier": 1,
+      "name": "무너진 태양 받침",
+      "nameEn": "Ruined Sun Pedestal",
+      "element": "astral",
+      "elementKo": "천체",
+      "role": "bounce",
+      "desc": "금빛 구가 적 셋을 차례로 튕겨 맞힌다. 사거리가 가장 길다.",
+      "upgradeDesc": "단이 오르면 튕길 때 줄어드는 피해가 적어진다.",
+      "cost": 35,
+      "attackType": "energy",
+      "range": 1200,
+      "attackCd": 2,
+      "dmgMin": 43,
+      "dmgMax": 47,
+      "dps": 22.5,
+      "splash": null,
+      "bounce": {
+        "count": 3,
+        "decay": 0.5
+      },
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "bounce"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "sun_2",
+      "family": "sun",
+      "familyName": "태양기둥",
+      "tier": 2,
+      "name": "태양 기둥",
+      "nameEn": "Ruined Sun Pillar",
+      "element": "astral",
+      "elementKo": "천체",
+      "role": "bounce",
+      "desc": "금빛 구가 적 셋을 차례로 튕겨 맞힌다. 사거리가 가장 길다.",
+      "upgradeDesc": "단이 오르면 튕길 때 줄어드는 피해가 적어진다.",
+      "cost": 130,
+      "attackType": "energy",
+      "range": 1200,
+      "attackCd": 2,
+      "dmgMin": 154,
+      "dmgMax": 171,
+      "dps": 81.3,
+      "splash": null,
+      "bounce": {
+        "count": 3,
+        "decay": 0.48
+      },
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "bounce"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "sun_3",
+      "family": "sun",
+      "familyName": "태양기둥",
+      "tier": 3,
+      "name": "금 간 태양 기둥",
+      "nameEn": "Flawed Sun Pillar",
+      "element": "astral",
+      "elementKo": "천체",
+      "role": "bounce",
+      "desc": "금빛 구가 적 셋을 차례로 튕겨 맞힌다. 사거리가 가장 길다.",
+      "upgradeDesc": "단이 오르면 튕길 때 줄어드는 피해가 적어진다.",
+      "cost": 320,
+      "attackType": "energy",
+      "range": 1200,
+      "attackCd": 2,
+      "dmgMin": 370,
+      "dmgMax": 414,
+      "dps": 196,
+      "splash": null,
+      "bounce": {
+        "count": 3,
+        "decay": 0.46
+      },
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "bounce"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "storm_1",
+      "family": "storm",
+      "familyName": "폭풍기둥",
+      "tier": 1,
+      "name": "부서진 폭풍 뚜껑",
+      "nameEn": "Ruined Storm Cap",
+      "element": "storm",
+      "elementKo": "폭풍",
+      "role": "splash",
+      "desc": "번개가 바로 꽂히고 주변까지 퍼진다. 사거리가 길다.",
+      "upgradeDesc": "3단은 번개 반경이 넓어진다.",
+      "cost": 40,
+      "attackType": "energy",
+      "range": 1200,
+      "attackCd": 1.3,
+      "dmgMin": 24,
+      "dmgMax": 64,
+      "dps": 33.8,
+      "splash": {
+        "radius": 250,
+        "ratio": 0.2
+      },
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "splash",
+          "range"
+        ]
+      },
+      "rangeOriginal": 1600,
+      "rangeReason": "원본 1600 은 지도 절반을 덮어 배치 고민이 사라지고 지배적(지출 30%·채택 80%)이라 1200 으로"
+    },
+    {
+      "id": "storm_2",
+      "family": "storm",
+      "familyName": "폭풍기둥",
+      "tier": 2,
+      "name": "깨진 폭풍 기둥",
+      "nameEn": "Broken Storm Column",
+      "element": "storm",
+      "elementKo": "폭풍",
+      "role": "splash",
+      "desc": "번개가 바로 꽂히고 주변까지 퍼진다. 사거리가 길다.",
+      "upgradeDesc": "3단은 번개 반경이 넓어진다.",
+      "cost": 160,
+      "attackType": "energy",
+      "range": 1200,
+      "attackCd": 1.25,
+      "dmgMin": 68,
+      "dmgMax": 228,
+      "dps": 118.4,
+      "splash": {
+        "radius": 250,
+        "ratio": 0.2
+      },
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "splash",
+          "range"
+        ]
+      },
+      "rangeOriginal": 1600,
+      "rangeReason": "원본 1600 은 지도 절반을 덮어 배치 고민이 사라지고 지배적(지출 30%·채택 80%)이라 1200 으로"
+    },
+    {
+      "id": "storm_3",
+      "family": "storm",
+      "familyName": "폭풍기둥",
+      "tier": 3,
+      "name": "폭풍 기둥",
+      "nameEn": "Storm Column",
+      "element": "storm",
+      "elementKo": "폭풍",
+      "role": "splash",
+      "desc": "번개가 바로 꽂히고 주변까지 퍼진다. 사거리가 길다.",
+      "upgradeDesc": "3단은 번개 반경이 넓어진다.",
+      "cost": 420,
+      "attackType": "energy",
+      "range": 1200,
+      "attackCd": 1.2,
+      "dmgMin": 160,
+      "dmgMax": 580,
+      "dps": 308.3,
+      "splash": {
+        "radius": 300,
+        "ratio": 0.25
+      },
+      "bounce": null,
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "splash",
+          "range"
+        ]
+      },
+      "rangeOriginal": 1600,
+      "rangeReason": "원본 1600 은 지도 절반을 덮어 배치 고민이 사라지고 지배적(지출 30%·채택 80%)이라 1200 으로"
+    },
+    {
+      "id": "snowman_1",
+      "family": "snowman",
+      "familyName": "설인",
+      "tier": 1,
+      "name": "설인",
+      "nameEn": "Abominable Snowman",
+      "element": "ice",
+      "elementKo": "얼음",
+      "role": "bounce",
+      "desc": "눈덩이가 둘을 연달아 맞힌다. 값은 비싸지만 세다.",
+      "upgradeDesc": "3단 거대 설인은 한 방 650 — 가장 비싼 만큼 가장 세다.",
+      "cost": 45,
+      "attackType": "energy",
+      "range": 900,
+      "attackCd": 1.5,
+      "dmgMin": 45,
+      "dmgMax": 48,
+      "dps": 31,
+      "splash": null,
+      "bounce": {
+        "count": 2,
+        "decay": 0.25
+      },
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "bounce"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "snowman_2",
+      "family": "snowman",
+      "familyName": "설인",
+      "tier": 2,
+      "name": "큰 설인",
+      "nameEn": "Greater Abominable Snowman",
+      "element": "ice",
+      "elementKo": "얼음",
+      "role": "bounce",
+      "desc": "눈덩이가 둘을 연달아 맞힌다. 값은 비싸지만 세다.",
+      "upgradeDesc": "3단 거대 설인은 한 방 650 — 가장 비싼 만큼 가장 세다.",
+      "cost": 220,
+      "attackType": "energy",
+      "range": 900,
+      "attackCd": 1.5,
+      "dmgMin": 220,
+      "dmgMax": 236,
+      "dps": 152,
+      "splash": null,
+      "bounce": {
+        "count": 2,
+        "decay": 0.2
+      },
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "bounce"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "snowman_3",
+      "family": "snowman",
+      "familyName": "설인",
+      "tier": 3,
+      "name": "거대 설인",
+      "nameEn": "Large Abominable Snowman",
+      "element": "ice",
+      "elementKo": "얼음",
+      "role": "bounce",
+      "desc": "눈덩이가 둘을 연달아 맞힌다. 값은 비싸지만 세다.",
+      "upgradeDesc": "3단 거대 설인은 한 방 650 — 가장 비싼 만큼 가장 세다.",
+      "cost": 650,
+      "attackType": "energy",
+      "range": 900,
+      "attackCd": 1.5,
+      "dmgMin": 650,
+      "dmgMax": 689,
+      "dps": 446.3,
+      "splash": null,
+      "bounce": {
+        "count": 2,
+        "decay": 0.15
+      },
+      "multishot": 1,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "bounce"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "firepit_1",
+      "family": "firepit",
+      "familyName": "어둠화덕",
+      "tier": 1,
+      "name": "어둠 화덕",
+      "nameEn": "Dark Fire Pit",
+      "element": "darkness",
+      "elementKo": "어둠",
+      "role": "multishot",
+      "desc": "독 방울을 두 발씩 쏜다. 여러 적을 동시에.",
+      "upgradeDesc": "3단은 세 발씩 쏜다.",
+      "cost": 50,
+      "attackType": "decay",
+      "range": 850,
+      "attackCd": 1.1,
+      "dmgMin": 42,
+      "dmgMax": 42,
+      "dps": 38.2,
+      "splash": null,
+      "bounce": null,
+      "multishot": 2,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "multishot"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "firepit_2",
+      "family": "firepit",
+      "familyName": "어둠화덕",
+      "tier": 2,
+      "name": "강화된 화덕",
+      "nameEn": "Enhanced Dark Fire Pit",
+      "element": "darkness",
+      "elementKo": "어둠",
+      "role": "multishot",
+      "desc": "독 방울을 두 발씩 쏜다. 여러 적을 동시에.",
+      "upgradeDesc": "3단은 세 발씩 쏜다.",
+      "cost": 210,
+      "attackType": "decay",
+      "range": 850,
+      "attackCd": 1.1,
+      "dmgMin": 177,
+      "dmgMax": 177,
+      "dps": 160.9,
+      "splash": null,
+      "bounce": null,
+      "multishot": 2,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "multishot"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "firepit_3",
+      "family": "firepit",
+      "familyName": "어둠화덕",
+      "tier": 3,
+      "name": "마법 화덕",
+      "nameEn": "Enchanted Dark Fire Pit",
+      "element": "darkness",
+      "elementKo": "어둠",
+      "role": "multishot",
+      "desc": "독 방울을 두 발씩 쏜다. 여러 적을 동시에.",
+      "upgradeDesc": "3단은 세 발씩 쏜다.",
+      "cost": 660,
+      "attackType": "decay",
+      "range": 850,
+      "attackCd": 1.1,
+      "dmgMin": 383,
+      "dmgMax": 383,
+      "dps": 348.2,
+      "splash": null,
+      "bounce": null,
+      "multishot": 3,
+      "aura": null,
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "cost",
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax",
+          "multishot"
+        ],
+        "정함": []
+      }
+    },
+    {
+      "id": "skink_1",
+      "family": "skink",
+      "familyName": "스킹크",
+      "tier": 1,
+      "name": "스킹크",
+      "nameEn": "Skink",
+      "element": "nature",
+      "elementKo": "자연",
+      "role": "aura",
+      "desc": "공격하지 않는다. 대신 주변 타워의 공격력을 올려 준다.",
+      "upgradeDesc": "단이 오르면 주변 보너스가 20%→55% 로 커진다. 타워가 모인 곳 가운데에.",
+      "cost": 75,
+      "attackType": null,
+      "range": 800,
+      "attackCd": 1,
+      "dmgMin": 0,
+      "dmgMax": 0,
+      "dps": 0,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": {
+        "range": 1100,
+        "damageBonus": 0.2
+      },
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "cost",
+          "attackDisabled",
+          "aura"
+        ]
+      },
+      "costOriginal": 75
+    },
+    {
+      "id": "skink_2",
+      "family": "skink",
+      "familyName": "스킹크",
+      "tier": 2,
+      "name": "늙은 스킹크",
+      "nameEn": "Aged Skink",
+      "element": "nature",
+      "elementKo": "자연",
+      "role": "aura",
+      "desc": "공격하지 않는다. 대신 주변 타워의 공격력을 올려 준다.",
+      "upgradeDesc": "단이 오르면 주변 보너스가 20%→55% 로 커진다. 타워가 모인 곳 가운데에.",
+      "cost": 220,
+      "attackType": null,
+      "range": 800,
+      "attackCd": 1,
+      "dmgMin": 0,
+      "dmgMax": 0,
+      "dps": 0,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": {
+        "range": 1100,
+        "damageBonus": 0.35
+      },
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "cost",
+          "attackDisabled",
+          "aura"
+        ]
+      },
+      "costOriginal": 280
+    },
+    {
+      "id": "skink_3",
+      "family": "skink",
+      "familyName": "스킹크",
+      "tier": 3,
+      "name": "황금비늘 스킹크",
+      "nameEn": "Yellowskin Skink",
+      "element": "nature",
+      "elementKo": "자연",
+      "role": "aura",
+      "desc": "공격하지 않는다. 대신 주변 타워의 공격력을 올려 준다.",
+      "upgradeDesc": "단이 오르면 주변 보너스가 20%→55% 로 커진다. 타워가 모인 곳 가운데에.",
+      "cost": 500,
+      "attackType": null,
+      "range": 800,
+      "attackCd": 1,
+      "dmgMin": 0,
+      "dmgMax": 0,
+      "dps": 0,
+      "splash": null,
+      "bounce": null,
+      "multishot": 1,
+      "aura": {
+        "range": 1100,
+        "damageBonus": 0.55
+      },
+      "slow": null,
+      "dmgToBoss": 0,
+      "source": {
+        "원본": [
+          "attackType",
+          "range",
+          "attackCd",
+          "dmgMin",
+          "dmgMax"
+        ],
+        "정함": [
+          "cost",
+          "attackDisabled",
+          "aura"
+        ]
+      },
+      "costOriginal": 800
+    }
+  ]
+}

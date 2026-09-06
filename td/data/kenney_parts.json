@@ -1,0 +1,71 @@
+{
+  "_설명": "Kenney 3D 창고(CC0) 부품을 어느 계열·적에 쓰는지. 게임(models.js)·번들(bundle.js)·나눔 빌드(build.js)가 이 표를 읽는다. 부품 파일은 assets/kenney/<팩>/<이름>.glb, 텍스처는 assets/kenney/<팩>/Textures/colormap.png.",
+  "_출처": "https://github.com/shorepine/kenney (Kenney.nl 공식 미러) — Creative Commons Zero. 매핑은 우리가 정한 것. 2026-09-06 계열마다 몸통·무기를 다른 팩에서 골라 실루엣을 갈랐다(checklist J-1).",
+  "_규칙": "타워 = stack 을 아래에서 위로 쌓는다. 조각은 문자열('팩/이름') 또는 객체. 객체 칸: p=팩/이름 · s=배율(TD 킷 1칸 폭 기준) · y/x/z=위치 보정 · r=이 조각이 다음 조각을 얼마나 밀어올리나(0~1, 기본 1. 머리·장식은 0) · head=적을 향해 도는 머리(별도 메시) · headNode=머리로 돌릴 노드 이름(나머지는 몸통) · anim=aim|bob|spin · raw=텍스처 원색 유지(회색조+속성색 안 함) · accent=속성 원색으로(기본은 돌빛과 섞음) · tint=이 조각만 다른 색 · recolor={재질이름: 색|'tint'} (텍스처 없는 팩 — space 는 metalRed 만 바꾸면 파랑·흰 SF 색이 그대로 난다) · fx=상시 효과(flame|spark|mist).",
+
+  "towerScale": 3.1,
+  "enemyScale": 2.0,
+
+  "towers": {
+    "shrub": { "tint": "#5FC24A", "recolor": { "grass": "tint", "leafsGreen": "tint", "leafsDark": "#3E9C3A" }, "stack": {
+      "1": [ { "p": "nature/stump_squareDetailedWide", "s": 1.55, "r": 0.9 }, { "p": "nature/plant_bushDetailed", "s": 1.5 } ],
+      "2": [ { "p": "nature/stump_squareDetailedWide", "s": 1.55, "r": 0.9 }, { "p": "nature/log_stack", "s": 1.3, "r": 0.8 }, { "p": "nature/tree_blocks", "s": 1.25, "y": -0.05 }, { "p": "tower-defense/weapon-ballista", "s": 0.62, "head": true, "anim": "aim", "y": -0.02 } ],
+      "3": [ { "p": "nature/stump_squareDetailedWide", "s": 1.55, "r": 0.9 }, { "p": "nature/log_stack", "s": 1.3, "r": 0.8 }, { "p": "nature/tree_oak", "s": 1.35, "y": -0.05 }, { "p": "tower-defense/weapon-ballista", "s": 0.72, "head": true, "anim": "aim", "y": -0.02 } ] } },
+
+    "fiery": { "tint": "#FF6A2A", "stack": {
+      "1": [ { "p": "castle/tower-hexagon-base", "s": 0.95, "r": 0.96 }, { "p": "castle/tower-hexagon-top", "s": 0.95, "r": 1 }, { "p": "weapon/flamethrower_long", "s": 2.2, "head": true, "anim": "aim", "y": 0.12, "recolor": { "red": "tint" } } ],
+      "2": [ { "p": "castle/tower-hexagon-base", "s": 0.95, "r": 0.96 }, { "p": "castle/tower-hexagon-mid", "s": 0.95, "r": 0.96 }, { "p": "castle/tower-hexagon-top", "s": 0.95, "r": 1 }, { "p": "weapon/flamethrower_long", "s": 2.45, "head": true, "anim": "aim", "y": 0.12, "recolor": { "red": "tint" } } ],
+      "3": [ { "p": "castle/tower-hexagon-base", "s": 0.95, "r": 0.96 }, { "p": "castle/tower-hexagon-mid", "s": 0.95, "r": 0.96 }, { "p": "castle/tower-hexagon-mid", "s": 0.95, "r": 0.96 }, { "p": "castle/tower-hexagon-top", "s": 0.95, "r": 1 }, { "p": "weapon/flamethrower_long", "s": 2.7, "head": true, "anim": "aim", "y": 0.12, "recolor": { "red": "tint" } }, { "p": "castle/flag", "s": 1.1, "r": 0, "x": 0.55, "z": -0.35, "y": -0.5, "accent": true } ] } },
+
+    "frost": { "tint": "#6FD0FF", "recolor": { "dirt": "#7F95A8", "grass": "#D6ECF7", "rock": "#9FB9CC", "rockTrack": "#8AA6BB", "crystal": "tint" }, "stack": {
+      "1": [ { "p": "nature/rock_largeA", "s": 1.35, "r": 0.85 }, { "p": "space/rock_crystals", "s": 1.35, "r": 0.9 }, { "p": "tower-defense/detail-crystal", "s": 0.8, "accent": true, "head": true, "anim": "spin" } ],
+      "2": [ { "p": "nature/rock_largeA", "s": 1.35, "r": 0.85 }, { "p": "space/rock_crystalsLargeA", "s": 1.35, "r": 0.9 }, { "p": "tower-defense/detail-crystal-large", "s": 0.85, "accent": true, "head": true, "anim": "spin" } ],
+      "3": [ { "p": "nature/rock_largeA", "s": 1.35, "r": 0.85 }, { "p": "space/rock_crystalsLargeA", "s": 1.45, "r": 0.9 }, { "p": "tower-defense/detail-crystal-large", "s": 1.0, "accent": true, "r": 0.9 }, { "p": "holiday/snowflake-a", "s": 1.4, "raw": true, "head": true, "anim": "spin", "y": 0.1 } ] } },
+
+    "haunted": { "tint": "#9B5CFF", "stack": {
+      "1": [ { "p": "graveyard/crypt", "s": 1.05, "r": 1 }, { "p": "graveyard/character-ghost", "s": 0.95, "raw": true, "head": true, "anim": "bob", "y": 0.25 } ],
+      "2": [ { "p": "graveyard/crypt-small", "s": 0.78, "r": 1 }, { "p": "graveyard/candle-multiple", "s": 1.3, "raw": true, "r": 0, "x": 0.45, "z": 0.45, "y": -0.05 }, { "p": "graveyard/character-ghost", "s": 1.05, "raw": true, "head": true, "anim": "bob", "y": 0.25 } ],
+      "3": [ { "p": "graveyard/crypt-small", "s": 0.78, "r": 1 }, { "p": "graveyard/crypt-small-roof", "s": 0.78, "r": 0.9 }, { "p": "graveyard/candle-multiple", "s": 1.3, "raw": true, "r": 0, "x": 0.45, "z": 0.5, "y": -0.72 }, { "p": "graveyard/character-ghost", "s": 1.2, "raw": true, "head": true, "anim": "bob", "y": 0.3, "fx": "mist" } ] } },
+
+    "heap": { "tint": "#B8C4D0", "recolor": { "metalRed": "#5B8DEF" }, "stack": {
+      "1": [ { "p": "survival/box-large", "s": 1.9, "r": 1, "ry": 1.5708 }, { "p": "survival/resource-planks", "s": 1.4, "r": 0, "raw": true, "x": -0.45, "z": 0.35, "y": -0.42 }, { "p": "space/turret_single", "s": 1.25, "head": true, "headNode": "turret", "anim": "aim" } ],
+      "2": [ { "p": "survival/box-large", "s": 1.9, "r": 1, "ry": 1.5708 }, { "p": "survival/structure-metal", "s": 1.5, "r": 1 }, { "p": "survival/barrel", "s": 1.6, "r": 0, "raw": true, "x": 0.5, "z": 0.45, "y": -0.75 }, { "p": "space/turret_double", "s": 1.3, "head": true, "headNode": "turret", "anim": "aim" } ],
+      "3": [ { "p": "survival/box-large", "s": 1.9, "r": 1, "ry": 1.5708 }, { "p": "survival/box-large", "s": 1.9, "r": 1 }, { "p": "survival/structure-metal", "s": 1.5, "r": 1 }, { "p": "survival/barrel", "s": 1.6, "r": 0, "raw": true, "x": 0.5, "z": 0.45, "y": -0.75 }, { "p": "survival/workbench-anvil", "s": 1.5, "r": 0, "raw": true, "x": -0.5, "z": -0.4, "y": -0.75 }, { "p": "space/turret_double", "s": 1.5, "head": true, "headNode": "turret", "anim": "aim" } ] } },
+
+    "sun": { "tint": "#FFC93C", "recolor": { "metalRed": "tint", "stone": "#F2D77A", "stoneDark": "#C9A742" }, "stack": {
+      "1": [ { "p": "graveyard/pillar-large", "s": 1.1, "r": 1 }, { "p": "space/satelliteDish", "s": 1.35, "head": true, "anim": "aim" } ],
+      "2": [ { "p": "graveyard/pillar-obelisk", "s": 1.15, "r": 0.92 }, { "p": "space/satelliteDish_detailed", "s": 1.4, "head": true, "anim": "aim" } ],
+      "3": [ { "p": "graveyard/pillar-obelisk", "s": 1.2, "r": 0.92 }, { "p": "nature/statue_ring", "s": 1.4, "r": 0, "y": -0.9 }, { "p": "space/satelliteDish_large", "s": 1.35, "head": true, "anim": "aim", "y": 0.05 } ] } },
+
+    "storm": { "tint": "#4C7DFF", "recolor": { "metalRed": "tint" }, "stack": {
+      "1": [ { "p": "space/structure", "s": 0.95, "r": 1 }, { "p": "space/machine_wireless", "s": 1.3, "fx": "spark" } ],
+      "2": [ { "p": "space/supports_high", "s": 0.95, "r": 1 }, { "p": "space/structure", "s": 0.95, "r": 1 }, { "p": "space/machine_wirelessCable", "s": 1.3, "fx": "spark" } ],
+      "3": [ { "p": "space/supports_high", "s": 0.95, "r": 1 }, { "p": "space/structure_detailed", "s": 0.95, "r": 1 }, { "p": "space/machine_generator", "s": 1.1, "r": 0, "x": 0.45, "z": 0.45, "y": 0.02 }, { "p": "space/machine_wirelessCable", "s": 1.45, "fx": "spark" } ] } },
+
+    "snowman": { "tint": "#F4FAFF", "stack": {
+      "1": [ { "p": "holiday/snow-pile", "s": 1.15, "raw": true, "r": 0.9 }, { "p": "holiday/snowman", "s": 0.8, "raw": true, "head": true, "anim": "aim" } ],
+      "2": [ { "p": "holiday/snow-pile", "s": 1.15, "raw": true, "r": 0.9 }, { "p": "holiday/snowman-hat", "s": 0.85, "raw": true, "head": true, "anim": "aim" } ],
+      "3": [ { "p": "holiday/snow-pile", "s": 1.25, "raw": true, "r": 0.9 }, { "p": "holiday/tree-snow-a", "s": 0.55, "raw": true, "r": 0, "x": -0.55, "z": -0.5 }, { "p": "holiday/lantern", "s": 0.6, "raw": true, "r": 0, "x": 0.6, "z": -0.35 }, { "p": "holiday/snowman-hat", "s": 0.95, "raw": true, "head": true, "anim": "aim" } ] } },
+
+    "firepit": { "tint": "#E0405A", "stack": {
+      "1": [ { "p": "graveyard/altar-stone", "s": 1.05, "r": 1 }, { "p": "graveyard/fire-basket", "s": 1.6, "accent": true, "r": 1, "fx": "flame" } ],
+      "2": [ { "p": "castle/tower-square-base", "s": 0.85, "r": 0.98 }, { "p": "graveyard/altar-stone", "s": 1.05, "r": 1 }, { "p": "graveyard/candle-multiple", "s": 1.4, "raw": true, "r": 0, "x": 0.4, "z": 0.3, "y": 0 }, { "p": "graveyard/fire-basket", "s": 1.7, "accent": true, "r": 1, "fx": "flame" } ],
+      "3": [ { "p": "castle/tower-square-base", "s": 0.85, "r": 0.98 }, { "p": "graveyard/altar-stone", "s": 1.05, "r": 1 }, { "p": "graveyard/urn-round", "s": 1.4, "raw": true, "r": 0, "x": -0.45, "z": 0.3 }, { "p": "graveyard/candle-multiple", "s": 1.4, "raw": true, "r": 0, "x": 0.4, "z": 0.3 }, { "p": "graveyard/fire-basket", "s": 1.9, "accent": true, "r": 1, "fx": "flame" } ] } },
+
+    "skink": { "tint": "#A6F050", "recolor": { "colorRed": "tint", "grass": "#78D850", "leafsGreen": "#6CC848", "leafsDark": "#4FA83A" }, "stack": {
+      "1": [ { "p": "nature/stump_round", "s": 2.4, "r": 0.9 }, { "p": "nature/mushroom_redGroup", "s": 2.3 } ],
+      "2": [ { "p": "nature/stump_round", "s": 2.4, "r": 0.9 }, { "p": "nature/mushroom_redGroup", "s": 2.3, "r": 0, "x": 0.35, "z": 0.25 }, { "p": "nature/mushroom_redTall", "s": 2.6, "x": -0.3, "z": -0.2 } ],
+      "3": [ { "p": "nature/stump_round", "s": 2.6, "r": 0.9 }, { "p": "nature/plant_bushLarge", "s": 2.0, "r": 0, "x": 0.5, "z": 0.45 }, { "p": "nature/mushroom_tanGroup", "s": 2.3, "r": 0, "x": 0.4, "z": -0.35, "recolor": { "*": "tint" } }, { "p": "nature/mushroom_redGroup", "s": 2.4, "r": 0, "x": -0.45, "z": 0.3 }, { "p": "nature/mushroom_redTall", "s": 3.0, "x": -0.15, "z": -0.15 } ] } }
+  },
+
+  "enemies": {
+    "basic":  { "model": "tower-defense/enemy-ufo-a", "tint": "#B08CE8", "scale": 1.0 },
+    "fast":   { "model": "tower-defense/enemy-ufo-b", "tint": "#F0B860", "scale": 0.9 },
+    "tank":   { "model": "tower-defense/enemy-ufo-c", "tint": "#8FA0B0", "scale": 1.35 },
+    "swarm":  { "model": "tower-defense/enemy-ufo-a", "tint": "#90D888", "scale": 0.65 },
+    "flyer":  { "model": "tower-defense/enemy-ufo-d", "tint": "#F4F0E0", "scale": 1.0 },
+    "boss":   { "model": "tower-defense/enemy-ufo-d-weapon", "tint": "#E86070", "scale": 2.2 }
+  },
+
+  "fx": { "atlas": "fx/particles.png", "_설명": "Kenney Particle Pack(CC0) 16장을 4×4 로 묶은 것. 칸 번호 = fx.js 의 CELL 표" }
+}

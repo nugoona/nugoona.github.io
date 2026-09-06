@@ -1,0 +1,155 @@
+{
+  "_설명": "적 무리에 붙는 성질. 같은 '기본 적'이라도 갑옷을 입거나 둘로 나뉘면 다른 상대가 된다. 그전에는 적이 6종뿐이고 후반에는 그 6종이 더 아파지기만 했다(checklist I-8).",
+  "_출처": "YouTD 2 (MIT, Copyright 2023 Icob2Games) 의 data/wave_special_properties.csv — 원본 41종 중 우리 엔진에 붙일 수 있는 9종을 골랐다. hpMul·등장 시점·빈도·배타 조합은 원본이 맞춰 둔 값 그대로다. 🛑 회피처럼 확률이 필요한 것은 '받는 피해 감소'로 옮겼다 — 우리 전투에는 난수가 없고 그게 기록 겨루기의 기반이다.",
+  "_환산": "원본은 80웨이브짜리 한 판이고 우리는 스테이지 20개다. 우리 진행도 = 스테이지 번호 × 4 로 본다(스테이지 1 = 4, 스테이지 20 = 80). fromProgress 가 그 값 이하일 때만 나온다.",
+  "_규칙": "한 웨이브에 최대 1종. 같은 group 끼리는 함께 안 붙는다. 스테이지 1~3 에는 붙이지 않는다(배우는 구간). 붙일 확률은 스테이지 진행도에 따라 오른다.",
+  "progressPerStage": 4,
+  "notBeforeStage": 4,
+  "chanceByProgress": {
+    "4": 0.1,
+    "20": 0.25,
+    "40": 0.4,
+    "80": 0.55,
+    "_설명": "진행도 → 웨이브 하나에 성질이 붙을 확률"
+  },
+  "specials": [
+    {
+      "id": "swift",
+      "이름": "날쌤",
+      "hpMul": 0.8,
+      "fromProgress": 0,
+      "freq": 100,
+      "sizes": "all",
+      "group": "speed,mshield-speed",
+      "효과": {
+        "speedMul": 1.35
+      },
+      "_원본": "Speed",
+      "_설명": "더 빨리 달린다",
+      "color": "#F0A030"
+    },
+    {
+      "id": "blitz",
+      "이름": "질주",
+      "hpMul": 0.67,
+      "fromProgress": 16,
+      "freq": 80,
+      "sizes": "all",
+      "group": "speed,mshield-speed",
+      "효과": {
+        "speedMul": 1.7
+      },
+      "_원본": "Greater Speed",
+      "_설명": "아주 빨리 달린다",
+      "color": "#FF4E00"
+    },
+    {
+      "id": "sluggish",
+      "이름": "굼뜸",
+      "hpMul": 1.35,
+      "fromProgress": 32,
+      "freq": 80,
+      "sizes": "all",
+      "group": "speed,mshield-speed",
+      "효과": {
+        "speedMul": 0.7
+      },
+      "_원본": "Slow",
+      "_설명": "느리지만 단단하다",
+      "color": "#7A5C3A"
+    },
+    {
+      "id": "armored",
+      "이름": "갑옷",
+      "hpMul": 0.75,
+      "fromProgress": 0,
+      "freq": 100,
+      "sizes": "all",
+      "group": "armor-spellres",
+      "효과": {
+        "dmgTakenMul": 0.75
+      },
+      "_원본": "Armored",
+      "_설명": "받는 피해가 준다",
+      "color": "#2F6F9F"
+    },
+    {
+      "id": "plated",
+      "이름": "중갑",
+      "hpMul": 0.65,
+      "fromProgress": 16,
+      "freq": 100,
+      "sizes": "all",
+      "group": "armor-spellres",
+      "효과": {
+        "dmgTakenMul": 0.62
+      },
+      "_원본": "Heavy Armored",
+      "_설명": "받는 피해가 크게 준다",
+      "color": "#1F3A5F"
+    },
+    {
+      "id": "slippery",
+      "이름": "미끄러움",
+      "hpMul": 0.8,
+      "fromProgress": 16,
+      "freq": 140,
+      "sizes": "all",
+      "group": "evasion,immune-evasion",
+      "효과": {
+        "dmgTakenMul": 0.8
+      },
+      "_원본": "Evasion",
+      "_설명": "원본은 회피 확률이지만 우리는 난수를 안 써서 피해 감소로 옮겼다",
+      "color": "#00B7C2"
+    },
+    {
+      "id": "regen",
+      "이름": "재생",
+      "hpMul": 0.83,
+      "fromProgress": 16,
+      "freq": 140,
+      "sizes": "all",
+      "group": "regen,regen-ethereal,regen-evo,regen-protector",
+      "효과": {
+        "regenPerSec": 0.015
+      },
+      "_원본": "Regeneration",
+      "_설명": "초마다 최대 체력의 1.5% 를 회복한다",
+      "color": "#3DBB5C"
+    },
+    {
+      "id": "revive",
+      "이름": "부활",
+      "hpMul": 0.53,
+      "fromProgress": 32,
+      "freq": 160,
+      "sizes": "all",
+      "group": "regen,regen-evo,seccha",
+      "효과": {
+        "reviveHp": 0.3
+      },
+      "_원본": "Second Chance",
+      "_설명": "죽으면 한 번, 체력 30% 로 다시 일어난다",
+      "color": "#B15BE8"
+    },
+    {
+      "id": "flock",
+      "이름": "분열",
+      "hpMul": 0.5,
+      "fromProgress": 40,
+      "freq": 250,
+      "sizes": "air",
+      "group": "exp,bounty,relic",
+      "효과": {
+        "splitInto": 2,
+        "splitHp": 0.45
+      },
+      "_원본": "Flock",
+      "_설명": "죽으면 둘로 나뉜다",
+      "color": "#FF5FB0"
+    }
+  ],
+  "_화면": "color 는 화면 표시용(웨이브 예고 칩·적 발밑 고리). 방어 타입 색(노랑·주황·초록·보라·연회색·크림)과 눈 지도 바탕(흰색)에 묻히지 않게 골랐다 — 규칙과 무관, 우리가 정한 값.",
+  "_결정론": "어느 웨이브에 무엇이 붙는지는 스테이지 번호 × 웨이브 번호로 정해진다(sim/build-waves.js 의 specialForWave). 난수 없음 — 같은 판은 언제나 같고, 그게 시뮬레이터와 기록 겨루기의 기반이다."
+}

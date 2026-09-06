@@ -1,0 +1,156 @@
+{
+  "_설명": "③ 뽑기(판 사이 성장). 과금 없음 — 티켓만 보상으로 지급. 뽑은 것은 실제로 강해지는 것(사장님 뜻: 많이 한 사람이 유리한 게 의도). 시뮬레이터·게임이 같은 표를 읽는다.",
+  "_출처": "전부 우리가 정한 값(원본 YouTD 2 에는 뽑기가 없다).",
+  "tickets": {
+    "_설명": "티켓을 언제 몇 장 주나. 못해도 하면 받게(판 시작 1장), 잘하면 더(웨이브 5마다, 30 클리어, 기록 갱신, 무한 구간 5웨이브마다 2장).",
+    "perGame": 1,
+    "everyWaves": 5,
+    "perMilestone": 1,
+    "clear30": 3,
+    "newRecord": 2,
+    "infiniteEvery5": 2
+  },
+  "rates": {
+    "_설명": "등급별 확률(%). 좋은 걸 얻으려면 여러 번 뽑아야 한다.",
+    "common": 60,
+    "rare": 25,
+    "epic": 12,
+    "legendary": 3
+  },
+  "pity": {
+    "_설명": "천장. 전설 없이 pityLegendary−1 번을 뽑으면 그 다음은 전설 확정. 서사(epic)도 pityEpic 마다 보장.",
+    "pityLegendary": 50,
+    "pityEpic": 10
+  },
+  "gradeKo": {
+    "common": "흔함",
+    "rare": "고급",
+    "epic": "희귀",
+    "legendary": "전설"
+  },
+  "gradeColor": {
+    "common": "#9BA3A8",
+    "rare": "#4FA3E8",
+    "epic": "#B15BE8",
+    "legendary": "#F2B632"
+  },
+  "pool": {
+    "_설명": "등급별 보상 풀. 같은 등급 안에서는 균등. familyDmg 는 계열 하나를 무작위로 고른다(내가 안 쓰는 계열이 나올 수도 — 그게 뽑기). unlock 은 잠긴 계열을 연다(이미 열려 있으면 그 계열 피해 +8% 로 바뀐다). 효과는 전부 누적(스택).",
+    "common": [
+      {
+        "id": "family_dmg_3",
+        "name": "계열 강화 +3%",
+        "type": "familyDmg",
+        "value": 0.03
+      },
+      {
+        "id": "gold_10",
+        "name": "시작 골드 +10",
+        "type": "startGold",
+        "value": 10
+      },
+      {
+        "id": "exp_5",
+        "name": "경험치 획득 +5%",
+        "type": "expMul",
+        "value": 0.05
+      }
+    ],
+    "rare": [
+      {
+        "id": "family_dmg_6",
+        "name": "계열 강화 +6%",
+        "type": "familyDmg",
+        "value": 0.06
+      },
+      {
+        "id": "range_2",
+        "name": "모든 타워 사거리 +2%",
+        "type": "rangeMul",
+        "value": 0.02
+      },
+      {
+        "id": "gold_25",
+        "name": "시작 골드 +25",
+        "type": "startGold",
+        "value": 25
+      },
+      {
+        "id": "lives_1",
+        "name": "생명 +1",
+        "type": "lives",
+        "value": 1
+      }
+    ],
+    "epic": [
+      {
+        "id": "all_dmg_4",
+        "name": "모든 타워 피해 +4%",
+        "type": "allDmg",
+        "value": 0.04
+      },
+      {
+        "id": "unlock_snowman",
+        "name": "새 계열: 설인",
+        "type": "unlock",
+        "family": "snowman"
+      },
+      {
+        "id": "unlock_firepit",
+        "name": "새 계열: 어둠화덕",
+        "type": "unlock",
+        "family": "firepit"
+      },
+      {
+        "id": "exp_15",
+        "name": "경험치 획득 +15%",
+        "type": "expMul",
+        "value": 0.15
+      },
+      {
+        "id": "lives_3",
+        "name": "생명 +3",
+        "type": "lives",
+        "value": 3
+      }
+    ],
+    "legendary": [
+      {
+        "id": "all_dmg_10",
+        "name": "모든 타워 피해 +10%",
+        "type": "allDmg",
+        "value": 0.1
+      },
+      {
+        "id": "unlock_skink",
+        "name": "새 계열: 스킹크(오라)",
+        "type": "unlock",
+        "family": "skink"
+      },
+      {
+        "id": "sell_100",
+        "name": "팔 때 전액 환급",
+        "type": "sellRatio",
+        "value": 1.0
+      },
+      {
+        "id": "boss_dmg_25",
+        "name": "보스에게 피해 +25%",
+        "type": "bossDmg",
+        "value": 0.25
+      }
+    ]
+  },
+  "unlockFallbackFamilyDmg": 0.08,
+  "startFamilies": {
+    "_설명": "처음부터 열려 있는 계열 셋. haunted·heap·sun·storm 은 스테이지 2·4·6·8 클리어로 열리고(stages.json.unlockFamily), 설인·어둠화덕·스킹크는 뽑기로만 연다.",
+    "list": [
+      "shrub",
+      "fiery",
+      "frost"
+    ]
+  },
+  "_시뮬용_프리셋": {
+    "_설명": "시뮬레이터가 '뽑기를 N번 한 평범한 사람' 을 흉내낼 때 쓰는 기대 효과. node sim/run.js --perks=30 처럼 회수를 주면 gacha 표의 확률로 기대값을 계산한다(무작위 아님)."
+  }
+}

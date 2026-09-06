@@ -1,0 +1,770 @@
+{
+  "_설명": "웨이브 구성(1~waveCount). sim/build-waves.js 가 balance.json + enemies.json 에서 생성. 손으로 고치지 말고 balance.json 을 고칠 것. 그 뒤 웨이브는 게임이 같은 생성기(waveFor)로 이어서 만든다.",
+  "waveCount": 30,
+  "lives": 20,
+  "startGold": 60,
+  "waves": [
+    {
+      "wave": 1,
+      "kind": "basic",
+      "kindKo": "기본",
+      "defense": "ZOD",
+      "enemies": [
+        {
+          "kind": "basic",
+          "kindKo": "기본",
+          "count": 8,
+          "exp": 0.4,
+          "hp": 40,
+          "speed": 480,
+          "reward": 3,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 10,
+      "totalHp": 320,
+      "totalReward": 24
+    },
+    {
+      "wave": 2,
+      "kind": "basic",
+      "kindKo": "기본",
+      "defense": "ZOD",
+      "enemies": [
+        {
+          "kind": "basic",
+          "kindKo": "기본",
+          "count": 9,
+          "exp": 0.8,
+          "hp": 46,
+          "speed": 480,
+          "reward": 3,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 10,
+      "totalHp": 414,
+      "totalReward": 27
+    },
+    {
+      "wave": 3,
+      "kind": "basic",
+      "kindKo": "기본",
+      "defense": "ZOD",
+      "enemies": [
+        {
+          "kind": "basic",
+          "kindKo": "기본",
+          "count": 10,
+          "exp": 1.2,
+          "hp": 53,
+          "speed": 480,
+          "reward": 3.1,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 10,
+      "totalHp": 530,
+      "totalReward": 31
+    },
+    {
+      "wave": 4,
+      "kind": "fast",
+      "kindKo": "빠른 놈",
+      "defense": "LUA",
+      "enemies": [
+        {
+          "kind": "fast",
+          "kindKo": "빠른 놈",
+          "count": 11,
+          "exp": 1.1,
+          "hp": 33,
+          "speed": 816,
+          "reward": 2.8,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 10,
+      "totalHp": 363,
+      "totalReward": 31
+    },
+    {
+      "wave": 5,
+      "kind": "boss",
+      "kindKo": "보스",
+      "defense": "SOL",
+      "enemies": [
+        {
+          "kind": "basic",
+          "kindKo": "기본",
+          "count": 6,
+          "exp": 2,
+          "hp": 70,
+          "speed": 480,
+          "reward": 3.1,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        },
+        {
+          "kind": "boss",
+          "kindKo": "보스",
+          "count": 1,
+          "exp": 20,
+          "hp": 2519,
+          "speed": 288,
+          "reward": 56.2,
+          "livesCost": 5,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 10,
+      "totalHp": 2939,
+      "totalReward": 75
+    },
+    {
+      "wave": 6,
+      "kind": "swarm",
+      "kindKo": "떼거리",
+      "defense": "HEL",
+      "enemies": [
+        {
+          "kind": "swarm",
+          "kindKo": "떼거리",
+          "count": 33,
+          "exp": 0.7,
+          "hp": 28,
+          "speed": 528,
+          "reward": 1.4,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.3
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 924,
+      "totalReward": 46
+    },
+    {
+      "wave": 7,
+      "kind": "tank",
+      "kindKo": "단단한 놈",
+      "defense": "SIF",
+      "enemies": [
+        {
+          "kind": "tank",
+          "kindKo": "단단한 놈",
+          "count": 7,
+          "exp": 5.6,
+          "hp": 259,
+          "speed": 336,
+          "reward": 7.6,
+          "livesCost": 2,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 1813,
+      "totalReward": 53
+    },
+    {
+      "wave": 8,
+      "kind": "flyer",
+      "kindKo": "공중",
+      "defense": "LUA",
+      "enemies": [
+        {
+          "kind": "flyer",
+          "kindKo": "공중",
+          "count": 13,
+          "exp": 3.2,
+          "hp": 106,
+          "speed": 480,
+          "reward": 4.2,
+          "livesCost": 1,
+          "flying": true,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 1378,
+      "totalReward": 55
+    },
+    {
+      "wave": 9,
+      "kind": "fast",
+      "kindKo": "빠른 놈",
+      "defense": "SOL",
+      "enemies": [
+        {
+          "kind": "fast",
+          "kindKo": "빠른 놈",
+          "count": 17,
+          "exp": 2.5,
+          "hp": 67,
+          "speed": 816,
+          "reward": 2.9,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 1139,
+      "totalReward": 49
+    },
+    {
+      "wave": 10,
+      "kind": "boss",
+      "kindKo": "보스",
+      "defense": "HEL",
+      "enemies": [
+        {
+          "kind": "basic",
+          "kindKo": "기본",
+          "count": 9,
+          "exp": 4,
+          "hp": 141,
+          "speed": 480,
+          "reward": 3.3,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        },
+        {
+          "kind": "boss",
+          "kindKo": "보스",
+          "count": 1,
+          "exp": 40,
+          "hp": 5066,
+          "speed": 288,
+          "reward": 59.1,
+          "livesCost": 5,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 6335,
+      "totalReward": 89
+    },
+    {
+      "wave": 11,
+      "kind": "swarm",
+      "kindKo": "떼거리",
+      "defense": "MYT",
+      "enemies": [
+        {
+          "kind": "swarm",
+          "kindKo": "떼거리",
+          "count": 47,
+          "exp": 1.3,
+          "hp": 57,
+          "speed": 528,
+          "reward": 1.5,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.3
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 2679,
+      "totalReward": 71
+    },
+    {
+      "wave": 12,
+      "kind": "flyer",
+      "kindKo": "공중",
+      "defense": "LUA",
+      "enemies": [
+        {
+          "kind": "flyer",
+          "kindKo": "공중",
+          "count": 17,
+          "exp": 4.8,
+          "hp": 186,
+          "speed": 480,
+          "reward": 4.4,
+          "livesCost": 1,
+          "flying": true,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 3162,
+      "totalReward": 75
+    },
+    {
+      "wave": 13,
+      "kind": "tank",
+      "kindKo": "단단한 놈",
+      "defense": "SIF",
+      "enemies": [
+        {
+          "kind": "tank",
+          "kindKo": "단단한 놈",
+          "count": 11,
+          "exp": 10.4,
+          "hp": 599,
+          "speed": 336,
+          "reward": 8.1,
+          "livesCost": 2,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 6589,
+      "totalReward": 89
+    },
+    {
+      "wave": 14,
+      "kind": "fast",
+      "kindKo": "빠른 놈",
+      "defense": "HEL",
+      "enemies": [
+        {
+          "kind": "fast",
+          "kindKo": "빠른 놈",
+          "count": 23,
+          "exp": 3.9,
+          "hp": 135,
+          "speed": 816,
+          "reward": 3.1,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 3105,
+      "totalReward": 71
+    },
+    {
+      "wave": 15,
+      "kind": "boss",
+      "kindKo": "보스",
+      "defense": "MYT",
+      "enemies": [
+        {
+          "kind": "basic",
+          "kindKo": "기본",
+          "count": 12,
+          "exp": 6,
+          "hp": 283,
+          "speed": 480,
+          "reward": 3.4,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        },
+        {
+          "kind": "boss",
+          "kindKo": "보스",
+          "count": 1,
+          "exp": 60,
+          "hp": 10189,
+          "speed": 288,
+          "reward": 62.1,
+          "livesCost": 5,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 11,
+      "totalHp": 13585,
+      "totalReward": 103
+    },
+    {
+      "wave": 16,
+      "kind": "swarm",
+      "kindKo": "떼거리",
+      "defense": "LUA",
+      "enemies": [
+        {
+          "kind": "swarm",
+          "kindKo": "떼거리",
+          "count": 61,
+          "exp": 1.9,
+          "hp": 114,
+          "speed": 528,
+          "reward": 1.6,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.3
+        }
+      ],
+      "clearBonus": 12,
+      "totalHp": 6954,
+      "totalReward": 98
+    },
+    {
+      "wave": 17,
+      "kind": "flyer",
+      "kindKo": "공중",
+      "defense": "SOL",
+      "enemies": [
+        {
+          "kind": "flyer",
+          "kindKo": "공중",
+          "count": 21,
+          "exp": 6.8,
+          "hp": 374,
+          "speed": 480,
+          "reward": 4.6,
+          "livesCost": 1,
+          "flying": true,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 12,
+      "totalHp": 7854,
+      "totalReward": 97
+    },
+    {
+      "wave": 18,
+      "kind": "tank",
+      "kindKo": "단단한 놈",
+      "defense": "SIF",
+      "enemies": [
+        {
+          "kind": "tank",
+          "kindKo": "단단한 놈",
+          "count": 14,
+          "exp": 14.4,
+          "hp": 1205,
+          "speed": 336,
+          "reward": 8.5,
+          "livesCost": 2,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 12,
+      "totalHp": 16870,
+      "totalReward": 119
+    },
+    {
+      "wave": 19,
+      "kind": "fast",
+      "kindKo": "빠른 놈",
+      "defense": "MYT",
+      "enemies": [
+        {
+          "kind": "fast",
+          "kindKo": "빠른 놈",
+          "count": 29,
+          "exp": 5.3,
+          "hp": 272,
+          "speed": 816,
+          "reward": 3.2,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 12,
+      "totalHp": 7888,
+      "totalReward": 93
+    },
+    {
+      "wave": 20,
+      "kind": "boss",
+      "kindKo": "보스",
+      "defense": "LUA",
+      "enemies": [
+        {
+          "kind": "basic",
+          "kindKo": "기본",
+          "count": 15,
+          "exp": 8,
+          "hp": 569,
+          "speed": 480,
+          "reward": 3.6,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        },
+        {
+          "kind": "boss",
+          "kindKo": "보스",
+          "count": 1,
+          "exp": 80,
+          "hp": 20494,
+          "speed": 288,
+          "reward": 65.2,
+          "livesCost": 5,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 12,
+      "totalHp": 29029,
+      "totalReward": 119
+    },
+    {
+      "wave": 21,
+      "kind": "swarm",
+      "kindKo": "떼거리",
+      "defense": "SOL",
+      "enemies": [
+        {
+          "kind": "swarm",
+          "kindKo": "떼거리",
+          "count": 74,
+          "exp": 2.5,
+          "hp": 234,
+          "speed": 528,
+          "reward": 1.6,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.3
+        }
+      ],
+      "clearBonus": 12,
+      "totalHp": 17316,
+      "totalReward": 118
+    },
+    {
+      "wave": 22,
+      "kind": "flyer",
+      "kindKo": "공중",
+      "defense": "HEL",
+      "enemies": [
+        {
+          "kind": "flyer",
+          "kindKo": "공중",
+          "count": 26,
+          "exp": 8.8,
+          "hp": 783,
+          "speed": 480,
+          "reward": 4.8,
+          "livesCost": 1,
+          "flying": true,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 12,
+      "totalHp": 20358,
+      "totalReward": 125
+    },
+    {
+      "wave": 23,
+      "kind": "tank",
+      "kindKo": "단단한 놈",
+      "defense": "SIF",
+      "enemies": [
+        {
+          "kind": "tank",
+          "kindKo": "단단한 놈",
+          "count": 17,
+          "exp": 18.4,
+          "hp": 2573,
+          "speed": 336,
+          "reward": 9,
+          "livesCost": 2,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 12,
+      "totalHp": 43741,
+      "totalReward": 153
+    },
+    {
+      "wave": 24,
+      "kind": "fast",
+      "kindKo": "빠른 놈",
+      "defense": "LUA",
+      "enemies": [
+        {
+          "kind": "fast",
+          "kindKo": "빠른 놈",
+          "count": 34,
+          "exp": 6.7,
+          "hp": 593,
+          "speed": 816,
+          "reward": 3.4,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 13,
+      "totalHp": 20162,
+      "totalReward": 116
+    },
+    {
+      "wave": 25,
+      "kind": "boss",
+      "kindKo": "보스",
+      "defense": "SOL",
+      "enemies": [
+        {
+          "kind": "basic",
+          "kindKo": "기본",
+          "count": 18,
+          "exp": 10,
+          "hp": 1264,
+          "speed": 480,
+          "reward": 3.8,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        },
+        {
+          "kind": "boss",
+          "kindKo": "보스",
+          "count": 1,
+          "exp": 100,
+          "hp": 45510,
+          "speed": 288,
+          "reward": 68.6,
+          "livesCost": 5,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 13,
+      "totalHp": 68262,
+      "totalReward": 137
+    },
+    {
+      "wave": 26,
+      "kind": "swarm",
+      "kindKo": "떼거리",
+      "defense": "HEL",
+      "enemies": [
+        {
+          "kind": "swarm",
+          "kindKo": "떼거리",
+          "count": 88,
+          "exp": 3.1,
+          "hp": 519,
+          "speed": 528,
+          "reward": 1.7,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.3
+        }
+      ],
+      "clearBonus": 13,
+      "totalHp": 45672,
+      "totalReward": 150
+    },
+    {
+      "wave": 27,
+      "kind": "flyer",
+      "kindKo": "공중",
+      "defense": "MYT",
+      "enemies": [
+        {
+          "kind": "flyer",
+          "kindKo": "공중",
+          "count": 30,
+          "exp": 10.8,
+          "hp": 1739,
+          "speed": 480,
+          "reward": 5.1,
+          "livesCost": 1,
+          "flying": true,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 13,
+      "totalHp": 52170,
+      "totalReward": 153
+    },
+    {
+      "wave": 28,
+      "kind": "tank",
+      "kindKo": "단단한 놈",
+      "defense": "SIF",
+      "enemies": [
+        {
+          "kind": "tank",
+          "kindKo": "단단한 놈",
+          "count": 20,
+          "exp": 22.4,
+          "hp": 5713,
+          "speed": 336,
+          "reward": 9.4,
+          "livesCost": 2,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 13,
+      "totalHp": 114260,
+      "totalReward": 188
+    },
+    {
+      "wave": 29,
+      "kind": "fast",
+      "kindKo": "빠른 놈",
+      "defense": "SOL",
+      "enemies": [
+        {
+          "kind": "fast",
+          "kindKo": "빠른 놈",
+          "count": 40,
+          "exp": 8.1,
+          "hp": 1316,
+          "speed": 816,
+          "reward": 3.6,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 13,
+      "totalHp": 52640,
+      "totalReward": 144
+    },
+    {
+      "wave": 30,
+      "kind": "boss",
+      "kindKo": "보스",
+      "defense": "HEL",
+      "enemies": [
+        {
+          "kind": "basic",
+          "kindKo": "기본",
+          "count": 21,
+          "exp": 12,
+          "hp": 2807,
+          "speed": 480,
+          "reward": 4,
+          "livesCost": 1,
+          "flying": false,
+          "interval": 0.7
+        },
+        {
+          "kind": "boss",
+          "kindKo": "보스",
+          "count": 1,
+          "exp": 120,
+          "hp": 101065,
+          "speed": 288,
+          "reward": 72.1,
+          "livesCost": 5,
+          "flying": false,
+          "interval": 0.7
+        }
+      ],
+      "clearBonus": 13,
+      "totalHp": 160012,
+      "totalReward": 156
+    }
+  ]
+}
