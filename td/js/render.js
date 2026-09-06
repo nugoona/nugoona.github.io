@@ -90,7 +90,9 @@ class Particles {
 // 색은 인스턴스 색(instanceColor)으로, 위치·크기는 매 프레임 행렬로. 막대는 카메라를 본다
 class EnemyOverlays {
   constructor(root, geo, cap = 256) {
-    const mk = (g, mat) => { const m = new THREE.InstancedMesh(g, mat, cap); m.frustumCulled = false; m.count = 0; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.setColorAt(0, new THREE.Color(1, 1, 1)); m.instanceColor.setUsage(THREE.DynamicDrawUsage); root.add(m); return m; };
+    // 🔴 인스턴스 색 버퍼는 최대 수(cap)로 직접 만든다(2026-09-06 J-11 실측). 전엔 count=0 인 채 setColorAt(0) 을 불러 three r128 이 길이 0 짜리 색 버퍼를 만들었고,
+    //    적이 나와 count 가 커지면 버퍼가 모자라 매 프레임 GL_INVALID_OPERATION(Vertex buffer is not big enough)이 256회 상한까지 쌓였다 — 고리·막대 셋이 각각. 웨이브 전엔 안 나서 "경고 0"으로 지나쳤었다
+    const mk = (g, mat) => { const m = new THREE.InstancedMesh(g, mat, cap); m.frustumCulled = false; m.count = 0; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage); root.add(m); return m; };
     this.ring = mk(geo.ring, new THREE.MeshBasicMaterial({ color: 0xFFFFFF }));
     this.ring2 = mk(geo.ring, new THREE.MeshBasicMaterial({ color: 0xFFFFFF }));
     this.glow = mk(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: geo.glowTex, color: 0xFFFFFF, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));

@@ -79,7 +79,7 @@ NGN.serverNow = async function serverNow() {
   }
   const renderer = new NGN.Renderer(world, data, models);
   const preview = models.ready ? new NGN.TowerPreview(models) : null; // 카드 그림(한 번 찍어 캐시)·상세 화면의 돌아가는 모형
-  const meta = new NGN.Meta(data.gacha, data.stages, data.families);
+  const meta = new NGN.Meta(data.gacha, data.stages, data.families, data.lobby); // lobby = 일일 미션·출석·시즌 규칙(J-11)
   if (meta.state.settings.shadows === false) { world.renderer.shadowMap.enabled = false; world.sun.castShadow = false; }
   if (NGN.sound) NGN.sound.on = meta.state.settings.sound !== false; // 효과음(fx.js NGN.Sound): 설정에서 끈 사람은 끈 채로
 
@@ -95,6 +95,7 @@ NGN.serverNow = async function serverNow() {
   let paused = false; // 일시정지(②): 엔진 틱·카운트다운·연출 시간이 전부 멈춘다(화면은 그대로 그린다)
   let slowmo = 1, slowmoLeft = 0; // 보스 등장 슬로우모션(③): acc 에 곱하는 계수. speed 는 안 건드린다(버튼 배속이 그대로 살아 있게)
   let bossRef = null; // 지금 살아 있는 보스(체력 막대·처치 판정용)
+  let bossKills = 0; // 이 판에서 잡은 보스 수(일일 미션 J-11 ④)
   let lastLives = null; // 생명이 줄었는지 프레임마다 본다 — 렌더러 onLeak 이 안 와도 성 피격 연출이 빠지지 않게(온 만큼은 여기서 다시 안 센다)
   // 서버 시각은 게임을 열 때 미리 받아 둔다(오늘의 판 버튼이 바로 반응하게). 실패하면 버튼을 누를 때 한 번 더
   let serverTime = null, serverAt = 0;
@@ -135,6 +136,7 @@ NGN.serverNow = async function serverNow() {
       } else endGame(true, true); // 무한은 여기까지 간 기록으로 정산
     },
     onGacha() { gachaUi.show(); },
+    onCodex(sub) { codexUi.show(sub); }, // 로비 [타워] 탭 = 도감(J-11 ③)
     onMenu(on) {
       menuSpin = on;
       if (!on) { world.camAngle = world.baseAngle || 0; world.placeCamera(); }
@@ -198,7 +200,10 @@ NGN.serverNow = async function serverNow() {
   // 경고(④): 적이 출구 가까이 오면 렌더러가 true 로 부른다 → 가장자리 붉은 비네트
   renderer.onDanger = (on) => ui.setDanger(!!on);
   // 뽑기 화면: 타워 그림(카드 캐시)·돌아가는 3D 모형(전설 연출)을 쓴다
-  const gachaUi = new NGN.GachaUI(meta, data, () => { if (!game) ui.showMenu(meta); { const gd = document.getElementById('gachaDot'); if (gd) gd.hidden = meta.state.tickets < 1; } }, { towerImage: (def) => ui.cb.towerImage(def), preview });
+  // 뽑기를 닫으면 강화 탭으로 돌아간다(뽑기는 강화 탭 안에 있다 — J-11 ②)
+  const gachaUi = new NGN.GachaUI(meta, data, () => { if (!game) ui.showUpgrade(); }, { towerImage: (def) => ui.cb.towerImage(def), preview });
+  const codexUi = new NGN.CodexUI(meta, data, ui, { towerImage: (def) => ui.cb.towerImage(def), preview });
+  ui.codex = codexUi;
 
   // 공통: 엔진 한 판 만들기. 강화 나무·뽑기 보상은 meta.perks() 하나로 합쳐져 effectiveStats() 한 통로로 들어간다.
   // perks 를 직접 주면(오늘의 판 = 전부 0) 그것을 쓴다
@@ -207,7 +212,7 @@ NGN.serverNow = async function serverNow() {
     game = new NGN.Game({ towers: data.towers, waves, affinity: data.affinity, balance, deck, ai, waveSource, hpMul: hpMul * devHp, growth: data.growth, perks: perks !== undefined ? perks : (ai ? null : meta.perks()), map, items: data.items, seed });
     ended = false;
     ui.onGameStart(game, mode);
-    { const gd = document.getElementById('gachaDot'); if (gd) gd.hidden = meta.state.tickets < 1; }
+    bossKills = 0;
     tutorialStep = meta.state.games === 0 && !ai ? 1 : 0;
     if (tutorialStep === 1) setTimeout(() => ui.toast('아래 카드에서 타워를 고르세요'), 600); // 말풍선 대신 토스트(화면을 안 가린다)
     world.warmup = 0;
@@ -302,7 +307,7 @@ NGN.serverNow = async function serverNow() {
     const wvDef = game.wave.def;
     const leaks = game.endWave();
     renderer.consume(game);
-    const bossDown = !!(bossRef && bossRef.hp <= 0); // 보스를 잡아서 끝난 웨이브면 클리어 배너를 "보스 처치!"(금색)로(frame 의 감시보다 여기가 먼저라 거기선 못 본다)
+    const bossDown = !!(bossRef && bossRef.hp <= 0); if (bossDown) bossKills++; // 보스를 잡아서 끝난 웨이브면 클리어 배너를 "보스 처치!"(금색)로(frame 의 감시보다 여기가 먼저라 거기선 못 본다)
     bossRef = null; ui.bossBar(null); ui.setDanger(false);
     castleUpdate();
     if (game.lives <= 0) return endGame(false);
@@ -320,6 +325,11 @@ NGN.serverNow = async function serverNow() {
   function endGame(stopped, quit = false) {
     ended = true; game.stats.cleared = stopped; game.finish(); NGN.sound && NGN.sound.play(stopped ? 'win' : 'lose');
     resetBattleFx();
+    if (!auto) { // 일일 미션(J-11 ④): 이 판에서 한 것들
+      const st = game.stats, sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+      meta.missionProgress('play', 1); meta.missionProgress('kill', game.kills); meta.missionProgress('build', sum(st.builds)); meta.missionProgress('upgrade', sum(st.upgrades));
+      meta.missionProgress('tier3', game.towersBuilt.filter((t) => t.def.tier >= 3).length); meta.missionProgress('boss', bossKills);
+    }
     const clearedWaves = stopped ? game.stats.reachedWave - (game.wave ? 1 : 0) : game.stats.reachedWave - 1;
     const result = { cleared: stopped, stopped, wave: Math.max(0, clearedWaves), fellAt: game.stats.reachedWave, lives: Math.max(0, game.lives), gold: game.gold, spent: game.spent };
     if (mode === 'stage') {
@@ -421,7 +431,7 @@ NGN.serverNow = async function serverNow() {
         // 보스 체력 막대(③): 살아 있는 보스를 찾아 매 프레임 넘긴다(DOM 은 ui.bossBar 가 값이 바뀔 때만 만진다). 사라진 순간 hp≤0 이었으면 처치 배너
         const boss = game.wave ? game.enemies.find((e) => e.boss && e.hp > 0) : null;
         if (boss) bossRef = boss;
-        else if (bossRef) { if (bossRef.hp <= 0) ui.banner('보스 처치!', null, null, 'gold'); bossRef = null; }
+        else if (bossRef) { if (bossRef.hp <= 0) { ui.banner('보스 처치!', null, null, 'gold'); bossKills++; } bossRef = null; }
         ui.bossBar(boss || null);
       }
       // 다음 엔진 틱까지 얼마나 왔나 → 적 위치를 그 비율로 이어 그린다(A1). 웨이브 밖이면 1. 슬로우모 중엔 연출 시간도 같이 느리게

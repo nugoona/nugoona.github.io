@@ -119,11 +119,13 @@
   .tree { display: flex; flex-direction: column; gap: 12px; }
   .branch { padding: 10px 12px; }
   .branch .top { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+  .branch .top b { white-space: nowrap; } /* "기본기"가 세로로 깨지던 것(2026-09-06 로비 실측) */
+  .branch .top .eff { white-space: normal; text-align: right; }
   .branch .top svg.i { font-size: 22px; }
   .branch .top .eff { margin-left: auto; color: var(--green2); font-size: 15px; white-space: nowrap; }
   .branch .unit { font-size: 13px; color: var(--ink2); margin-top: 2px; }
-  .branch .steps { display: flex; gap: 6px; margin-top: 8px; }
-  .step { flex: 1; min-height: 46px; border-radius: 10px; border: 3px solid var(--brown); background: var(--cream2); display: flex; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; padding: 0; transition: transform .05s; }
+  .branch .steps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; } /* 공격 10칸은 폰 폭을 넘쳐 두 줄로 */
+  .step { flex: 1 0 44px; min-height: 46px; border-radius: 10px; border: 3px solid var(--brown); background: var(--cream2); display: flex; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; padding: 0; transition: transform .05s; }
   .step svg { width: 16px; height: 16px; }
   .step.done { background: var(--gold); border-color: var(--gold2); }
   .step.can { background: var(--green); border-color: var(--green2); color: #fff; text-shadow: var(--stroke); }
@@ -466,6 +468,118 @@
   /* 자리 미리보기(카드 고르고 빈 자리 누름): 사거리 원판 + 반투명 모형 + [짓기] */
   #pop .btn.build { min-width: 120px; } /* 오늘의 판을 폰 날짜로 판단 중 — 서버 시각과 구분 */
 
+  /* ---------- 로비(checklist J-11 ②): 하단 탭 넷 — 전투·타워·강화·순위. 전투·결과·뽑기 화면에선 숨긴다. 새 알림은 빨간 점 ---------- */
+  #lobbyTabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 22; display: flex; gap: 4px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: linear-gradient(rgba(18,28,40,.94), rgba(10,16,24,.98)); border-top: 3px solid var(--brown); }
+  #lobbyTabs button { flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 58px; border-radius: 12px; border: 3px solid transparent; background: rgba(255,255,255,.06); color: #D7DEE8; font: inherit; font-size: 13px; cursor: pointer; text-shadow: var(--stroke); transition: transform .05s; }
+  #lobbyTabs button:active { transform: translateY(2px); }
+  #lobbyTabs button svg { width: 26px; height: 26px; }
+  #lobbyTabs button.on { background: var(--gold); border-color: var(--gold2); color: #3a2a00; text-shadow: none; box-shadow: 0 3px 0 var(--gold2); }
+  #lobbyTabs button .dot { position: absolute; top: 4px; right: 16px; width: 13px; height: 13px; border-radius: 50%; background: #FF3B30; border: 2px solid #fff; box-shadow: 0 0 0 1px #7A1020; }
+  body.has-tabs .overlay.scroll { padding-bottom: calc(86px + env(safe-area-inset-bottom)); }
+  body.has-tabs #menu { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  body.has-tabs .a2hs { bottom: calc(86px + env(safe-area-inset-bottom)); }
+  body.has-tabs #worldScreen .world { margin-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .menu-top .rbtn.small { width: 44px; }
+  .menu-top .rbtn.small .circ { width: 44px; height: 44px; font-size: 22px; }
+  #menu .title { margin-top: 4vh; }
+  .menu-bottom { padding-bottom: 8px; gap: 8px; }
+  .menu-row { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 420px; }
+  .menu-row .btn { min-width: 0; min-height: 50px; padding-left: 8px; padding-right: 8px; }
+  #menu .menu-top .pill { font-size: 15px; padding: 3px 10px 3px 7px; }
+  #menu .menu-top .pill svg.i { font-size: 18px; }
+  body.has-tabs #menu .a2hs { top: calc(150px + env(safe-area-inset-top)); bottom: auto; } /* 제목 아래(3D 배경 위) — 시트도 제목도 안 가린다 */
+  .menu-row .btn > span:first-child { white-space: nowrap; }
+  .menu-row .btn .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  /* 전투 탭의 시트: 출석 도장 한 줄 + 오늘의 미션 셋. 3D 배경을 다 가리지 않게 높이를 묶는다 */
+  .lobby-sheet { width: 100%; max-width: 420px; padding: 6px 12px 8px; max-height: 34vh; overflow-y: auto; }
+  .attend { display: flex; align-items: center; gap: 6px; padding: 4px 0 8px; border-bottom: 2px dashed rgba(107,74,43,.3); }
+  .attend .stamps { display: flex; gap: 4px; flex: 1; min-width: 0; }
+  .attend .stamp { flex: 1; min-width: 0; min-height: 36px; border-radius: 8px; border: 2px solid var(--brown); background: var(--cream2); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 13px; line-height: 1.1; color: var(--ink2); }
+  .attend .stamp b { font-size: 13px; color: var(--ink); }
+  .attend .stamp.done { background: var(--gold); border-color: var(--gold2); color: #3a2a00; }
+  .attend .stamp.done b { color: #3a2a00; }
+  .attend .stamp.today { box-shadow: 0 0 0 3px rgba(88,194,74,.75); }
+  .attend .stamp svg { width: 12px; height: 12px; }
+  .attend .lbl { font-size: 13px; color: var(--ink2); white-space: nowrap; line-height: 1.2; text-align: center; }
+  .attend .lbl b { color: var(--ink); font-size: 15px; display: block; }
+  .mission-head { display: flex; align-items: center; gap: 6px; font-size: 15px; padding: 6px 0 2px; }
+  .mission-head small { color: var(--ink2); font-size: 13px; margin-left: auto; }
+  .mission { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px dashed rgba(107,74,43,.25); font-size: 15px; }
+  .mission:last-child { border-bottom: 0; }
+  .mission .nm { flex: 1; min-width: 0; line-height: 1.25; }
+  .mission .prog { font-size: 13px; color: var(--ink2); white-space: nowrap; }
+  .mission .bar { width: 100%; height: 6px; background: rgba(0,0,0,.12); border-radius: 3px; overflow: hidden; margin-top: 3px; }
+  .mission .bar span { display: block; height: 100%; background: var(--green); }
+  .mission .btn.tiny { min-height: 34px; padding: 0 10px; flex: 0 0 auto; }
+  .mission.done .nm { color: var(--green2); }
+  .mission .rw { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: #6A3FA0; white-space: nowrap; }
+  .mission .ok { color: var(--green2); font-size: 13px; white-space: nowrap; }
+  /* ---------- 도감(J-11 ③) ---------- */
+  #codexScreen .screen-head { margin-bottom: 8px; }
+  .cx-note { padding: 8px 12px; font-size: 15px; line-height: 1.45; }
+  .cx-note.small { font-size: 13px; color: var(--ink2); margin-top: 10px; }
+  .cx-table { padding: 8px; overflow-x: auto; margin-top: 10px; }
+  table.aff { border-collapse: separate; border-spacing: 2px; width: 100%; font-size: 13px; table-layout: fixed; }
+  table.aff th { font-weight: 400; color: var(--ink); padding: 2px 0; white-space: nowrap; font-size: 13px; }
+  table.aff col.first { width: 52px; }
+  table.aff th .dsh { width: 11px; height: 11px; margin-right: 1px; vertical-align: -1px; }
+  table.aff th.corner { color: var(--ink2); text-align: left; }
+  table.aff td { text-align: center; border-radius: 8px; padding: 7px 0; color: #fff; text-shadow: var(--stroke); font-size: 13px; }
+  table.aff td.up { background: var(--green); } table.aff td.down { background: var(--red); } table.aff td.even { background: #9AA3AA; }
+  .dsh { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #222; vertical-align: -2px; margin-right: 3px; }
+  .dsh.big { width: 20px; height: 20px; }
+  .ak { display: inline-block; background: #4A5A68; color: #fff; text-shadow: var(--stroke); border-radius: 999px; padding: 0 6px; font-size: 13px; line-height: 1.6; white-space: nowrap; }
+  .cx-list { padding: 8px 12px; font-size: 15px; margin-top: 10px; }
+  .cx-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px dashed rgba(107,74,43,.25); }
+  .cx-row:last-child { border-bottom: 0; }
+  .cx-row .grow { flex: 1; min-width: 0; font-size: 13px; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+  .cx-row .dn { min-width: 64px; }
+  .cx-row .up { background: rgba(88,194,74,.2); color: var(--green2); border-radius: 6px; padding: 0 5px; white-space: nowrap; }
+  .spc.gray { background: #5C666D; }
+  .cx-sec { margin-top: 12px; }
+  .cx-sec .rhead { color: #fff; border-bottom-color: rgba(255,255,255,.3); text-shadow: var(--stroke); }
+  .cx-sec .rhead small { color: #C3CFDD; }
+  .cx-sec .rhead .gtag { text-shadow: none; }
+  .cx-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
+  .cx-card { position: relative; background: var(--cream); border: 3px solid var(--gc, var(--brown)); border-radius: 14px; box-shadow: 0 4px 0 var(--brown2); padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; font: inherit; color: var(--ink); cursor: pointer; text-align: center; min-width: 0; }
+  .cx-card:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--brown2); }
+  .cx-card .art { width: 72px; height: 72px; border-radius: 50%; background: radial-gradient(circle at 50% 45%, var(--el), rgba(0,0,0,.15) 75%); display: flex; align-items: center; justify-content: center; }
+  .cx-card .art img { width: 78px; height: 78px; filter: drop-shadow(0 3px 2px rgba(0,0,0,.45)); }
+  .cx-card .art .ro svg { width: 36px; height: 36px; }
+  .cx-card .nm { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .cx-card .tags { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
+  .cx-card .tags .spc { font-size: 13px; padding: 0 6px; }
+  .cx-card .lv { font-size: 13px; background: var(--gold); color: #3a2a00; border-radius: 999px; padding: 0 8px; }
+  .cx-card .how { font-size: 13px; color: var(--ink2); display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; max-width: 100%; overflow: hidden; }
+  .cx-card.locked { filter: grayscale(.85) brightness(.85); }
+  .cx-detail .cx-affline { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; font-size: 13px; }
+  .cx-affline span { border-radius: 8px; padding: 1px 6px; background: rgba(0,0,0,.06); white-space: nowrap; }
+  .cx-affline .up { background: rgba(88,194,74,.25); } .cx-affline .down { background: rgba(232,90,79,.22); }
+  .cx-how { font-size: 15px; text-align: center; }
+  .cx-enemy { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed rgba(107,74,43,.25); }
+  .cx-enemy:last-child { border-bottom: 0; }
+  .cx-enemy .ico svg { width: 40px; height: 40px; }
+  .cx-enemy .grow { flex: 1; min-width: 0; line-height: 1.4; }
+  .cx-enemy .sub, .cx-enemy .nums { font-size: 13px; color: var(--ink2); }
+  /* ---------- 강화 탭: 강화 나무 위에 뽑기 카드 ---------- */
+  .grow-gacha { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .grow-gacha .grow { flex: 1; min-width: 0; font-size: 15px; line-height: 1.4; }
+  .grow-gacha .grow small { color: var(--ink2); font-size: 13px; display: block; }
+  .grow-gacha .btn { min-height: 50px; font-size: 15px; flex: 0 0 auto; }
+  /* ---------- 순위 탭: 월별 시즌 패널(J-11 ⑤) ---------- */
+  .season { padding: 10px 12px; margin-bottom: 10px; }
+  .season .shead { display: flex; align-items: center; gap: 8px; font-size: 20px; }
+  .season .shead small { font-size: 13px; color: var(--ink2); margin-left: auto; font-weight: 400; }
+  .season .score { font-size: 28px; color: var(--gold2); line-height: 1.1; }
+  .season .bd { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; color: var(--ink2); margin: 4px 0; }
+  .season .bd b { color: var(--ink); }
+  .season .prize { font-size: 13px; line-height: 1.5; background: rgba(255,201,60,.18); border-radius: 8px; padding: 6px 8px; margin-top: 6px; }
+  .season .last { font-size: 13px; color: var(--ink2); margin-top: 6px; line-height: 1.4; }
+  .season .last b { color: var(--ink); }
+  /* 결과 화면 버튼은 최대 3개(사장님: 7개는 많다) */
+  #endBtns { width: 100%; max-width: 360px; }
+  #endBtns .btn { min-width: 0; flex: 1 1 100px; white-space: nowrap; }
+  #endBtns #endNext, #endBtns #endCode { flex-basis: 100%; } /* 주 버튼은 한 줄 전체 — 폰 폭에서 "다음 스테이지"가 세 줄로 깨졌다 */
   @media (min-width: 700px) { #towerBar, #bottom { left: 50%; right: auto; transform: translateX(-50%); width: min(640px, 100vw - 16px); } .tree, .panel.list, .mapGrid, #recordBody, .tabs { max-width: 700px; width: 100%; margin-left: auto; margin-right: auto; } }
 </style>
 </head>
@@ -479,19 +593,16 @@
 </div>
 <div id="stage"></div>
 
-<!-- 메인 메뉴: 배경은 3D 지도(다음 스테이지)가 천천히 돈다. 큰 [▶ 스테이지 N], 그 아래 [무한](스테이지 10 뒤 열림), 가장자리에 뽑기·기록·설정 -->
+<!-- 로비(checklist J-11 ②) = 옛 메인 메뉴를 승격. 배경은 3D 지도(다음 스테이지)가 천천히 돈다. 하단 탭 넷(#lobbyTabs)이 화면을 모은다:
+     [전투] 이 화면 — [▶ 스테이지 N](월드맵) · [무한] · [오늘의 판] · 출석 도장 · 오늘의 미션 / [타워] 도감 / [강화] 강화 나무 + 뽑기 / [순위] 시즌 + 순위표. 설정은 상단 오른쪽 톱니 -->
 <section id="menu" class="overlay" hidden>
-  <div class="menu-top"><span class="pill" id="menuTickets"></span><span class="pill" id="menuStars"></span><span class="spacer"></span><span class="pill" id="menuBest"></span></div>
+  <div class="menu-top"><span class="pill" id="menuTickets"></span><span class="pill" id="menuStars"></span><span class="spacer"></span><button class="rbtn small" id="menuSettings" title="설정"><span class="circ"><svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.7 7.7 0 0 0-1.7-1L15 3H9l-.3 2.9a7.7 7.7 0 0 0-1.7 1l-2.5-1-2 3.5L4.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.7 7.7 0 0 0 1.7 1L9 21h6l.3-2.9a7.7 7.7 0 0 0 1.7-1l2.5 1 2-3.5L19.4 13zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></span></button></div>
   <h1 class="title">P의 디펜스</h1>
-  <div class="menu-side">
-    <button class="rbtn" id="menuGacha"><span class="circ"><svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M20 7h-2.2A3 3 0 0 0 13 3.3 3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3h18V8a1 1 0 0 0-1-1zM8.3 5.5c.8 0 2 .7 2.9 1.5H8.5a1 1 0 0 1-.2-1.5zm7.4 0a1 1 0 0 1-.2 1.5h-2.7c.9-.8 2.1-1.5 2.9-1.5zM4 13v7a1 1 0 0 0 1 1h6v-8H4zm9 8h6a1 1 0 0 0 1-1v-7h-7v8z"/></svg></span>뽑기<span class="dot" id="menuGachaDot" hidden></span></button>
-    <button class="rbtn" id="menuRecords"><span class="circ"><svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M5 21V10h4v11H5zm5 0V3h4v18h-4zm5 0v-7h4v7h-4z"/></svg></span>기록</button>
-    <button class="rbtn" id="menuSettings"><span class="circ"><svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.7 7.7 0 0 0-1.7-1L15 3H9l-.3 2.9a7.7 7.7 0 0 0-1.7 1l-2.5-1-2 3.5L4.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.7 7.7 0 0 0 1.7 1L9 21h6l.3-2.9a7.7 7.7 0 0 0 1.7-1l2.5 1 2-3.5L19.4 13zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></span>설정</button>
-  </div>
   <div class="menu-bottom">
     <button class="btn green big" id="menuPlay">▶ 스테이지 1</button>
-    <button class="btn blue mid" id="menuInfinite"></button>
-    <button class="btn gold mid" id="menuDaily"></button>
+    <div class="menu-row"><button class="btn blue mid" id="menuInfinite"></button><button class="btn gold mid" id="menuDaily"></button></div>
+    <!-- 출석 도장 + 오늘의 미션(J-11 ④): 하루 3개, 한국시간 자정 갱신, 안 쌓임. 못 한 날 벌칙 없음 -->
+    <div class="panel lobby-sheet" id="lobbySheet"><div id="attendBox"></div><div id="missionBox"></div></div>
   </div>
   <!-- 저장 지킴이(I-12): 아이폰 사파리는 7일 안 들어오면 저장을 지운다. 홈 화면 앱은 면제 -->
   <div class="panel a2hs" id="a2hs" hidden><span class="grow"><b>홈 화면에 추가</b>하면 기록이 안 지워져요</span><button class="btn blue tiny" id="a2hsMore">방법</button><button class="btn gray tiny" id="a2hsClose">닫기</button></div>
@@ -502,6 +613,21 @@
 <!-- 코드 보기/넣기·이름 묻기(records.js 가 채운다) -->
 <div class="modalWrap" id="codeModal" hidden></div>
 
+<!-- 로비 탭 바(J-11 ②): 로비류 화면(로비·월드맵·도감·강화·순위·설정·지도 고르기)에서만 보인다. 빨간 점 = 새 알림(받을 미션 보상·새 계열·티켓·시즌 결과) -->
+<nav id="lobbyTabs" hidden>
+  <button data-tab="battle"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.9 3 3 6.9l7.1 7.1-2.3 2.3-1.4-1.4-1.4 1.4 1.8 1.8L4.4 20.5 5.8 22l2.4-2.4 1.8 1.8 1.4-1.4-1.4-1.4 2.3-2.3 7.1 7.1 0-0L21 17.1 13.9 10l1.6-1.6 2.4 0 3.1-3.1V3h-2.3l-3.1 3.1v2.4L14 10.1z"/></svg><span>전투</span><span class="dot" hidden></span></button>
+  <button data-tab="tower"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 21V9h2.5V5H9v2h2V5h2v2h2V5h2.5v4H20v12h-6v-5h-4v5H4z"/></svg><span>타워</span><span class="dot" hidden></span></button>
+  <button data-tab="grow"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l3 6.6 7 .8-5.2 4.8 1.5 7L12 17.7 5.7 21.2l1.5-7L2 9.4l7-.8z"/></svg><span>강화</span><span class="dot" hidden></span></button>
+  <button data-tab="rank"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 3h12v3h3v3a5 5 0 0 1-4.2 4.9A6 6 0 0 1 13 17.9V20h4v2H7v-2h4v-2.1A6 6 0 0 1 7.2 13.9 5 5 0 0 1 3 9V6h3V3zm-1 5v1a3 3 0 0 0 2 2.8V8H5zm14 0h-2v3.8A3 3 0 0 0 19 9V8z"/></svg><span>순위</span><span class="dot" hidden></span></button>
+</nav>
+
+<!-- 도감(J-11 ③): 상성표 6×6 · 타워 30계열 · 적 6종+성질 9종+방어 6 · 아이템 24종. 전투 화면의 학습 요소를 여기로 옮겼다 -->
+<section id="codexScreen" class="overlay scroll" hidden>
+  <div class="screen-head"><h2>도감 <span class="sub">상성 · 타워 · 적 · 아이템</span></h2></div>
+  <div class="tabs" id="codexTabs"><button data-sub="affinity" class="on">상성표</button><button data-sub="towers">타워</button><button data-sub="enemies">적</button><button data-sub="items">아이템</button></div>
+  <div id="codexBody"></div>
+</section>
+
 <!-- 월드맵: 길 위의 점 20개. 점을 누르면 덱 편성 없이 바로 전투 -->
 <section id="worldScreen" class="overlay scroll" hidden>
   <div class="world-head"><button class="btn blue back" id="worldBack">◀</button><span class="pill" id="worldStars"></span><span class="spacer"></span><button class="btn gold" id="worldUpgrade"></button></div>
@@ -510,8 +636,10 @@
 
 <!-- 강화 나무: 별을 쓰는 곳. 되돌리기 무료 -->
 <section id="upgradeScreen" class="overlay scroll" hidden>
-  <div class="screen-head"><button class="btn blue back" id="upgradeBack">◀</button><h2>강화</h2><span class="spacer" style="flex:1"></span><span class="pill" id="upgradeStars"></span></div>
-  <p class="sub" style="margin:0 0 10px">남은 별로 앞 칸부터 찍는다. 잘못 찍었으면 아래 [전부 되돌리기] — 별은 전부 돌아온다.</p>
+  <div class="screen-head"><h2>강화</h2><span class="spacer" style="flex:1"></span><span class="pill" id="upgradeStars"></span></div>
+  <!-- 뽑기(J-11 ②): 강화 탭 안에. 티켓이 있으면 탭에 빨간 점 -->
+  <div class="panel grow-gacha" id="growGacha"></div>
+  <p class="sub" style="margin:0 0 10px">별은 스테이지를 깨면 받는다. 남은 별로 앞 칸부터 찍고, 잘못 찍었으면 아래 [전부 되돌리기] — 별은 전부 돌아온다.</p>
   <div class="tree" id="tree"></div>
   <button class="btn red" id="treeReset">전부 되돌리기</button>
 </section>
@@ -525,7 +653,9 @@
 
 <!-- 순위표(I-10): 캠페인·무한·도전 세 탭. 친구 기록은 코드로 — 바깥 서비스 없음 -->
 <section id="recordScreen" class="overlay scroll" hidden>
-  <div class="screen-head"><button class="btn blue back" id="recordBack">◀</button><h2>순위표</h2><span class="spacer" style="flex:1"></span><button class="btn gold tiny" id="recordName"></button></div>
+  <div class="screen-head"><h2>순위</h2><span class="spacer" style="flex:1"></span><button class="btn gold tiny" id="recordName"></button></div>
+  <!-- 월별 시즌(J-11 ⑤): 이번 달 점수·내역·친구 순위·상품. records.js 가 채운다 -->
+  <div id="seasonBox"></div>
   <div class="tabs" id="recordTabs"><button data-tab="campaign" class="on">캠페인</button><button data-tab="infinite">무한</button><button data-tab="daily">도전</button></div>
   <div id="recordBody"></div>
   <div class="screen-foot two"><button class="btn gray" id="recordFriends">친구 관리</button><button class="btn blue" id="recordPaste">친구 코드 넣기</button></div>
@@ -574,14 +704,13 @@
   <h1 id="endTitle"></h1>
   <div class="endStars" id="endStars" hidden></div>
   <div class="panel"><div id="endBody"></div><div id="ticketLines"></div></div>
-  <button id="endCode" class="btn gold" hidden>기록 코드 — 단톡방에 올리기</button>
+  <!-- 버튼은 세 개까지(J-11 ③, 사장님: 7개 → 3개). 뽑기·순위·월드맵은 [로비]의 탭 빨간 점이 안내한다 -->
   <div id="endBtns">
     <button id="endNext" class="btn green">다음 스테이지 ▶</button>
     <button id="endRetry" class="btn blue">다시</button>
-    <button id="endWorld" class="btn gray">월드맵</button>
-    <button id="endGacha" class="btn gold">뽑기 하러 가기</button>
-    <button id="endRecords" class="btn blue">순위표</button>
-    <button id="endMenu" class="btn gray">메뉴</button>
+    <button id="endRecords" class="btn blue">순위</button>
+    <button id="endMenu" class="btn gray">로비</button>
+    <button id="endCode" class="btn gold" hidden>기록 코드 — 단톡방에 올리기</button>
   </div>
 </section>
 
@@ -596,7 +725,7 @@
     <div id="gachaBurst"></div>
     <div id="gachaLegend" class="legend" hidden>전설!</div>
   </div>
-  <div class="gacha-actions"><button id="pullBtn" class="btn gold">1장 뽑기</button><button id="pull10Btn" class="btn gold">10장 뽑기</button></div>
+  <div class="gacha-actions"><button id="pullBtn" class="btn gold">1장 뽑기</button><button id="pull10Btn" class="btn gold">10장 뽑기</button><button id="pullPremiumBtn" class="btn blue" hidden>프리미엄 팩</button></div>
   <div id="pityInfo"></div>
   <div id="gachaLog"></div>
   <div id="perkSummary"></div>
@@ -606,12 +735,12 @@
 <!-- 부팅: 스크립트를 하나씩 받으며 로딩 막대를 채운다(0~30%). 그 뒤 데이터·모델은 main.js 가 NGN_LOADING 으로 이어 채운다.
      파일 위치는 window.__NGN_PATHS__(나눔 빌드가 넣는다)로 바꾼다. 번들(단일 HTML)은 __NGN_INLINE__ 을 세워 이 목록을 안 받고 뒤에 인라인된 것을 쓴다.
      SCRIPTS 는 유효한 JSON 배열이어야 한다 — game/build.js·bundle.js 가 이 줄을 읽는다 -->
-<script>window.__NGN_VERSION__ = "48621c9462"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
+<script>window.__NGN_VERSION__ = "1fa9eaa60c"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
 <script>
 (function () {
   const P = Object.assign({ sim: '../sim/', vendor: 'vendor/', data: '../data/', assets: '../assets/' }, window.__NGN_PATHS__ || {});
-  const SCRIPTS = ["vendor/three.r128.min.js", "vendor/GLTFLoader.r128.js", "vendor/SimplexNoise.js", "vendor/LightningStrike.js", "vendor/lz-string.1.5.0.min.js", "sim/map.js", "sim/mapgen.js", "sim/engine.js", "sim/ai.js", "sim/build-waves.js", "js/data.js", "js/world.js", "js/fx.js", "js/models.js", "js/render.js", "js/ui.js", "js/meta.js", "js/records.js", "js/gacha.js", "js/main.js"];
-  const TIPS = ["공중 적에겐 <b>대공</b>이 되는 타워를 — 카드의 화살표를 보세요", "타워를 <b>길게 누르면</b> 설명과 3단 모습이 나와요", "3단 승급은 <b>화력</b>과 <b>광역</b> 중 하나 — 정답은 없어요", "별은 <b>강화</b>에 쓰고, 잘못 찍었으면 전부 되돌리기(무료)", "어려움은 적 체력이 <b>2배</b> — 붉은 별은 따로 셉니다", "<b>홈 화면에 추가</b>하면 인터넷 없이도 열려요", "떨어진 <b>아이템</b>은 타워를 눌러 끼우세요 — 판이 끝나면 사라져요", "<b>기록 코드</b>를 단톡방에 올리면 친구 순위표에 나란히 떠요", "적 발밑 <b>색 고리</b>가 성질 — 갑옷·질주·재생·분열…", "<b>오늘의 판</b>은 하루 한 번, 모두 같은 지도·같은 조건"];
+  const SCRIPTS = ["vendor/three.r128.min.js", "vendor/GLTFLoader.r128.js", "vendor/SimplexNoise.js", "vendor/LightningStrike.js", "vendor/lz-string.1.5.0.min.js", "sim/map.js", "sim/mapgen.js", "sim/engine.js", "sim/ai.js", "sim/build-waves.js", "js/data.js", "js/world.js", "js/fx.js", "js/models.js", "js/render.js", "js/ui.js", "js/meta.js", "js/records.js", "js/codex.js", "js/gacha.js", "js/main.js"];
+  const TIPS = ["공중 적에겐 <b>대공</b>이 되는 타워를 — 카드의 화살표를 보세요", "타워를 <b>길게 누르면</b> 설명과 3단 모습이 나와요", "3단 승급은 <b>화력</b>과 <b>광역</b> 중 하나 — 정답은 없어요", "별은 <b>강화</b>에 쓰고, 잘못 찍었으면 전부 되돌리기(무료)", "어려움은 적 체력이 <b>2배</b> — 붉은 별은 따로 셉니다", "<b>홈 화면에 추가</b>하면 인터넷 없이도 열려요", "떨어진 <b>아이템</b>은 타워를 눌러 끼우세요 — 판이 끝나면 사라져요", "<b>기록 코드</b>를 단톡방에 올리면 친구 순위표에 나란히 떠요", "적 발밑 <b>색 고리</b>가 성질 — 갑옷·질주·재생·분열…", "<b>오늘의 판</b>은 하루 한 번, 모두 같은 지도·같은 조건", "로비 [타워] 탭의 <b>상성표</b> — 어느 공격이 어느 방어에 센지 한눈에", "<b>일일 미션</b> 셋을 다 하면 티켓 보너스 — 못 한 날 벌칙은 없어요", "매달 1일 <b>시즌 점수</b>만 0 — 별·타워·강화는 그대로"];
   const fill = document.getElementById('loadFill'), pct = document.getElementById('loadPct'), what = document.getElementById('loadWhat'), tip = document.getElementById('loadTip'), box = document.getElementById('loading');
   box.style.backgroundImage = `url(${P.assets}loading.jpg)`;
   let tipNo = Math.floor(Math.random() * TIPS.length);

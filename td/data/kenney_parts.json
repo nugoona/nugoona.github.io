@@ -370,10 +370,10 @@
       "hole": {"p": "tower-defense/tile-dirt"},
       "ring": {"p": "tower-defense/selection-a"},
       "theme": {
-        "grass": {"tint": "#D4CBB8", "ground": "#4F6E42", "hole": "#7E5E3E"},
-        "snow": {"tint": "#EAF1F7", "ground": "#8FA5B5", "holePiece": {"p": "tower-defense/snow-tile-dirt"}, "hole": "#A9BBCA"},
-        "desert": {"tint": "#E2CBA2", "ground": "#9A7A4E", "hole": "#96693F"},
-        "lava": {"tint": "#6E5E68", "ground": "#2A1E24", "hole": "#1E1418"}
+        "grass": {"tint": "#D4CBB8", "ground": "#2C4826", "hole": "#7E5E3E"},
+        "snow": {"tint": "#EAF1F7", "ground": "#5C7386", "holePiece": {"p": "tower-defense/snow-tile-dirt"}, "hole": "#A9BBCA"},
+        "desert": {"tint": "#E2CBA2", "ground": "#5E4628", "hole": "#96693F"},
+        "lava": {"tint": "#6E5E68", "ground": "#140D10", "hole": "#1E1418"}
       }
     }
   },

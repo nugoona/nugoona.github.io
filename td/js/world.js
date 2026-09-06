@@ -353,11 +353,14 @@ NGN.World = class World {
     const ring = L.ring ? mk({ p: L.ring.p, raw: false, tint: '#FFFFFF' }) : null;
     const n = pos.length, layers = {};
     const put = (key, g, s, y, material, cast) => { const m = instanced(g.geometry, material || g.material, pos.map((p) => ({ x: p.x, y, z: p.z, s, cast })), this.root); if (!m) return; m.castShadow = !!cast; layers[key] = { m, s, y }; for (let i = 0; i < n; i++) m.setColorAt(i, this._slotC.setHex(0xFFFFFF)); m.instanceColor.needsUpdate = true; };
-    if (ground) put('ground', ground.g, fit(ground.g, D * 1.3), 0.005, null, false);
+    // 바닥판은 브래킷보다 넓게(1.42배) — 브래킷 ㄱ자 네 개가 어두운 바닥판 위에 온전히 얹혀야 대비가 난다(2026-09-06 밸런스 담당 지적: 금색 브래킷이 흙색 바닥판과 명도가 비슷해 상태 변화가 안 보였다)
+    if (ground) put('ground', ground.g, fit(ground.g, D * 1.42), 0.005, null, false);
     put('base', base.g, sb, 0.01, null, true);
     if (hole) put('hole', hole.g, fit(hole.g, D * 0.46), hb + 0.012, null, false);
     // 링은 조명을 안 받는 재질(늘 밝게) — 아틀라스 × 인스턴스 색
-    if (ring) { this.slotRingMat = this.slotRingMat || new THREE.MeshBasicMaterial({ map: this.models.atlas, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }); put('ring', ring.g, fit(ring.g, D * 1.22), 0.03, this.slotRingMat, false); layers.ring.m.renderOrder = 1; }
+    // 🛑 vertexColors 를 켜지 마라(2026-09-06 실측): Basic 재질 + 정점색 + 인스턴스 색이 겹치면 크롬(ANGLE/D3D)이 매 프레임
+    //    GL_INVALID_OPERATION(Vertex buffer is not big enough) 을 뱉는다. 끄면 사라지고 인스턴스 색은 그대로 먹는다(빨강 시험으로 확인)
+    if (ring) { this.slotRingMat = this.slotRingMat || new THREE.MeshBasicMaterial({ map: this.models.atlas, transparent: true, opacity: 0.98, depthWrite: false }); put('ring', ring.g, fit(ring.g, D * 1.26), 0.03, this.slotRingMat, false); layers.ring.m.renderOrder = 1; }
     this.slotLayers = layers;
     return true;
   }
@@ -383,11 +386,12 @@ NGN.World = class World {
     for (let i = 0; i < this.slotBuilt.length; i++) {
       const built = this.slotBuilt[i], hi = this.slotHi[i];
       // 링 지오메트리는 회색조 칸(최대 밝기 ~0.9)이라 1 을 넘는 색을 곱해 밝힌다(Basic 재질은 클램프 안 함)
-      if (hi) c.setHex(0xFFFFFF).multiplyScalar(1.6 + 0.2 * pulse);             // 손가락이 올라간 자리: 흰색, 굵게(아래 스케일)
-      else if (built) c.setHex(gold).multiplyScalar(0.55);                        // 타워가 선 자리: 어두운 금색(찬 자리)
-      else if (this.slotPick === 2) c.setHex(0x8A8F94).multiplyScalar(0.9);       // 골랐는데 돈이 모자람: 회색
-      else if (this.slotPick === 1) c.setHex(gold).multiplyScalar(1.5 + 0.5 * pulse); // 놓을 수 있음: 밝게 빛남
-      else c.setHex(gold).multiplyScalar(0.85 + 0.35 * (0.5 + 0.5 * Math.sin(now * 0.0028 + i * 0.9))); // 그냥 비어 있음: 은은히 숨 쉼
+      // 2026-09-06 대비 상향(밸런스 담당 지적 "골랐을 때 자리가 밝아진 게 폰에서 한눈에 안 보인다"): 골랐을 때는 흰빛 섞인 금색을 더 세게, 빈 자리는 조금 더 밝게 — 바닥판은 어둡게 내렸다(kenney_parts.json slot.theme.ground)
+      if (hi) c.setHex(0xFFFFFF).multiplyScalar(1.8 + 0.2 * pulse);             // 손가락이 올라간 자리: 흰색, 굵게(아래 스케일)
+      else if (built) c.setHex(gold).multiplyScalar(0.5);                         // 타워가 선 자리: 어두운 금색(찬 자리)
+      else if (this.slotPick === 2) c.setHex(0x8A8F94).multiplyScalar(0.8);       // 골랐는데 돈이 모자람: 회색
+      else if (this.slotPick === 1) c.setHex(0xFFF0B0).multiplyScalar(1.7 + 0.5 * pulse); // 놓을 수 있음: 흰빛 도는 금색으로 밝게 빛남
+      else c.setHex(gold).multiplyScalar(0.95 + 0.4 * (0.5 + 0.5 * Math.sin(now * 0.0028 + i * 0.9))); // 그냥 비어 있음: 은은히 숨 쉼
       ring.setColorAt(i, c);
     }
     ring.instanceColor.needsUpdate = true;
@@ -396,13 +400,21 @@ NGN.World = class World {
     for (let i = 0; i < this.slotBuilt.length; i++) {
       const p = this.slotPos[i], built = this.slotBuilt[i], hi = this.slotHi[i];
       const lift = built ? 0 : hi ? 0.14 : this.slotPick === 1 ? 0.12 : this.slotPick === 2 ? -0.06 : 0; // 떠오름 / 가라앉음
-      const gray = !built && this.slotPick === 2;
+      const gray = !built && this.slotPick === 2, ready = !built && this.slotPick === 1;
       for (const k of Object.keys(Lr)) {
         const { m, s, y } = Lr[k]; if (!m) continue;
         const ringK = k === 'ring';
         o.position.set(p.x, y + (ringK ? 0 : lift), p.z); o.rotation.set(0, 0, 0);
-        const sc = ringK ? s * (hi ? 1.18 : 1) : s; o.scale.set(sc, ringK ? s : sc, sc); o.updateMatrix(); m.setMatrixAt(i, o.matrix);
-        if (!ringK) { m.setColorAt(i, c.setHex(gray ? 0x9AA0A6 : 0xFFFFFF)); }
+        const sc = ringK ? s * (hi ? 1.18 : ready ? 1.08 : 1) : s; o.scale.set(sc, ringK ? s : sc, sc); o.updateMatrix(); m.setMatrixAt(i, o.matrix);
+        // 상태는 브래킷 색만이 아니라 기단·홈 전체로 — 골랐을 때 기단이 금빛으로, 손가락이 올라가면 흰빛으로 밝아진다(Lambert 인스턴스 색은 1 을 넘어도 된다). 바닥판은 골랐을 때 오히려 더 어둡게(대비)
+        if (!ringK) {
+          if (gray) c.setHex(0x9AA0A6);
+          else if (k === 'ground') c.setHex(0xFFFFFF).multiplyScalar(ready || hi ? 0.7 : 1);
+          else if (hi && !built) c.setHex(0xFFFFFF).multiplyScalar(1.35);
+          else if (ready) c.setHex(k === 'hole' ? 0xFFD870 : 0xFFE9A8).multiplyScalar(1.2);
+          else c.setHex(0xFFFFFF);
+          m.setColorAt(i, c);
+        }
       }
     }
     for (const k of Object.keys(Lr)) { const m = Lr[k].m; if (m) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } }

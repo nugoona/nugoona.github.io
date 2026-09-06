@@ -8,6 +8,9 @@
 // 그 아래 보스 체력 막대(보스가 살아 있을 때만). 생명이 깎이면 알약이 튀고 가장자리가 붉게 번쩍, 적이 출구 가까이 오면 붉은 비네트가 깜빡. [⏸] 일시정지 오버레이.
 // 카드 → 빈 자리 = 사거리 원판 + 반투명 모형 미리보기 → [짓기]. 지어진 타워를 누르면 사거리 원판 + 팝.
 // 이모지 없음, 아이콘은 SVG. 규칙은 sim/engine.js, 3D 는 world.js/render.js.
+// 로비(checklist J-11 ②, 2026-09-06 사장님 "인게임 들어가기 전에 로비 같은 게 있어야"): 옛 메뉴가 로비. 하단 탭 넷 [전투][타워][강화][순위] — 전투 = 이 화면(월드맵·무한·오늘의 판) + 출석·오늘의 미션,
+//   타워 = 도감(codex.js), 강화 = 강화 나무 + 뽑기, 순위 = 시즌 + 순위표(records.js). 새 알림은 탭에 빨간 점(refreshDots). 전투·결과·뽑기 화면에선 탭을 숨긴다(hideTabs).
+//   전투 화면의 학습 요소(설명 문장·상성 목록·성질 설명)는 도감으로 옮겼다 — 전투엔 숫자·칩만. 결과 화면 버튼은 최대 3개.
 window.NGN = window.NGN || {};
 
 const $ = (id) => document.getElementById(id);
@@ -68,9 +71,11 @@ NGN.UI = class UI {
     $('menuPlay').addEventListener('click', () => this.showWorld());
     $('menuInfinite').addEventListener('click', () => { if (this.meta.infiniteUnlocked()) this.showMapScreen(); else this.toast(`스테이지 ${this.data.stages.infiniteUnlockStage}을 깨면 열립니다`); });
     $('menuDaily').addEventListener('click', () => cb.onStartDaily());
-    $('menuGacha').addEventListener('click', () => cb.onGacha());
-    $('menuRecords').addEventListener('click', () => this.showRecords());
     $('menuSettings').addEventListener('click', () => this.showSettings());
+    // 로비 탭 바(J-11 ②)
+    $('lobbyTabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const t = b.dataset.tab; if (t === 'battle') this.showMenu(); else if (t === 'tower') cb.onCodex(); else if (t === 'grow') this.showUpgrade(); else if (t === 'rank') this.showRecords(); });
+    $('growGacha').addEventListener('click', (e) => { if (e.target.closest('button')) cb.onGacha(); });
+    $('missionBox').addEventListener('click', (e) => { const b = e.target.closest('[data-claim]'); if (!b) return; const got = this.meta.missionClaim(Number(b.dataset.claim)); if (got) { this.toast(`뽑기 티켓 +${got}장`); NGN.sound && NGN.sound.play('gold'); this.showMenu(); } });
     $('a2hsClose').addEventListener('click', () => { this.meta.state.settings.a2hsDismissed = true; this.meta.save(); $('a2hs').hidden = true; });
     $('a2hsMore').addEventListener('click', () => this.a2hsHelp());
     // 난이도 고르기(월드맵 점을 누르면)
@@ -78,13 +83,11 @@ NGN.UI = class UI {
     // 월드맵 · 강화
     $('worldBack').addEventListener('click', () => this.showMenu());
     $('worldUpgrade').addEventListener('click', () => this.showUpgrade());
-    $('upgradeBack').addEventListener('click', () => this.showWorld());
     $('treeReset').addEventListener('click', () => { if (!this.meta.treeSpent()) return this.toast('찍은 것이 없습니다'); this.meta.resetTree(); this.toast('별을 전부 되돌렸습니다'); this.renderTree(); });
     // 무한 모드 지도 선택
     $('mapBack').addEventListener('click', () => this.showMenu());
     $('mapMore').addEventListener('click', () => { this.genCount += 12; this.buildMapGrid(); });
     $('mapStart').addEventListener('click', () => { if (this.mapId) cb.onStartInfinite(this.mapId); });
-    $('recordBack').addEventListener('click', () => this.showMenu());
     $('settingBack').addEventListener('click', () => this.showMenu());
     $('endCode').addEventListener('click', () => this.showEndCode());
     // 전투: ▶ 는 「미리 부르기」(카운트다운 중 누르면 바로 시작 + 보너스 골드 — main.js callWave), 웨이브 중에는 배속(1→2→3×)
@@ -99,12 +102,23 @@ NGN.UI = class UI {
     // 결과
     $('endNext').addEventListener('click', () => cb.onNextStage());
     $('endRetry').addEventListener('click', () => cb.onRetry());
-    $('endWorld').addEventListener('click', () => { cb.onLeave(); this.showWorld(); });
     $('endMenu').addEventListener('click', () => { cb.onLeave(); this.showMenu(); });
-    $('endGacha').addEventListener('click', () => cb.onGacha());
     $('endRecords').addEventListener('click', () => { cb.onLeave(); this.showRecords('daily'); });
   }
-  hideAll() { for (const id of ['menu', 'worldScreen', 'upgradeScreen', 'mapScreen', 'recordScreen', 'settingScreen', 'endScreen', 'game', 'diffModal', 'codeModal']) $(id).hidden = true; }
+  hideAll() { for (const id of ['menu', 'worldScreen', 'upgradeScreen', 'mapScreen', 'recordScreen', 'settingScreen', 'codexScreen', 'endScreen', 'game', 'diffModal', 'codeModal']) $(id).hidden = true; }
+  // ---------- 로비 탭 바(J-11 ②) ----------
+  showTabs(active) {
+    document.body.classList.add('has-tabs'); $('lobbyTabs').hidden = false;
+    for (const b of $('lobbyTabs').children) b.classList.toggle('on', b.dataset.tab === active);
+    this.refreshDots();
+  }
+  hideTabs() { document.body.classList.remove('has-tabs'); $('lobbyTabs').hidden = true; }
+  // 빨간 점: 전투 = 받을 미션 보상 · 타워 = 새로 열린 계열 · 강화 = 티켓·프리미엄 팩·찍을 별 · 순위 = 아직 안 본 지난 시즌 결과
+  refreshDots() {
+    const m = this.meta; if (!m) return;
+    const on = { battle: m.missionUnclaimed() > 0, tower: m.codexNew().length > 0, grow: m.state.tickets > 0 || (m.state.premiumPulls || 0) > 0 || m.treeKeys().some((k) => m.canBuy(k)), rank: !!m.seasonUnseen() };
+    for (const b of $('lobbyTabs').children) { const d = b.querySelector('.dot'); if (d) d.hidden = !on[b.dataset.tab]; }
+  }
 
   // ---------- 상성 ----------
   mul(attackType, defense) { return attackType ? this.data.affinity.table[attackType][defense] : null; }
@@ -119,14 +133,12 @@ NGN.UI = class UI {
     $('menuTickets').innerHTML = `${SVG.ticket}<span class="num">${m.state.tickets}</span>`;
     // 별은 난이도별로 따로(금·붉은). 상단 알약엔 둘의 합 / 120
     $('menuStars').innerHTML = `${m.diffList().map((d) => NGN.starOf(d)).join('')}<span class="num gold">${m.totalStars()}/${m.maxStars()}</span>`;
-    const b = m.state.best;
-    $('menuBest').innerHTML = `${SVG.trophy}<span class="num">${b ? '무한 ' + b.wave : '무한 —'}</span>`;
-    $('menuGachaDot').hidden = m.state.tickets < 1;
+    const b = m.state.best; // 무한 최고 기록은 무한 버튼 밑줄에(상단 알약은 폰 폭을 넘쳐 뺐다)
     const next = m.nextStage();
     $('menuPlay').innerHTML = next ? `<span>${SVG.play} 스테이지 ${next.id}</span><span class="sub">${esc(next.name)}</span>` : `<span>${SVG.play} 월드맵</span><span class="sub">모두 클리어</span>`;
     const inf = m.infiniteUnlocked();
     $('menuInfinite').classList.toggle('locked', !inf);
-    $('menuInfinite').innerHTML = inf ? `<span>${SVG.infinity} 무한 모드</span><span class="sub">끝없이 — 지도별 기록</span>` : `<span>${SVG.lock} 무한 모드</span><span class="sub">스테이지 ${this.data.stages.infiniteUnlockStage}을 깨면 열립니다</span>`;
+    $('menuInfinite').innerHTML = inf ? `<span>${SVG.infinity} 무한 모드</span><span class="sub">${b ? `최고 웨이브 ${b.wave}` : '끝없이 — 지도별 기록'}</span>` : `<span>${SVG.lock} 무한 모드</span><span class="sub">스테이지 ${this.data.stages.infiniteUnlockStage}을 깨면 열립니다</span>`;
     // 오늘의 판(I-9): 서버 시각이 있으면 그것, 없으면 폰 시계(작게 표시). 잠그지 않는다
     const dk = this.cb.dailyClock ? this.cb.dailyClock() : null;
     const done = dk && m.dailyPlayed(dk.date);
@@ -134,7 +146,35 @@ NGN.UI = class UI {
     const clockNote = dk && dk.src === 'p' ? ' · <span class="clock">폰 날짜로 판단하는 중</span>' : '';
     $('menuDaily').innerHTML = dk ? `<span>${SVG.calendar} 오늘의 판 · ${esc(dk.label)}</span><span class="sub">${done ? (m.dailyResult(dk.date).done ? `오늘은 했어요 — 웨이브 ${m.dailyResult(dk.date).wave}` : '오늘 판은 시작했다가 끊겼어요 — 내일 새 판') : '매일 새 지도 · 강화 없이 같은 조건 · 하루 한 번'}${clockNote}</span>` : `<span>${SVG.lock} 오늘의 판</span><span class="sub">준비 중</span>`;
     this.a2hsBanner();
+    this.lobbyDay(dk);
+    this.renderLobbySheet(dk);
+    this.showTabs('battle');
     this.cb.onMenu(true);
+  }
+  // 로비에 들어올 때 날짜 정리(J-11 ④·⑤): 출석 도장·미션 갱신·늦게 준 보상·시즌 정산. 알릴 것이 여럿이면 시즌 > 늦은 보상 > 출석 순으로 하나만 토스트(나머지는 시트에 보인다)
+  lobbyDay(dk) {
+    const r = this.meta.lobbyDay(dk);
+    if (r.seasonRolled) { const h = r.seasonRolled; this.toast(h.prize ? `지난달 시즌 ${h.rank}등 — 프리미엄 팩 ${h.prize}회!` : h.people > 1 ? `지난달 시즌 ${h.people}명 중 ${h.rank}등 — 새 달이 시작됐어요` : '새 달 — 시즌 점수가 0에서 다시 시작해요(별·타워는 그대로)'); }
+    else if (r.paidLate) this.toast(`어제 미션 보상 ${r.paidLate}장을 받았어요`);
+    else if (r.attended) { this.toast(`출석 ${r.attended.streak}일째 — 뽑기 티켓 +${r.attended.reward}장`); NGN.sound && NGN.sound.play('gold'); }
+    if (r.attended || r.paidLate || r.seasonRolled) $('menuTickets').innerHTML = `${SVG.ticket}<span class="num">${this.meta.state.tickets}</span>`;
+  }
+  // 전투 탭 시트: 출석 도장 한 줄(7칸 사이클, 연속 끊겨도 잃는 것 없음) + 오늘의 미션 셋(진행 막대·[받기])
+  renderLobbySheet(dk) {
+    const m = this.meta, A = m.attendInfo();
+    const stamps = A.cycle.map((rw, i) => { const d = i + 1, done = A.day >= d, today = A.day === d; return `<span class="stamp ${done ? 'done' : ''} ${today ? 'today' : ''}"><b>${d}일</b><span>${done ? '✓' : ''}${SVG.ticket}${rw}</span></span>`; }).join('');
+    $('attendBox').innerHTML = `<div class="attend"><span class="lbl">출석<b>${A.streak}일째</b></span><span class="stamps">${stamps}</span></div>`;
+    const M = m.missions();
+    if (!M || !dk) { $('missionBox').innerHTML = '<div class="mission-head">오늘의 미션 <small>날짜를 정하는 중…</small></div>'; return; }
+    const R = m.missionRules();
+    const allDone = M.list.length && M.list.every((x) => x.done), allClaimed = M.list.length && M.list.every((x) => x.claimed);
+    const rows = M.list.map((x, i) => {
+      const pct = Math.min(100, Math.round((x.n || 0) / x.goal * 100));
+      const right = x.claimed ? '<span class="ok">받음</span>' : x.done ? `<button class="btn green tiny" data-claim="${i}">받기 ${SVG.ticket}${x.reward}</button>` : `<span class="rw">${SVG.ticket}${x.reward}</span>`;
+      return `<div class="mission ${x.done ? 'done' : ''}"><span class="nm">${esc(x.name)}<span class="prog"> ${Math.min(x.n || 0, x.goal)}/${x.goal}</span><span class="bar"><span style="width:${pct}%"></span></span></span>${right}</div>`;
+    }).join('');
+    const bonus = R.allClearBonus ? `<div class="mission ${allDone ? 'done' : ''}"><span class="nm">셋 다 하면 보너스</span>${M.bonusClaimed ? '<span class="ok">받음</span>' : allClaimed ? '<span class="ok">받음</span>' : `<span class="rw">${SVG.ticket}${R.allClearBonus}</span>`}</div>` : '';
+    $('missionBox').innerHTML = `<div class="mission-head">오늘의 미션 <small>${esc(dk.label)} · 자정에 새로 · 밀리지 않아요</small></div>${rows}${bonus}`;
   }
   // 저장 지킴이(I-12): 아이폰 사파리는 7일 안 들어오면 저장을 통째로 지운다. 홈 화면에 추가한 웹앱은 면제(애플 공식). 홈 화면 앱이 아니면 첫 화면에 안내
   isStandalone() { return (navigator.standalone === true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
@@ -160,6 +200,7 @@ NGN.UI = class UI {
     const free = m.freeStars();
     $('worldUpgrade').innerHTML = `${SVG.star()} 강화${free ? ` <span class="num">${free}</span>` : ''}`;
     this.buildWorld();
+    this.showTabs('battle');
     this.cb.onMenu(true);
   }
   // 점 i(0부터)의 위치. 세로로 내려가며 좌우로 굽이친다(viewBox 360×1900)
@@ -214,7 +255,14 @@ NGN.UI = class UI {
   }
 
   // ---------- 강화 나무 ----------
-  showUpgrade() { this.hideAll(); $('upgradeScreen').hidden = false; this.renderTree(); }
+  showUpgrade() { this.hideAll(); $('upgradeScreen').hidden = false; this.renderGrowGacha(); this.renderTree(); this.showTabs('grow'); this.cb.onMenu(true); }
+  // 강화 탭 위의 뽑기 카드(J-11 ②): 티켓 수 · 천장까지 · 프리미엄 팩
+  renderGrowGacha() {
+    const m = this.meta, G = this.data.gacha, s = m.state;
+    const toLeg = G.pity.pityLegendary - s.sinceLegendary;
+    const owned = m.unlockedFamilies().length, all = this.data.families.length;
+    $('growGacha').innerHTML = `<span class="grow"><b>뽑기</b> — 새 타워 계열을 얻는 곳<small>타워 ${owned}/${all}계열 · 전설 확정까지 ${toLeg}번${s.premiumPulls ? ` · <b style="color:#1D5FA0">프리미엄 팩 ${s.premiumPulls}회</b>` : ''}</small></span><button class="btn gold">${SVG.ticket} ${s.tickets}장 뽑기</button>`;
+  }
   renderTree() {
     const m = this.meta, T = this.data.stages.upgradeTree;
     $('upgradeStars').innerHTML = `${SVG.star()}<span class="num gold">${m.freeStars()}</span><span class="sub" style="color:#6B5A48">/ ${m.totalStars()}</span>`;
@@ -238,7 +286,7 @@ NGN.UI = class UI {
   perStepText(ps) { return Object.keys(ps).map((k) => (k === 'allDmg' || k === 'rangeMul') ? `+${Math.round(ps[k] * 100)}%` : k === 'baseTier' ? '한 단 위에서 시작' : `+${ps[k]}`).join(' '); }
 
   // ---------- 무한 모드 지도 선택 ----------
-  showMapScreen() { this.hideAll(); $('mapScreen').hidden = false; this.buildMapGrid(); this.cb.onMenu(true); }
+  showMapScreen() { this.hideAll(); $('mapScreen').hidden = false; this.buildMapGrid(); this.showTabs('battle'); this.cb.onMenu(true); }
   mapList() { const list = [...this.data.maps.list]; for (let s = 1; s <= this.genCount; s++) list.push(this.cb.genMap(s)); return list; }
   buildMapGrid() {
     const grid = $('mapGrid'); grid.innerHTML = '';
@@ -269,7 +317,7 @@ NGN.UI = class UI {
   // ---------- 순위표(records.js) / 설정 ----------
   showRecords(tab) { if (!this.records) this.records = new NGN.RecordsUI(this.meta, this.data, this); this.records.show(tab); this.cb.onMenu(true); }
   showSettings() {
-    this.hideAll(); $('settingScreen').hidden = false;
+    this.hideAll(); $('settingScreen').hidden = false; this.hideTabs();
     const s = this.meta.state.settings || {}; const m = this.meta;
     $('settingList').innerHTML = `
       <div class="row"><span class="grow">이름 <span class="sub" style="color:#6B5A48">${m.hasName() ? esc(m.state.name) : '아직 없음'}</span></span><button class="btn blue" data-k="name">바꾸기</button></div>
@@ -304,7 +352,7 @@ NGN.UI = class UI {
   // ---------- 전투 화면 ----------
   onGameStart(game, mode) {
     this.game = game; this.mode = mode || 'stage'; this.pickFam = null; this.selectedSlot = null; this.previewSlot = null; this.lastGold = null;
-    this.hideAll(); $('game').hidden = false; $('nextDetail').hidden = true; $('pop').hidden = true;
+    this.hideAll(); this.hideTabs(); $('game').hidden = false; $('nextDetail').hidden = true; $('pop').hidden = true;
     this.setCountdown(null); this.bossBar(null); this.setDanger(false); this.showPause(false); // 지난 판의 잔상(카운트다운·보스 막대·경고·일시정지)을 지운다
     this.cb.onMenu(false);
     this.buildTowerBar(); this.refreshHud(); this.setPreview();
@@ -388,13 +436,10 @@ NGN.UI = class UI {
     const g = this.game; const wv = g.waveAt(g.stats.reachedWave + 1);
     const d = $('nextDetail');
     if (!wv) { d.hidden = true; return; }
-    if (!d.hidden) {
-      const rows = g.deck.map((f) => { const t = g.byFamily[f][0]; const m = this.mul(t.attackType, wv.defense); if (m === null || m === 1) return ''; return `<span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${this.elColor(t.element)}"></span> ${esc(t.familyName)} <b style="color:${m > 1 ? '#2E7D32' : '#9E2B22'}">×${m}</b></span>`; }).filter(Boolean);
+    if (!d.hidden) { // 글자 규칙 4(설명은 도감으로): 상성 목록·성질 설명 문장은 뺐다 — 카드의 화살표 배지가 상성을, 도감이 뜻을 알려 준다
       const spMul = wv.special ? wv.special.hpMul : 1;
       d.innerHTML = `<span><b>${wv.wave > g.waves.length ? '∞ ' : ''}다음 웨이브 ${wv.wave}</b> · ${this.foeIcons(wv)}</span>`
-        + `<span>${esc(wv.kindKo)} ×${wv.enemies.reduce((a, e) => a + e.count, 0)} · 체력 ${wv.enemies.map((e) => fmt(Math.round(e.hp * g.hpMul * spMul))).join('/')} · ${SVG.shield(hex(NGN.DEFENSE_COLOR[wv.defense]))} ${NGN.DEFENSE_KO[wv.defense]} 방어</span>`
-        + (wv.special ? `<span><b style="color:${esc(wv.special.color || '#888')}">${esc(wv.special.이름)}</b> — ${esc(wv.special._설명 || '')}</span>` : '')
-        + (rows.length ? rows.join('') : '<span style="color:#6B5A48">상성 없음 — 전부 ×1</span>');
+        + `<span>${esc(wv.kindKo)} ×${wv.enemies.reduce((a, e) => a + e.count, 0)} · 체력 ${wv.enemies.map((e) => fmt(Math.round(e.hp * g.hpMul * spMul))).join('/')} · ${SVG.shield(hex(NGN.DEFENSE_COLOR[wv.defense]))} ${NGN.DEFENSE_KO[wv.defense]} 방어</span>`;
     }
     this.refreshTowerBar();
   }
@@ -485,10 +530,8 @@ NGN.UI = class UI {
     m.innerHTML = `<div class="panel modal tdetail">
       <div class="head"><b>${esc(t1.familyName)}</b><div class="tags"><span class="spc" style="background:${this.elColor(t1.element)}">${esc(t1.elementKo)}</span><span class="spc" style="background:#5C666D">${esc(roleTxt)}</span></div></div>
       <div class="view" id="tdView"></div>
-      <p class="desc">${esc(t1.desc || '')}</p>
       <div class="tiers">${tiers.map((t) => { const img = this.cb.towerImage ? this.cb.towerImage(t) : null; return `<div class="tier" style="background:${this.elColor(t.element)}"><span class="lv">${t.tier}단</span>${img ? `<img src="${img}" alt="">` : ''}<b>${esc(t.name)}</b><br>${statLine(t)}<span class="st">${SVG.coin} ${t.tier === 1 ? g.costToBuild(fam) : t.cost}</span></div>`; }).join('')}</div>
-      <p class="up">${esc(t1.upgradeDesc || '')}${bd.tier > 1 ? ` <b>기본기로 ${bd.tier}단부터 지어진다.</b>` : ''}</p>
-      ${t1.aura || !B.length ? '' : `<div class="branches">${B.map((b) => `<span style="background:${esc(b.color)}"><b>3단 ${esc(b.name)}</b><br>${esc(b.설명)}</span>`).join('')}</div>`}
+      <p class="up">${bd.tier > 1 ? `<b>기본기로 ${bd.tier}단부터 지어진다.</b> ` : ''}${t1.aura || !B.length ? '' : `3단 갈래 ${B.map((b) => `<span class="spc" style="background:${esc(b.color)}">${esc(b.name)}</span>`).join(' ')} · `}<span style="color:#6B5A48">설명은 로비 [타워] 도감에</span></p>
       <div class="row"><button class="btn green" id="tdPick">이 타워 고르기</button><button class="btn gray" id="codeClose">닫기</button></div></div>`;
     if (this.cb.onDetailOpen) this.cb.onDetailOpen($('tdView'), bd);
     const close = () => { m.hidden = true; if (this.cb.onDetailClose) this.cb.onDetailClose(); };
@@ -586,9 +629,10 @@ NGN.UI = class UI {
       ? `<br><b style="color:#B8860B">${SVG.ticket} 뽑기 티켓 +${tickets.lines.reduce((a, l) => a + l.n, 0)}장</b><br>` + tickets.lines.map((l) => `· ${esc(l.why)} +${l.n}`).join('<br>') + `<br><span style="color:#6B5A48">가진 티켓 ${tickets.total}장</span>`
       : '';
   }
-  showBtns(ids) { for (const b of $('endBtns').children) b.hidden = !ids.includes(b.id); }
+  showBtns(ids) { for (const b of $('endBtns').children) if (b.id !== 'endCode') b.hidden = !ids.includes(b.id); }
   // 결과 화면의 [기록 코드] — 이 판의 기록(종목 최고가 아니면 최고 기록)을 코드로. 이름이 없으면 먼저 묻는다(I-10 ②)
-  setEndCode(rec) { this.endRec = rec ? (rec.notBest ? rec.best : rec) : null; $('endCode').hidden = !this.endRec; }
+  // show = false 면 코드 버튼을 숨긴다(버튼 3개 규칙 — 클리어 화면은 [다음][다시][로비]. 코드는 로비 [순위] 탭의 [내 코드]로도 만든다)
+  setEndCode(rec, show = true) { this.endRec = rec ? (rec.notBest ? rec.best : rec) : null; $('endCode').hidden = !(this.endRec && show); }
   async showEndCode() {
     if (!this.endRec) return;
     if (!this.meta.hasName()) { const n = await NGN.askName(this.meta, '기록 코드에 실릴 이름이에요. 8자까지. 설정에서 바꿀 수 있어요.'); if (!n) return; }
@@ -618,9 +662,8 @@ NGN.UI = class UI {
       + (result.cleared && stage.id === this.data.stages.infiniteUnlockStage && settle.firstClear ? `<b style="color:#1D5FA0">무한 모드가 열렸다!</b><br>` : '');
     $('ticketLines').innerHTML = this.ticketHtml(settle.tickets);
     const hasNext = result.cleared && !isLast;
-    this.showBtns([hasNext ? 'endNext' : '', 'endRetry', 'endWorld', (isLast && result.cleared) ? 'endMenu' : ''].filter(Boolean));
-    $('endMenu').textContent = '메뉴';
-    this.setEndCode(settle.rec);
+    this.showBtns([hasNext ? 'endNext' : '', 'endRetry', 'endMenu'].filter(Boolean)); // 최대 3개: 다음 있으면 [다음][다시][로비], 없으면 [다시][로비][기록 코드]
+    this.setEndCode(settle.rec, !hasNext);
   }
   // 무한 모드 결과: 웨이브 N, 지도 기록. [뽑기] / [다시] / [메뉴]
   showInfiniteEnd(result, best, tickets, mapName, rec) {
@@ -630,7 +673,7 @@ NGN.UI = class UI {
     $('endTitle').textContent = result.stopped ? `웨이브 ${result.wave}까지 막았다` : `웨이브 ${result.wave}까지 막고, ${result.fellAt}에서 무너졌다`;
     const at30 = result.livesAt30 !== null && result.livesAt30 !== undefined ? `<br>30웨이브 때 — 남은 생명 ${result.livesAt30} · 쓴 골드 ${Math.round(result.spentAt30).toLocaleString()} <span style="color:#6B5A48">(순위표 철벽·알뜰 부문)</span>` : '';
     $('endBody').innerHTML = `<b>${esc(mapName)}</b> · 무한 모드<br>${result.wave > this.game.waves.length ? '30웨이브를 넘어 무한 구간까지 갔다!<br>' : ''}남은 생명 ${result.lives} · 남은 골드 ${Math.floor(result.gold)} · 쓴 골드 ${Math.round(result.spent).toLocaleString()}${at30}<br>${result.newBest ? '<b style="color:#B8860B">새 기록!</b> ' : ''}이 지도 최고: 웨이브 ${best.wave}`;
-    this.showBtns([tickets && tickets.total > 0 ? 'endGacha' : '', 'endRetry', 'endMenu'].filter(Boolean));
+    this.showBtns(['endRetry', 'endMenu']); // [다시][로비][기록 코드]
     this.setEndCode(rec);
   }
   // 오늘의 판 결과(I-9): 하루 한 번이라 [다시] 없음. [순위표] / [메뉴]
@@ -640,7 +683,7 @@ NGN.UI = class UI {
     $('ticketLines').innerHTML = this.ticketHtml(settle);
     $('endTitle').textContent = result.cleared ? `오늘의 판 클리어!` : `오늘의 판 — 웨이브 ${result.wave}까지 막았다`;
     $('endBody').innerHTML = `<b>${esc(dk.label)}</b> · 강화 없이 같은 조건<br>${result.cleared ? `남은 생명 ${result.lives} · 쓴 골드 ${Math.round(result.spent).toLocaleString()}` : `웨이브 ${result.fellAt}에서 무너졌다`}<br><span style="color:#6B5A48">내일 새 판이 열려요. 기록 코드를 단톡방에 올려 겨루세요.</span>`;
-    this.showBtns(['endRecords', 'endMenu']);
+    this.showBtns(['endRecords', 'endMenu']); // [순위][로비][기록 코드]
     this.setEndCode(settle.rec);
   }
 };

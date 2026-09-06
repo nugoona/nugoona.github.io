@@ -3,6 +3,8 @@
 // 탭 셋: 캠페인(별 총합 · 금/붉은별 · 스테이지별 등급) · 무한(지도별 최고 웨이브) · 도전(오늘의 판).
 // 부문 넷: 최고 웨이브 · 철벽(남은 생명) · 알뜰(쓴 골드, 클리어한 판만) · 별 총합 — 부문마다 1등에 왕관. 꼴찌도 부문 하나는 1등이 되게.
 // 순위 진입에 조건이 없다: 캠페인 별 총합만으로도 이름이 오른다(무한 모드를 못 열었어도).
+// 월별 시즌(J-11 ⑤, 사장님 확정): 상단 패널에 이번 달 점수("이번 달에 얼마나 늘었나")·내역·친구 순위·상품. 1등 = 사장님이 게임 밖 실물, 2·3등 = 프리미엄 팩(gacha.json premiumPack).
+//   매달 1일 점수만 0 — 별·티켓·타워·강화는 그대로(meta.seasonRoll). 친구 점수는 기록 코드에 실려 온다(sk·sp).
 // 규칙·저장은 meta.js(ranking·starRanking·importFriend·recordCode), 여기는 보여주고 누르는 것만.
 window.NGN = window.NGN || {};
 
@@ -58,16 +60,40 @@ NGN.RecordsUI = class RecordsUI {
     $r('recordFriends').addEventListener('click', () => this.friends());
     $r('recordName').addEventListener('click', async () => { await NGN.askName(this.meta); this.render(); });
   }
-  show(tab) { if (tab) this.tab = tab; this.ui.hideAll(); $r('recordScreen').hidden = false; this.render(); }
+  show(tab) { if (tab) this.tab = tab; this.ui.hideAll(); $r('recordScreen').hidden = false; this.render(); if (this.ui.showTabs) this.ui.showTabs('rank'); }
   render() {
     const m = this.meta;
     $r('recordName').innerHTML = m.hasName() ? escR(m.state.name) : '이름 정하기';
+    this.renderSeason();
     for (const b of $r('recordTabs').children) b.classList.toggle('on', b.dataset.tab === this.tab);
     const body = $r('recordBody');
     body.innerHTML = this.tab === 'campaign' ? this.campaign() : this.tab === 'infinite' ? this.infinite() : this.daily();
     body.querySelectorAll('[data-open]').forEach((el) => el.addEventListener('click', () => { const k = el.dataset.open; if (this.open.has(k)) this.open.delete(k); else this.open.add(k); this.render(); }));
     body.querySelectorAll('[data-code]').forEach((el) => el.addEventListener('click', (e) => { e.stopPropagation(); this.showMyCode(JSON.parse(el.dataset.code)); }));
     const d = body.querySelector('#dailyGo'); if (d) d.addEventListener('click', () => this.ui.cb.onStartDaily());
+  }
+  // ---------- 월별 시즌 패널 ----------
+  renderSeason() {
+    const m = this.meta, box = $r('seasonBox'); if (!box) return;
+    const s = m.season();
+    if (!s) { box.innerHTML = ''; return; }
+    const [y, mo] = s.key.split('-').map(Number);
+    const dk = this.ui.cb.dailyClock ? this.ui.cb.dailyClock() : null;
+    const daysLeft = dk && dk.date ? (() => { const [yy, mm, dd] = dk.date.split('-').map(Number); const end = new Date(Date.UTC(yy, mm, 0)).getUTCDate(); return end - dd; })() : null;
+    const score = m.seasonScore(s), bd = m.seasonBreakdown(s);
+    const rank = m.seasonRank(s.key, score);
+    const packs = (this.data.gacha.premiumPack && this.data.gacha.premiumPack.pulls) || {};
+    const rows = rank.rows.map((r, i) => `<div class="rk ${r.me ? 'me' : ''}"><span class="pos">${i + 1}</span><span class="nm">${r.me ? '나' : escR(r.n)}</span><span class="v"><b>${r.p}</b>점</span><span class="cr">${i === 0 && rank.rows.length > 1 ? `<span class="ctag">${NGN.CROWN}1등</span>` : ''}</span></div>`).join('');
+    const last = m.seasonUnseen() || (m.state.seasonHistory || [])[0];
+    const lastHtml = last ? `<div class="last"><b>지난 ${Number(last.key.split('-')[1])}월</b> — ${last.score}점${last.people > 1 ? ` · ${last.people}명 중 ${last.rank}등` : ' · 혼자'}${last.prize ? ` · <b style="color:#B8860B">프리미엄 팩 ${last.prize}회 받음</b>(강화 탭 → 뽑기)` : last.rank === 1 && last.people >= (m.seasonRules().minPeople || 3) ? ' · <b>1등! 상품은 사장님이</b>' : ''}</div>` : '';
+    if (m.seasonUnseen()) m.seasonMarkSeen();
+    box.innerHTML = `<div class="panel season">
+      <div class="shead">${NGN.CROWN} ${mo}월 시즌<small>${daysLeft !== null ? `${daysLeft}일 남음 · ` : ''}1일에 점수만 0</small></div>
+      <div class="score">${score}점</div>
+      <div class="bd">${bd.map((b) => `<span>${escR(b.name)} <b>${b.n}${escR(b.unit)}</b> → ${b.pts}점</span>`).join('')}</div>
+      <div class="rhead">이번 달 순위 <small>친구 코드에 이번 달 점수가 실려요</small></div>${rows}${rank.rows.length === 1 ? '<div class="rk dim">친구 코드를 넣으면 나란히 서요</div>' : ''}
+      <div class="prize"><b>상품</b> · 1등은 사장님이 게임 밖에서 · 2등 프리미엄 팩 ${packs['2등'] || 0}회 · 3등 ${packs['3등'] || 0}회(고급 ${this.data.gacha.premiumPack ? this.data.gacha.premiumPack.rates.uncommon : 0}·희귀 ${this.data.gacha.premiumPack ? this.data.gacha.premiumPack.rates.rare : 0}·전설 ${this.data.gacha.premiumPack ? this.data.gacha.premiumPack.rates.legendary : 0}%). 나까지 ${m.seasonRules().minPeople || 3}명 이상일 때 매겨요. 별·타워·강화는 초기화되지 않아요.</div>
+      ${lastHtml}</div>`;
   }
   crownOf(crowns, name) { const has = (k) => (Array.isArray(crowns[k]) ? crowns[k].includes(name) : crowns[k] === name); const parts = []; if (has('wave')) parts.push(crowns.waveLabel || '웨이브'); if (has('lives')) parts.push('철벽'); if (has('gold')) parts.push('알뜰'); return parts; }
   // 순위 줄 하나: 이름 · 부문 값 · 왕관

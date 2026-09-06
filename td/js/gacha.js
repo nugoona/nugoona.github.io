@@ -21,6 +21,8 @@ NGN.GachaUI = class GachaUI {
     this.busy = false;
     $g('pullBtn').addEventListener('click', () => this.pull(1));
     $g('pull10Btn').addEventListener('click', () => this.pull(10));
+    // 프리미엄 팩(J-11 ⑤): 시즌 2·3등 상품. 있을 때만 버튼이 보인다
+    const pb = $g('pullPremiumBtn'); if (pb) pb.addEventListener('click', () => this.pull(1, true));
     $g('gachaClose').addEventListener('click', () => this.hide());
   }
   show() { $g('gachaScreen').hidden = false; this.refresh(); this.resetCard(); }
@@ -31,6 +33,7 @@ NGN.GachaUI = class GachaUI {
     $g('ticketCount').innerHTML = `${NGN.SVG ? NGN.SVG.ticket : ''}<span class="num">${s.tickets}</span>`;
     $g('pullBtn').disabled = s.tickets < 1 || this.busy;
     $g('pull10Btn').disabled = s.tickets < 10 || this.busy;
+    const pb = $g('pullPremiumBtn'); if (pb) { pb.hidden = !(s.premiumPulls > 0); pb.disabled = this.busy; pb.innerHTML = `프리미엄 팩 <span class="num">${s.premiumPulls || 0}</span>회`; }
     const toLeg = G.pity.pityLegendary - s.sinceLegendary, toRare = G.pity.pityRare - s.sinceRare;
     $g('pityInfo').innerHTML = `<span class="pity"><b style="color:${GRADE_COLOR.legendary}">전설</b> 확정까지 <b>${toLeg}</b>번 · <b style="color:${GRADE_COLOR.rare}">희귀</b> 확정까지 <b>${toRare}</b>번</span>`
       + `<span class="rates">${['common', 'uncommon', 'rare', 'legendary'].map((g) => `<span class="gtag" style="background:${GRADE_COLOR[g]}">${GRADE_KO[g]} ${R[g]}%</span>`).join('')}</span>`;
@@ -50,12 +53,12 @@ NGN.GachaUI = class GachaUI {
   }
 
   // n 장 연속 뽑기. 카드가 뒤집히며 하나씩 나오고, 여러 장이면 마지막에 가장 좋은 것을 한 번 더 크게
-  async pull(n) {
+  async pull(n, premium = false) {
     if (this.busy) return;
     const items = [];
     this.busy = true; this.refresh();
     for (let i = 0; i < n; i++) {
-      const it = this.meta.pull();
+      const it = this.meta.pull(Math.random, premium);
       if (!it) break;
       items.push(it);
       await this.reveal(it, n > 1 ? (it.grade === 'legendary' ? 1600 : 700) : (it.grade === 'legendary' ? 2400 : 1300));

@@ -7,6 +7,8 @@
 //   별은 난이도마다 따로 센다(starsBy.normal/hard = 금별·붉은별. 쉬움·은별은 2026-09-06 폐지). 뭉뚱그리면 아무도 어려움을 안 한다.
 //   기록(records)은 "한 판" 단위 — 이름·모드·종목·난이도·막은 웨이브·남은 생명·쓴 골드·별 총합·날짜. 친구 기록도 같은 모양으로 friends 에 쌓인다.
 //   기록 코드(TD-…)와 저장 코드(TDSAVE-…)는 lz-string 압축 + 검사 숫자. 바깥 서비스 없이 단톡방으로 주고받는다.
+// 로비(checklist J-11, design.md 12-15): 일일 미션(하루 3개·안 쌓임·벌칙 없음)·출석(연속 보너스만, 끊겨도 잃는 것 없음)·월별 시즌(점수만 초기화, 재화는 그대로)·도감 새 계열 알림·프리미엄 팩.
+//   규칙 숫자는 data/lobby.json. 날짜는 dailyClock(서버 시각 우선)으로 — 폰 시계를 돌려도 이득이 없다.
 window.NGN = window.NGN || {};
 
 // ---------- 코드(문자열) 만들기·읽기 ----------
@@ -40,8 +42,8 @@ NGN.DIFF_SHORT = { normal: 'n', hard: 'h' };
 NGN.DIFF_FROM_SHORT = { n: 'normal', h: 'hard' };
 
 NGN.Meta = class Meta {
-  constructor(gacha, stages, families) {
-    this.gacha = gacha; this.stages = stages; this.families = families || [];
+  constructor(gacha, stages, families, lobby) {
+    this.gacha = gacha; this.stages = stages; this.families = families || []; this.lobby = lobby || null;
     this.KEY = 'ngn-td-meta';
     this.state = this.load() || { tickets: 0, pulls: 0, sinceLegendary: 0, sinceRare: 0, items: [], unlocked: [], famLevel: {}, best: null, games: 0 };
     this.migrate();
@@ -63,6 +65,12 @@ NGN.Meta = class Meta {
     s.daily = s.daily || {};          // 날짜 → 오늘의 판 결과
     s.settings = s.settings || {};
     s.name = s.name || null;
+    s.missions = s.missions || null;   // 오늘의 일일 미션 { date, list[], bonusClaimed } (J-11)
+    s.attend = s.attend || { streak: 0, last: null, total: 0 }; // 출석
+    s.season = s.season || null;       // 이번 달 시즌 { key, base, pts, infBest }
+    s.seasonHistory = s.seasonHistory || []; // 지난 시즌 결과(최근 12개)
+    s.codexSeen = s.codexSeen || [];   // 도감에서 본 계열(새 계열 빨간 점)
+    s.premiumPulls = s.premiumPulls || 0; // 시즌 2·3등 프리미엄 팩 남은 횟수
     delete s.lastDeck;                // 덱 편성은 없어졌다(12장)
     // 옛 기록(ngn-td-best)이 있으면 가져온다
     if (!s.best) { try { const b = JSON.parse(localStorage.getItem('ngn-td-best') || 'null'); if (b) s.best = b; } catch (e) { /* 무시 */ } }
@@ -137,7 +145,9 @@ NGN.Meta = class Meta {
     if (!cleared) give(Math.floor(held / 3) + 1, held > 0 ? `웨이브 ${held}까지 막았다 (${held}÷3+1)` : '한 판 했다');
     else {
       give(T.perGame, '한 판 했다');
-      if (gained > 0) this.state.starsBy[diff][stage.id] = stars;
+      if (gained > 0) { this.state.starsBy[diff][stage.id] = stars; this.seasonAdd('star', gained); this.missionProgress('star', gained); }
+      this.missionProgress('clearStage', 1);
+      if (diff === 'hard') this.missionProgress('hardClear', 1);
       if (firstClear) give(stage.firstClearTickets || 0, `스테이지 ${stage.id} 첫 클리어`);
       else if (gained <= 0) { const m = Math.floor(held / T.everyWaves); give(m * T.perMilestone, `웨이브 ${T.everyWaves}마다 (${m}번)`); }
     }
@@ -275,6 +285,7 @@ NGN.Meta = class Meta {
     if (base > 0) { this.state.tickets += base; lines.push({ n: base, why: '오늘의 판' }); }
     if (result.cleared) { this.state.tickets += NGN.DAILY_CLEAR_BONUS; lines.push({ n: NGN.DAILY_CLEAR_BONUS, why: '오늘의 판 클리어' }); }
     this.state.daily[date] = { done: true, wave: result.wave, lives: result.lives, spent: Math.round(result.spent), cleared: result.cleared ? 1 : 0, src };
+    this.seasonAdd('daily', result.wave, result.cleared); this.missionProgress('daily', 1);
     const rec = this.addRecord({ m: 'd', k: date, d: null, w: result.wave, l: result.cleared ? result.lives : 0, g: result.cleared ? Math.round(result.spent) : null, c: result.cleared ? 1 : 0, cs: src });
     this.save();
     return { lines, total: this.state.tickets, rec };
@@ -308,11 +319,12 @@ NGN.Meta = class Meta {
   myRecords(m) { return this.state.records.filter((x) => x.m === m); }
   // 무한 모드 판 하나를 기록으로(엔진 결과에서). l·g 는 30웨이브 시점 값(못 가면 null)
   addInfiniteRecord(mapId, result) {
+    this.seasonAdd('inf', result.wave); this.missionProgress('infinite', 1);
     return this.addRecord({ m: 'i', k: mapId, d: null, w: result.wave, l: result.livesAt30 === null || result.livesAt30 === undefined ? null : result.livesAt30, g: result.spentAt30 === null || result.spentAt30 === undefined ? null : Math.round(result.spentAt30), c: result.wave >= 30 ? 1 : 0 });
   }
 
   // 기록 코드: 이 판 하나 + 내 별 총합. 단톡방에 올리면 친구가 [친구 코드 넣기]로 받는다
-  recordCode(rec) { return NGN.Codes.encode('TD-', Object.assign({}, rec, { n: this.state.name || '이름없음', t: this.totalStars(), v: 1 })); }
+  recordCode(rec) { const s = this.state.season; return NGN.Codes.encode('TD-', Object.assign({}, rec, { n: this.state.name || '이름없음', t: this.totalStars(), v: 1, sk: s ? s.key : undefined, sp: s ? this.seasonScore(s) : undefined })); }
   // 친구 코드 넣기. 돌아오는 값: { ok, why?, rec?, replaced? }
   importFriend(code) {
     const r = NGN.Codes.decode('TD-', code);
@@ -324,6 +336,7 @@ NGN.Meta = class Meta {
     if (this.state.name && f.n === this.state.name) return { ok: false, why: '내 이름과 같은 코드예요 — 친구 이름을 다르게 정해 주세요' };
     const rec = { v: 1, n: String(f.n).slice(0, 8), m: f.m, k: f.k, d: f.d || null, w: Number(f.w) || 0, l: f.l === null || f.l === undefined ? null : Number(f.l), g: f.g === null || f.g === undefined ? null : Number(f.g), c: f.c ? 1 : 0, s: Number(f.s) || 0, t: Number(f.t) || 0, dt: String(f.dt || ''), at: Date.now() };
     if (f.m === 'd') rec.cs = f.cs === 'p' ? 'p' : 's'; // 오늘의 판: 어느 시계로 판정됐나
+    if (f.sk && f.sp !== undefined) { rec.sk = String(f.sk).slice(0, 7); rec.sp = Math.max(0, Number(f.sp) || 0); } // 시즌(J-11 ⑤): 그 달의 점수
     const key = this.recordKey(rec);
     const i = this.state.friends.findIndex((x) => x.n === rec.n && this.recordKey(x) === key);
     let replaced = false;
@@ -331,6 +344,7 @@ NGN.Meta = class Meta {
     else { replaced = true; if (this.better(rec, this.state.friends[i]) >= 0) this.state.friends[i] = rec; }
     // 별 총합은 사람 단위 — 그 친구의 다른 기록에도 최신 값을 적는다
     for (const x of this.state.friends) if (x.n === rec.n && x.t < rec.t) x.t = rec.t;
+    if (rec.sk) for (const x of this.state.friends) if (x.n === rec.n && x.sk === rec.sk && (x.sp || 0) < rec.sp) x.sp = rec.sp; // 같은 달 점수는 사람 단위로 최신·최대
     this.save();
     return { ok: true, rec, replaced };
   }
@@ -376,18 +390,33 @@ NGN.Meta = class Meta {
   // 등급(흔함 52 · 고급 28 · 희귀 15 · 전설 5) → 천장(전설 40회 · 희귀 8회) → 고급·희귀·전설은 towerPool 의 새 계열, 흔함은 pool.common 의 숫자 상품.
   // 이미 가진 계열이 또 나오면 그 계열 레벨 +1(피해 +dupLevelDmg, 상한 dupLevelMax). 그 등급의 계열을 다 모으고 레벨도 꽉 찼으면 숫자 상품으로.
   // 돌아오는 값: { kind: 'tower', grade, family, isNew, level } 또는 { kind: 'perk', grade, id, name, type, value }. 무작위는 여기서만 쓴다(rng 를 넣으면 시험 가능)
-  pull(rng = Math.random) {
-    if (this.state.tickets <= 0) return null;
-    this.state.tickets--; this.state.pulls++;
-    const P = this.gacha.pity;
-    let grade = this.rollGrade(rng);
-    if (this.state.sinceLegendary + 1 >= P.pityLegendary) grade = 'legendary';
-    else if (grade !== 'legendary' && grade !== 'rare' && this.state.sinceRare + 1 >= P.pityRare) grade = 'rare';
-    if (grade === 'legendary') this.state.sinceLegendary = 0; else this.state.sinceLegendary++;
-    if (grade === 'rare' || grade === 'legendary') this.state.sinceRare = 0; else this.state.sinceRare++;
+  // premium = true 면 시즌 2·3등 프리미엄 팩(gacha.json premiumPack: 고급 30·희귀 45·전설 25, 흔함 없음). 티켓 대신 premiumPulls 를 쓰고 천장 카운터는 안 건드린다
+  pull(rng = Math.random, premium = false) {
+    let grade;
+    if (premium) {
+      if ((this.state.premiumPulls || 0) <= 0) return null;
+      this.state.premiumPulls--; this.state.pulls++;
+      grade = this.rollGradeFrom((this.gacha.premiumPack && this.gacha.premiumPack.rates) || this.gacha.rates, rng);
+    } else {
+      if (this.state.tickets <= 0) return null;
+      this.state.tickets--; this.state.pulls++;
+      const P = this.gacha.pity;
+      grade = this.rollGrade(rng);
+      if (this.state.sinceLegendary + 1 >= P.pityLegendary) grade = 'legendary';
+      else if (grade !== 'legendary' && grade !== 'rare' && this.state.sinceRare + 1 >= P.pityRare) grade = 'rare';
+      if (grade === 'legendary') this.state.sinceLegendary = 0; else this.state.sinceLegendary++;
+      if (grade === 'rare' || grade === 'legendary') this.state.sinceRare = 0; else this.state.sinceRare++;
+    }
     const item = (grade === 'common' ? null : this.pullTower(grade, rng)) || this.pullPerk(grade, rng);
+    item.premium = !!premium;
+    this.missionProgress('pull', 1);
     this.save();
     return item;
+  }
+  rollGradeFrom(R, rng) {
+    const r = rng() * 100; let acc = 0;
+    for (const g of ['legendary', 'rare', 'uncommon']) { acc += R[g] || 0; if (r < acc) return g; }
+    return R.common ? 'common' : 'uncommon';
   }
   rollGrade(rng) {
     const R = this.gacha.rates; const r = rng() * 100; let acc = 0;
@@ -410,6 +439,132 @@ NGN.Meta = class Meta {
     this.state.items.push({ id: item.id, grade, type: item.type, value: item.value, name: item.name, at: Date.now() });
     return item;
   }
+
+  // ---------- 로비(checklist J-11): 날짜가 바뀌면 여기서 한 번에 정리한다 ----------
+  lobbyRules() { return this.lobby || {}; }
+  missionRules() { return this.lobbyRules().missions || { pool: [], perDay: 3, allClearBonus: 0 }; }
+  attendRules() { return this.lobbyRules().attendance || { cycle: [1] }; }
+  seasonRules() { return this.lobbyRules().season || { scoring: {}, minPeople: 3 }; }
+  seasonKeyOf(date) { return String(date || '').slice(0, 7); }
+  dateShift(date, days) { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d) + days * 86400e3).toISOString().slice(0, 10); }
+  // 로비에 들어올 때 부른다(dk = dailyClock 결과). 돌아오는 값 = 화면이 알릴 것들(출석 보상·미션 갱신·늦게 준 보상·시즌 정산)
+  lobbyDay(dk) {
+    const out = { attended: null, missionsReset: false, paidLate: 0, seasonRolled: null };
+    if (!dk || !dk.date) return out;
+    const date = dk.date;
+    out.seasonRolled = this.seasonRoll(date); // ① 월이 바뀌었으면 지난달 정산
+    // ② 미션: 날짜가 바뀌었으면 어제 미수령 보상은 자동으로 주고(벌칙 없음) 오늘 것을 새로 고른다 — 밀린 미션은 없다(안 쌓인다)
+    const M = this.state.missions;
+    if (!M || M.date !== date) {
+      if (M && Array.isArray(M.list)) {
+        for (const m of M.list) if (m.done && !m.claimed) { out.paidLate += m.reward; this.state.tickets += m.reward; }
+        if (M.list.length && M.list.every((m) => m.done) && !M.bonusClaimed) { const b = this.missionRules().allClearBonus || 0; out.paidLate += b; this.state.tickets += b; }
+      }
+      this.state.missions = { date, list: this.pickMissions(date), bonusClaimed: false };
+      out.missionsReset = true;
+    }
+    // ③ 출석: 오늘 처음이면 도장 + 티켓. 어제도 왔으면 연속 +1, 아니면 1일차부터 — 잃는 것은 없다(보너스 칸을 다시 걸어갈 뿐)
+    const A = this.state.attend;
+    if (A.last !== date) {
+      A.streak = A.last === this.dateShift(date, -1) ? (A.streak || 0) + 1 : 1;
+      A.last = date; A.total = (A.total || 0) + 1;
+      const cycle = this.attendRules().cycle || [1];
+      const reward = cycle[(A.streak - 1) % cycle.length] || 1;
+      this.state.tickets += reward;
+      out.attended = { reward, streak: A.streak, day: ((A.streak - 1) % cycle.length) + 1, cycleLen: cycle.length };
+    }
+    this.save();
+    return out;
+  }
+  attendInfo() { const A = this.state.attend, cycle = this.attendRules().cycle || [1]; const streak = A.streak || 0; return { streak, total: A.total || 0, last: A.last, cycle, day: streak ? ((streak - 1) % cycle.length) + 1 : 0 }; }
+  // 오늘의 미션 3개 — 날짜가 씨앗이라 같은 날은 모두 같은 미션. needs 조건이 안 열린 사람에겐 그 미션이 안 나온다
+  pickMissions(date) {
+    const R = this.missionRules();
+    const pool = (R.pool || []).filter((m) => !m.needs || (m.needs === 'infinite' && this.infiniteUnlocked()) || (m.needs === 'hard' && this.hardOpenedAny()));
+    let seed = 7; for (const ch of date) seed = (Math.imul(seed, 31) + ch.charCodeAt(0)) >>> 0;
+    const rng = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const arr = pool.slice();
+    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    return arr.slice(0, R.perDay || 3).map((m) => ({ id: m.id, name: m.name, type: m.type, goal: m.goal, reward: m.reward, n: 0, done: false, claimed: false }));
+  }
+  hardOpenedAny() { return this.stages.stages.some((s) => this.isDiffOpen(s.id, 'hard')); }
+  missions() { return this.state.missions; }
+  // 진행 올리기(판 끝·뽑기·별). 완료되면 시즌 점수도. 돌아오는 값 = 이번에 완료된 미션들
+  missionProgress(type, n = 1) {
+    const M = this.state.missions; if (!M || !(n > 0)) return [];
+    const done = [];
+    for (const m of M.list) {
+      if (m.type !== type || m.done) continue;
+      m.n = Math.min(m.goal, (m.n || 0) + n);
+      if (m.n >= m.goal) { m.done = true; done.push(m); this.seasonAdd('mission', 1); }
+    }
+    if (done.length) this.save();
+    return done;
+  }
+  missionClaim(i) {
+    const M = this.state.missions; if (!M) return 0;
+    const m = M.list[i]; if (!m || !m.done || m.claimed) return 0;
+    m.claimed = true; this.state.tickets += m.reward;
+    let got = m.reward;
+    if (M.list.every((x) => x.claimed) && !M.bonusClaimed) { const b = this.missionRules().allClearBonus || 0; M.bonusClaimed = true; this.state.tickets += b; got += b; }
+    this.save();
+    return got;
+  }
+  missionUnclaimed() { const M = this.state.missions; return M ? M.list.filter((m) => m.done && !m.claimed).length : 0; }
+
+  // ---------- 월별 시즌(J-11 ⑤) — 점수만 매달 0, 재화·타워·강화는 그대로 ----------
+  seasonNew(key) { const inf = this.state.best ? this.state.best.wave : 0; return { key, base: { inf }, pts: { star: 0, daily: 0, dailyN: 0, mission: 0 }, infBest: inf }; }
+  season() { return this.state.season; }
+  seasonScore(s = this.state.season) { return s ? this.seasonBreakdown(s).reduce((a, b) => a + b.pts, 0) : 0; }
+  // 항목별 내역 — 화면이 그대로 보여 준다("이번 달에 얼마나 늘었나")
+  seasonBreakdown(s = this.state.season) {
+    if (!s) return [];
+    const S = this.seasonRules().scoring || {};
+    const inf = Math.max(0, (s.infBest || 0) - (s.base.inf || 0));
+    return [
+      { name: '새로 딴 별', n: s.pts.star || 0, unit: '개', pts: (s.pts.star || 0) * (S.starPts || 0) },
+      { name: '오늘의 판', n: s.pts.dailyN || 0, unit: '판', pts: s.pts.daily || 0 },
+      { name: '무한 기록 갱신', n: inf, unit: '웨이브', pts: inf * (S.infWavePts || 0) },
+      { name: '일일 미션', n: s.pts.mission || 0, unit: '개', pts: (s.pts.mission || 0) * (S.missionPts || 0) },
+    ];
+  }
+  seasonAdd(kind, n, extra) {
+    const s = this.state.season; if (!s) return;
+    const S = this.seasonRules().scoring || {};
+    if (kind === 'star') s.pts.star = (s.pts.star || 0) + n;
+    else if (kind === 'daily') { s.pts.daily = (s.pts.daily || 0) + n * (S.dailyWavePts || 0) + (extra ? (S.dailyClearPts || 0) : 0); s.pts.dailyN = (s.pts.dailyN || 0) + 1; }
+    else if (kind === 'mission') s.pts.mission = (s.pts.mission || 0) + n;
+    else if (kind === 'inf') s.infBest = Math.max(s.infBest || 0, n);
+  }
+  // 월이 바뀌었으면 지난달을 정산하고 새 달을 연다. 2·3등이면 프리미엄 팩(gacha.json premiumPack.pulls). 나까지 minPeople 명이 안 되면 팩 없음
+  seasonRoll(date) {
+    const key = this.seasonKeyOf(date); if (!key) return null;
+    const s = this.state.season;
+    if (!s) { this.state.season = this.seasonNew(key); return null; }
+    if (s.key === key) return null;
+    const result = this.seasonRank(s.key, this.seasonScore(s));
+    const packs = (this.gacha.premiumPack && this.gacha.premiumPack.pulls) || {};
+    let prize = 0;
+    if (result.people >= (this.seasonRules().minPeople || 3)) prize = result.rank === 2 ? (packs['2등'] || 0) : result.rank === 3 ? (packs['3등'] || 0) : 0;
+    if (prize) this.state.premiumPulls = (this.state.premiumPulls || 0) + prize;
+    const rec = { key: s.key, score: this.seasonScore(s), rank: result.rank, people: result.people, prize, rows: result.rows, seenAt: null };
+    this.state.seasonHistory = [rec, ...(this.state.seasonHistory || [])].slice(0, 12);
+    this.state.season = this.seasonNew(key);
+    return rec;
+  }
+  // 시즌 순위: 나 + 친구(코드에 실린 sk 가 그 달인 사람). 친구 점수는 코드를 받은 시점의 값
+  seasonRank(key, myScore) {
+    const rows = [{ n: this.state.name || '나', p: myScore, me: true }];
+    for (const name of this.friendNames()) { const ps = this.state.friends.filter((x) => x.n === name && x.sk === key).map((x) => Number(x.sp) || 0); if (ps.length) rows.push({ n: name, p: Math.max(...ps), me: false }); }
+    rows.sort((a, b) => b.p - a.p);
+    return { rows, people: rows.length, rank: rows.findIndex((r) => r.me) + 1 };
+  }
+  seasonUnseen() { const h = this.state.seasonHistory || []; return h.length && !h[0].seenAt ? h[0] : null; }
+  seasonMarkSeen() { const h = this.state.seasonHistory || []; if (h.length && !h[0].seenAt) { h[0].seenAt = this.today(); this.save(); } }
+
+  // ---------- 도감(J-11 ③): 새로 열린 계열 → 로비 [타워] 탭 빨간 점 ----------
+  codexNew() { const seen = new Set(this.state.codexSeen || []); return this.unlockedFamilies().filter((f) => !seen.has(f)); }
+  codexMarkSeen() { const s = new Set(this.state.codexSeen || []); let changed = false; for (const f of this.unlockedFamilies()) if (!s.has(f)) { s.add(f); changed = true; } if (changed) { this.state.codexSeen = [...s]; this.save(); } }
 };
 NGN.GRADES = ['common', 'uncommon', 'rare', 'legendary'];
 NGN.DAILY_CLEAR_BONUS = 2; // 오늘의 판 클리어 보너스 — stages.json daily 에 칸이 생기면 그것을 읽게

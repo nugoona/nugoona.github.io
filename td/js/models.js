@@ -80,7 +80,7 @@ NGN.Models = class Models {
     // 2026-09-06 팩이 10 → 17개로 늘어(적 캐릭터·장식·성) 4×4=16 칸을 넘친다 → 8×8=64 칸(2048²). 칸 크기 256 은 그대로(Kenney colormap 은 512² 팔레트라 축소해도 색이 안 뭉개진다)
     const CELL = 256, N = 8;
     const canvas = document.createElement('canvas'); canvas.width = canvas.height = CELL * N;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true }); // 회색조 변환에 getImageData 를 여러 번 부른다 — 이 옵션이 없으면 크롬이 경고를 낸다(2026-09-06 콘솔 warn 점검)
     // 🔴 팩 이름으로 묶는다 — GLB 파일마다 같은 colormap 을 따로 읽어 Image 객체가 다 달라서, 이미지로 묶으면 파일 60개가 칸 16개를 넘쳐 뒤쪽 팩이 흰 칸으로 떨어졌다(실측 2026-09-06)
     this.cells = new Map(); // 팩 → { gray: n, color: n }
     let n = 0;

@@ -8,7 +8,7 @@ window.NGN = window.NGN || {};
 // 파일 위치. 개발(game/index.html)은 프로젝트 루트 기준 '../', 나눔 빌드(dist/)는 index.html 이 window.__NGN_PATHS__ 로 './' 를 준다
 NGN.PATHS = Object.assign({ data: '../data/', assets: '../assets/', sim: '../sim/', vendor: 'vendor/' }, window.__NGN_PATHS__ || {});
 
-NGN.DATA_FILES = ['towers', 'enemies', 'waves', 'affinity', 'balance', 'growth', 'gacha', 'kenney_parts', 'maps', 'stages', 'wave_specials', 'items'];
+NGN.DATA_FILES = ['towers', 'enemies', 'waves', 'affinity', 'balance', 'growth', 'gacha', 'kenney_parts', 'maps', 'stages', 'wave_specials', 'items', 'lobby'];
 
 NGN.loadData = async function loadData(onProgress) {
   let raw = window.__NGN_DATA__;
@@ -44,5 +44,6 @@ NGN.shapeData = function shapeData(raw) {
     stages: raw.stages, // 스테이지 20개·별 등급·강화 나무·해금 표 (design.md 12장)
     specials: raw.wave_specials || null, // 적 성질 9종 (checklist I-8) — 웨이브 생성기가 스테이지 번호로 붙인다
     items: raw.items || null, // 아이템 24종 (checklist I-11) — 처치 수로 떨어진다
+    lobby: raw.lobby || null, // 로비 규칙 — 일일 미션·출석·월별 시즌 (checklist J-11)
   };
 };
