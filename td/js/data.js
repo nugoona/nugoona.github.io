@@ -14,7 +14,8 @@ NGN.loadData = async function loadData(onProgress) {
   let raw = window.__NGN_DATA__;
   if (!raw) {
     const get = async (p) => {
-      const r = await fetch(NGN.PATHS.data + p + '.json');
+      // 스크립트와 같은 이유로 버전을 붙인다(index.html 의 V 와 짝) — 안 붙이면 옛 데이터가 캐시에서 나온다
+      const r = await fetch(NGN.PATHS.data + p + '.json' + (window.__NGN_VERSION__ ? '?v=' + window.__NGN_VERSION__ : ''));
       if (!r.ok) throw new Error('데이터를 못 읽음: ' + p);
       return r.json();
     };

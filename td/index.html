@@ -919,7 +919,7 @@
 <!-- 부팅: 스크립트를 하나씩 받으며 로딩 막대를 채운다(0~30%). 그 뒤 데이터·모델은 main.js 가 NGN_LOADING 으로 이어 채운다.
      파일 위치는 window.__NGN_PATHS__(나눔 빌드가 넣는다)로 바꾼다. 번들(단일 HTML)은 __NGN_INLINE__ 을 세워 이 목록을 안 받고 뒤에 인라인된 것을 쓴다.
      SCRIPTS 는 유효한 JSON 배열이어야 한다 — game/build.js·bundle.js 가 이 줄을 읽는다 -->
-<script>window.__NGN_VERSION__ = "5a5790e78c"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
+<script>window.__NGN_VERSION__ = "907053a327"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
 <script>
 (function () {
   const P = Object.assign({ sim: '../sim/', vendor: 'vendor/', data: '../data/', assets: 'assets/' }, window.__NGN_PATHS__ || {});
@@ -937,7 +937,11 @@
     done() { this.set(100, '준비 완료!'); clearInterval(tipTimer); setTimeout(() => { box.classList.add('out'); setTimeout(() => box.remove(), 500); }, 250); },
   };
   if (window.__NGN_INLINE__) return; // 번들: 스크립트가 이미 아래에 심겨 있다
-  const url = (s) => s.startsWith('vendor/') ? P.vendor + s.slice(7) : s.startsWith('sim/') ? P.sim + s.slice(4) : s;
+  // 🔴 파일 이름에 버전을 붙인다(2026-09-07). 안 붙이면 GitHub Pages 가 주는 브라우저 캐시(max-age) 때문에
+  //    새 index.html + 옛 js 가 섞여 게임이 통째로 안 뜬다(실측: 배포 직후 ui.js 68,998 옛것 / 새것 77,061 → "문제가 생겼어요").
+  //    개발 서버에는 __NGN_VERSION__ 이 없어 쿼리가 안 붙는다(늘 새 파일).
+  const V = window.__NGN_VERSION__ ? '?v=' + window.__NGN_VERSION__ : '';
+  const url = (s) => (s.startsWith('vendor/') ? P.vendor + s.slice(7) : s.startsWith('sim/') ? P.sim + s.slice(4) : s) + V;
   const names = { three: '3D 엔진', GLTFLoader: '모델 읽기', Lightning: '번개', Simplex: '번개', lz: '기록 코드', map: '지도', mapgen: '지도 생성기', engine: '게임 규칙', ai: '자동 플레이', 'build-waves': '웨이브', data: '데이터', world: '세계', fx: '효과', models: '부품', render: '연출', ui: '화면', meta: '진행 저장', records: '순위표', gacha: '뽑기', main: '시작' };
   (async () => {
     for (let i = 0; i < SCRIPTS.length; i++) {
