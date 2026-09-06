@@ -24,15 +24,15 @@
   },
   "gradeKo": {
     "common": "흔함",
-    "rare": "고급",
-    "epic": "희귀",
+    "uncommon": "고급",
+    "rare": "희귀",
     "legendary": "전설"
   },
   "gradeColor": {
-    "common": "#9BA3A8",
-    "rare": "#4FA3E8",
-    "epic": "#B15BE8",
-    "legendary": "#F2B632"
+    "common": "#9AA7B4",
+    "uncommon": "#3FA46A",
+    "rare": "#3E7BD6",
+    "legendary": "#E0A32E"
   },
   "pool": {
     "_설명": "흔함 등급에서만 나오는 보조 상품. 계열은 towerPool 에서 나온다.",
@@ -71,7 +71,7 @@
   },
   "unlockFallbackFamilyDmg": 0.08,
   "startFamilies": {
-    "_설명": "처음부터 열려 있는 계열 셋. haunted·heap·sun·storm 은 스테이지 2·4·6·8 클리어로 열리고(stages.json.unlockFamily), 설인·어둠화덕·스킹크는 뽑기로만 연다.",
+    "_설명": "처음부터 열려 있는 계열 셋. haunted·heap·sun·storm 은 스테이지 2·4·6·8 클리어로 열리고, 나머지 23계열(설인·어둠화덕·스킹크 포함)은 뽑기로만 얻는다.",
     "list": [
       "shrub",
       "fiery",
@@ -102,13 +102,16 @@
       "defIron",
       "defNature",
       "defStorm",
-      "mushroom"
+      "firepit",
+      "mushroom",
+      "snowman"
     ],
     "legendary": [
       "astral",
       "brazier",
       "inferno",
       "quarry",
+      "skink",
       "totem",
       "wolves"
     ]

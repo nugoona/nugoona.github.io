@@ -152,6 +152,7 @@ NGN.serverNow = async function serverNow() {
       renderer.showRange(NGN.map.SLOTS[slotId], def.range, { color: NGN.ELEMENT_COLOR[def.element], ghost: def });
     },
     onPick(fam) { if (fam && tutorialStep === 1) tutorialStep = 2; },
+    onPickState(state) { if (world.setPickState) world.setPickState(state); }, // 0 안 고름 · 1 놓을 수 있음 · 2 돈 모자람 → 자리 링·기단 표시
     // 카드 그림: 계열·단마다 한 번만 그려 data URL 로 캐시. 못 그리면 null → 카드는 역할 아이콘으로
     towerImage(def) { try { return preview ? preview.snapshot(def.family, def.tier, def.element) : null; } catch (e) { return null; } },
     onDetailOpen(host, def) { if (preview) preview.attach(host, def.family, def.tier, def.element, Math.min(220, innerWidth - 80)); },

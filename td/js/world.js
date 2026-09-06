@@ -321,45 +321,92 @@ NGN.World = class World {
 
   // 자리(2026-09-06 화면 설계 2판): 흰 원판 + 금색 테두리 링. 원판은 InstancedMesh 하나(색으로 선택 표시), 금테는 조명을 안 받는 Basic 재질 InstancedMesh 하나 — 자리 수와 무관하게 그리기 2회.
   // 비어 있는 자리는 금테가 은은히 숨 쉰다(render 에서 인스턴스 색 밝기를 사인파로) — "여기 지으라고". 타워가 서면(setSlotBuilt) 숨쉬기를 멈추고 얌전한 금색으로
+  // 2026-09-06 사장님 "타워 놓는 곳 디자인 디테일하게": 창고 조각 세 겹(kenney_parts.json landmarks.slot) — 바닥판 + 둥근 석조 기단 + 기단 위 파인 홈 + 기단을 두르는 선택 링.
+  // 층마다 InstancedMesh 하나 → 자리 수와 무관하게 그리기 4회(+자리 점 1회). 상태(빈/놓을 수 있음/돈 모자람/손가락/타워 섬)는 링 색·기단 색·기단 높이(인스턴스 색·행렬)로만 바꾼다 — 그리기 횟수 불변.
+  // 타워는 기단 위(slotH)에 선다 — 타워가 서도 기단이 그대로 보여 "몇 자리가 남았나"가 한눈에 세진다. 모델이 없으면 옛 원판+링(폴백)
   buildSlots() {
     this.slotMeshes = [];
-    const geo = new THREE.CylinderGeometry(1.5, 1.65, 0.3, 14);
-    const pips = [], discs = [], rings = [];
-    this.slotBuilt = []; this.slotHi = [];
+    this.slotBuilt = []; this.slotHi = []; this.slotPick = 0; this.slotDirty = true; this.slotH = 0.3;
+    const pips = [], pos = [];
     for (const s of NGN.map.SLOTS) {
-      const p = this.toWorld(s.x, s.y, 0.15);
-      discs.push({ x: p.x, y: p.y, z: p.z, cast: true }); rings.push({ x: p.x, y: 0.32, z: p.z });
+      const p = this.toWorld(s.x, s.y, 0); pos.push(p);
       this.slotBuilt[s.id] = false; this.slotHi[s.id] = false;
       const cover = NGN.map.coverageFor(s.id, 800, false);
       const n = cover > 2600 ? 3 : cover > 1900 ? 2 : 1;
-      for (let i = 0; i < n; i++) pips.push({ x: p.x + (i - (n - 1) / 2) * 0.45, y: 0.34, z: p.z + 0.95 });
+      for (let i = 0; i < n; i++) pips.push({ x: p.x + (i - (n - 1) / 2) * 0.45, y: 0.34, z: p.z + 1.05 });
     }
-    this.slotDisc = instanced(geo, this.M.slot, discs, this.root);
-    const ringGeo = new THREE.RingGeometry(1.32, 1.62, 40); ringGeo.rotateX(-Math.PI / 2);
-    this.slotRing = instanced(ringGeo, new THREE.MeshBasicMaterial({ color: 0xFFFFFF }), rings, this.root);
-    if (this.slotRing) this.slotRing.castShadow = false;
-    const white = new THREE.Color(0xFFFFFF), gold = new THREE.Color(this.C.slotEdge);
-    for (let i = 0; i < discs.length; i++) { if (this.slotDisc) this.slotDisc.setColorAt(i, white); if (this.slotRing) this.slotRing.setColorAt(i, gold); }
-    if (this.slotDisc && this.slotDisc.instanceColor) this.slotDisc.instanceColor.needsUpdate = true;
-    if (this.slotRing && this.slotRing.instanceColor) this.slotRing.instanceColor.needsUpdate = true;
+    this.slotPos = pos; this._slotC = new THREE.Color(); this._slotO = new THREE.Object3D();
+    const L = this.parts && this.parts.landmarks && this.parts.landmarks.slot;
+    this.slotLayers = null;
+    if (!(L && this.models && this.buildSlotsKenney(L, pos))) this.buildSlotsFallback(pos);
     instanced(new THREE.CylinderGeometry(0.16, 0.16, 0.08, 8), this.M.pip, pips, this.root);
-    this._slotC = new THREE.Color();
   }
-  setSlotHighlight(slotId, on) {
-    if (!this.slotDisc || slotId >= this.slotBuilt.length) return;
-    this.slotHi[slotId] = !!on;
-    this.slotDisc.setColorAt(slotId, this._slotC.setHex(on ? NGN.C.slotHover : 0xFFFFFF)); this.slotDisc.instanceColor.needsUpdate = true;
+  buildSlotsKenney(L, pos) {
+    const T = (L.theme || {})[this.theme] || {}, D = 3.1; // 자리 지름(세계 단위) — 옛 원판과 같다
+    const mk = (P) => this.piece(P);
+    const base = mk({ p: L.base.p, raw: false, tint: T.tint || '#CFC6B4' }); if (!base) return false;
+    const fit = (g, d) => d / Math.max(1e-3, Math.max(g.size.x, g.size.z));
+    const sb = fit(base.g, D), hb = base.g.height * sb;
+    this.slotH = hb + 0.02;
+    const ground = L.ground ? mk({ p: L.ground.p, raw: false, tint: T.ground || '#9AB07A' }) : null;
+    const hole = L.hole ? mk({ p: (T.holePiece && T.holePiece.p) || L.hole.p, raw: false, tint: T.hole || '#8A6A48' }) : null; // 테마 조각은 {p} 꼴(로더가 p 키만 모은다)
+    const ring = L.ring ? mk({ p: L.ring.p, raw: false, tint: '#FFFFFF' }) : null;
+    const n = pos.length, layers = {};
+    const put = (key, g, s, y, material, cast) => { const m = instanced(g.geometry, material || g.material, pos.map((p) => ({ x: p.x, y, z: p.z, s, cast })), this.root); if (!m) return; m.castShadow = !!cast; layers[key] = { m, s, y }; for (let i = 0; i < n; i++) m.setColorAt(i, this._slotC.setHex(0xFFFFFF)); m.instanceColor.needsUpdate = true; };
+    if (ground) put('ground', ground.g, fit(ground.g, D * 1.3), 0.005, null, false);
+    put('base', base.g, sb, 0.01, null, true);
+    if (hole) put('hole', hole.g, fit(hole.g, D * 0.46), hb + 0.012, null, false);
+    // 링은 조명을 안 받는 재질(늘 밝게) — 아틀라스 × 인스턴스 색
+    if (ring) { this.slotRingMat = this.slotRingMat || new THREE.MeshBasicMaterial({ map: this.models.atlas, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }); put('ring', ring.g, fit(ring.g, D * 1.22), 0.03, this.slotRingMat, false); layers.ring.m.renderOrder = 1; }
+    this.slotLayers = layers;
+    return true;
   }
-  // 렌더러(syncTowers)가 판의 자리 상태를 알려 준다 — 빈 자리만 숨 쉰다
-  setSlotBuilt(slotId, built) { if (this.slotBuilt) this.slotBuilt[slotId] = !!built; }
+  buildSlotsFallback(pos) {
+    const geo = new THREE.CylinderGeometry(1.5, 1.65, 0.3, 14);
+    const disc = instanced(geo, this.M.slot, pos.map((p) => ({ x: p.x, y: 0.15, z: p.z, cast: true })), this.root);
+    const ringGeo = new THREE.RingGeometry(1.32, 1.62, 40); ringGeo.rotateX(-Math.PI / 2);
+    const ring = instanced(ringGeo, new THREE.MeshBasicMaterial({ color: 0xFFFFFF }), pos.map((p) => ({ x: p.x, y: 0.32, z: p.z })), this.root);
+    for (let i = 0; i < pos.length; i++) { if (disc) disc.setColorAt(i, this._slotC.setHex(0xFFFFFF)); if (ring) ring.setColorAt(i, this._slotC.setHex(0xFFFFFF)); }
+    this.slotLayers = { base: { m: disc, s: 1, y: 0.15 }, ring: { m: ring, s: 1, y: 0.32 } };
+    this.slotH = 0.3;
+  }
+  setSlotHighlight(slotId, on) { if (slotId < this.slotBuilt.length && this.slotHi[slotId] !== !!on) { this.slotHi[slotId] = !!on; this.slotDirty = true; } }
+  // 렌더러(syncTowers)가 판의 자리 상태를 알려 준다
+  setSlotBuilt(slotId, built) { if (this.slotBuilt && this.slotBuilt[slotId] !== !!built) { this.slotBuilt[slotId] = !!built; this.slotDirty = true; } }
+  // 화면이 알려 주는 카드 상태: 0 = 안 고름 · 1 = 골랐고 돈이 된다(빈 자리가 떠오르며 밝게) · 2 = 골랐는데 돈이 모자란다(회색으로 가라앉음)
+  setPickState(state) { const s = state | 0; if (this.slotPick !== s) { this.slotPick = s; this.slotDirty = true; } }
+  // 매 프레임: 링 색은 늘(숨쉬기), 기단 색·높이는 상태가 바뀐 프레임에만 행렬을 다시 쓴다
   breatheSlots(now) {
-    if (!this.slotRing || !this.slotRing.instanceColor) return;
-    const gold = this.C.slotEdge, c = this._slotC; let any = false;
+    const Lr = this.slotLayers; if (!Lr || !Lr.ring) return;
+    const gold = this.C.slotEdge, c = this._slotC, o = this._slotO, ring = Lr.ring.m, base = Lr.base.m;
+    const pulse = 0.5 + 0.5 * Math.sin(now * 0.004);
     for (let i = 0; i < this.slotBuilt.length; i++) {
-      const k = this.slotHi[i] ? 1.25 : this.slotBuilt[i] ? 0.85 : 0.72 + 0.4 * (0.5 + 0.5 * Math.sin(now * 0.0028 + i * 0.9));
-      c.setHex(gold).multiplyScalar(k); this.slotRing.setColorAt(i, c); any = true;
+      const built = this.slotBuilt[i], hi = this.slotHi[i];
+      // 링 지오메트리는 회색조 칸(최대 밝기 ~0.9)이라 1 을 넘는 색을 곱해 밝힌다(Basic 재질은 클램프 안 함)
+      if (hi) c.setHex(0xFFFFFF).multiplyScalar(1.6 + 0.2 * pulse);             // 손가락이 올라간 자리: 흰색, 굵게(아래 스케일)
+      else if (built) c.setHex(gold).multiplyScalar(0.55);                        // 타워가 선 자리: 어두운 금색(찬 자리)
+      else if (this.slotPick === 2) c.setHex(0x8A8F94).multiplyScalar(0.9);       // 골랐는데 돈이 모자람: 회색
+      else if (this.slotPick === 1) c.setHex(gold).multiplyScalar(1.5 + 0.5 * pulse); // 놓을 수 있음: 밝게 빛남
+      else c.setHex(gold).multiplyScalar(0.85 + 0.35 * (0.5 + 0.5 * Math.sin(now * 0.0028 + i * 0.9))); // 그냥 비어 있음: 은은히 숨 쉼
+      ring.setColorAt(i, c);
     }
-    if (any) this.slotRing.instanceColor.needsUpdate = true;
+    ring.instanceColor.needsUpdate = true;
+    if (!this.slotDirty) return;
+    this.slotDirty = false;
+    for (let i = 0; i < this.slotBuilt.length; i++) {
+      const p = this.slotPos[i], built = this.slotBuilt[i], hi = this.slotHi[i];
+      const lift = built ? 0 : hi ? 0.14 : this.slotPick === 1 ? 0.12 : this.slotPick === 2 ? -0.06 : 0; // 떠오름 / 가라앉음
+      const gray = !built && this.slotPick === 2;
+      for (const k of Object.keys(Lr)) {
+        const { m, s, y } = Lr[k]; if (!m) continue;
+        const ringK = k === 'ring';
+        o.position.set(p.x, y + (ringK ? 0 : lift), p.z); o.rotation.set(0, 0, 0);
+        const sc = ringK ? s * (hi ? 1.18 : 1) : s; o.scale.set(sc, ringK ? s : sc, sc); o.updateMatrix(); m.setMatrixAt(i, o.matrix);
+        if (!ringK) { m.setColorAt(i, c.setHex(gray ? 0x9AA0A6 : 0xFFFFFF)); }
+      }
+    }
+    for (const k of Object.keys(Lr)) { const m = Lr[k].m; if (m) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } }
+    void base;
   }
 
   // ---------- 성(출구)·동굴(입구) ----------

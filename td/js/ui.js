@@ -438,6 +438,8 @@ NGN.UI = class UI {
       const pr = b.querySelector('.pr'); if (pr && pr.dataset.poor !== String(poor)) { pr.dataset.poor = String(poor); pr.innerHTML = (poor ? SVG.lock : SVG.coin) + g.costToBuild(b.dataset.fam); }
       b.querySelector('.affslot').innerHTML = this.affBadge(t.attackType, def);
     }
+    // 자리(3D)에 카드 상태를 알린다: 골랐고 돈이 되면 빈 자리가 떠오르며 빛나고, 돈이 모자라면 회색으로 가라앉는다(2026-09-06)
+    if (this.cb.onPickState) this.cb.onPickState(this.pickFam ? (g.gold >= g.costToBuild(this.pickFam) ? 1 : 2) : 0);
   }
   pickTower(fam) {
     const g = this.game;

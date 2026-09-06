@@ -286,7 +286,7 @@ NGN.Renderer = class Renderer {
         if (g) this.world.root.remove(g);
         g = this.towerMesh(inst.def, inst.branch);
         g.userData.defId = key;
-        g.position.copy(this.world.toWorld(inst.slot.x, inst.slot.y, 0.3));
+        g.position.copy(this.world.toWorld(inst.slot.x, inst.slot.y, this.world.slotH || 0.3)); // 기단 위에 선다(2026-09-06 자리 세 겹)
         this.world.root.add(g);
         this.towerMeshes.set(inst.id, g);
         // 건설·승급: 솟아오르며 커지고 발밑에 빛 링
@@ -317,7 +317,7 @@ NGN.Renderer = class Renderer {
     if (opts.ghost) {
       const body = this.models ? this.models.buildTower(opts.ghost.family, opts.ghost.tier, { element: opts.ghost.element }) : this.towerMeshCoded(opts.ghost);
       body.traverse((o) => { if (o.isMesh) { o.material = this.cachedMat('ghost', NGN.ELEMENT_COLOR[opts.ghost.element], () => new THREE.MeshBasicMaterial({ color: NGN.ELEMENT_COLOR[opts.ghost.element], transparent: true, opacity: 0.45, depthWrite: false })); o.castShadow = false; } });
-      body.position.copy(this.world.toWorld(slot.x, slot.y, 0.3));
+      body.position.copy(this.world.toWorld(slot.x, slot.y, this.world.slotH || 0.3));
       this.world.root.add(body); this.ghost = body;
     }
   }

@@ -7,7 +7,7 @@ window.NGN = window.NGN || {};
 
 const $g = (id) => document.getElementById(id);
 const escG = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-// 등급 이름·색. gacha.json 의 gradeKo/gradeColor 는 옛 키(rare=고급·epic=희귀)라 rates·towerPool 의 키(uncommon·rare)와 어긋난다 — 여기 표가 정본(데이터 담당에게 알림)
+// 등급 이름·색은 data/gacha.json 의 gradeKo/gradeColor(2026-09-06 데이터 담당이 새 키 common·uncommon·rare·legendary 로 맞췄다). 표가 없을 때만 아래 예비값
 const GRADE_KO = { common: '흔함', uncommon: '고급', rare: '희귀', legendary: '전설' };
 const GRADE_COLOR = { common: '#9BA3A8', uncommon: '#4FA3E8', rare: '#B15BE8', legendary: '#F2B632' };
 const GRADE_RANK = { common: 0, uncommon: 1, rare: 2, legendary: 3 };
@@ -16,6 +16,8 @@ NGN.GachaUI = class GachaUI {
   constructor(meta, data, onChange, opts = {}) {
     this.meta = meta; this.data = data; this.onChange = onChange || (() => {});
     this.towerImage = opts.towerImage || null; this.preview = opts.preview || null;
+    const G = data.gacha || {};
+    for (const g of Object.keys(GRADE_KO)) { if (G.gradeKo && G.gradeKo[g]) GRADE_KO[g] = G.gradeKo[g]; if (G.gradeColor && G.gradeColor[g]) GRADE_COLOR[g] = G.gradeColor[g]; }
     this.busy = false;
     $g('pullBtn').addEventListener('click', () => this.pull(1));
     $g('pull10Btn').addEventListener('click', () => this.pull(10));
