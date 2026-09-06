@@ -58,7 +58,23 @@ NGN.serverNow = async function serverNow() {
   // 서비스워커(PWA): 나눔 빌드(__NGN_PATHS__ 가 있다)에서만. 개발 서버는 저장본이 헷갈리니 ?sw=1 로만
   if ('serviceWorker' in navigator && location.protocol !== 'file:' && (window.__NGN_PATHS__ || params.get('sw'))) {
     navigator.serviceWorker.register('sw.js').then((reg) => {
-      reg.addEventListener('updatefound', () => { const w = reg.installing; if (!w) return; w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) setTimeout(() => ui && ui.toast('새 버전을 받았어요 — 다음에 열면 적용됩니다'), 800); }); });
+      // 🔴 전에는 "다음에 열면 적용됩니다" 안내만 띄웠다 — 사장님이 열어도 옛 화면이라 "똑같잖아" 가 됐다.
+      // 새 버전이 준비되면 스스로 새로고침한다(전투 중이면 판이 끝난 뒤). 조카가 아무것도 안 해도 최신이 된다.
+      let reloading = false;
+      const swapNow = () => {
+        if (reloading) return; reloading = true;
+        const go = () => { location.reload(); };
+        if (window.NGN && NGN.app && NGN.app.game && NGN.app.mode) { // 판 중이면 끝나고 나서
+          if (ui) ui.toast('새 버전이 있어요 — 판이 끝나면 바뀝니다');
+          const t = setInterval(() => { if (!NGN.app.game || !NGN.app.mode) { clearInterval(t); go(); } }, 1500);
+        } else go();
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', swapNow);
+      reg.addEventListener('updatefound', () => {
+        const w = reg.installing; if (!w) return;
+        w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) swapNow(); });
+      });
+      setInterval(() => reg.update(), 5 * 60 * 1000); // 5분마다 새 버전이 있는지 본다
     }).catch((e) => console.warn('서비스워커 등록 실패', e.message));
   }
   const renderer = new NGN.Renderer(world, data, models);
