@@ -4,6 +4,8 @@
 // 3단계: 월드맵 점 → 난이도 고르기(쉬움/보통/어려움, 별은 은·금·붉은으로 따로) · 결과 화면에 기록 코드 · 설정에 저장 코드 · 첫 화면에 홈 화면 추가 안내 · 메뉴에 오늘의 판.
 // 전투 화면(2026-09-06 참고: 레이드 러시): 상단 얇은 한 줄([←] · 웨이브 진행 막대 · 생명·골드 알약) · 예고 줄 상시 표시 없음(막대를 누르면 펼침, 웨이브 시작 배너에 적 아이콘) ·
 // 하단은 판 아래 빈 땅에 카드 한 줄(타워 3D 그림 + 값, 이름은 고른 카드 위에만) + 큰 ▶(웨이브 중엔 배속). 카드를 길게 누르거나 위로 밀면 상세(돌아가는 모형·설명·3단·갈래).
+// 웨이브는 저절로 온다(main.js 카운트다운). 막대 아래 카운트다운 줄("다음 8초" + 적 아이콘·보스/성질 칩)이 그걸 알리고, ▶ 는 「미리 부르기」(보너스 골드 칩 "+N").
+// 그 아래 보스 체력 막대(보스가 살아 있을 때만). 생명이 깎이면 알약이 튀고 가장자리가 붉게 번쩍, 적이 출구 가까이 오면 붉은 비네트가 깜빡. [⏸] 일시정지 오버레이.
 // 카드 → 빈 자리 = 사거리 원판 + 반투명 모형 미리보기 → [짓기]. 지어진 타워를 누르면 사거리 원판 + 팝.
 // 이모지 없음, 아이콘은 SVG. 규칙은 sim/engine.js, 3D 는 world.js/render.js.
 window.NGN = window.NGN || {};
@@ -61,6 +63,7 @@ NGN.UI = class UI {
     this.mapId = null;
     this.genCount = 12;
     this.lastGold = null;
+    this.cdSec = null; this.cdWave = null; this.cdBonus = 0; this.bossPct = null; // 카운트다운 줄·보스 막대의 마지막 표시값(바뀔 때만 DOM 을 만진다)
     // 메뉴
     $('menuPlay').addEventListener('click', () => this.showWorld());
     $('menuInfinite').addEventListener('click', () => { if (this.meta.infiniteUnlocked()) this.showMapScreen(); else this.toast(`스테이지 ${this.data.stages.infiniteUnlockStage}을 깨면 열립니다`); });
@@ -84,10 +87,14 @@ NGN.UI = class UI {
     $('recordBack').addEventListener('click', () => this.showMenu());
     $('settingBack').addEventListener('click', () => this.showMenu());
     $('endCode').addEventListener('click', () => this.showEndCode());
-    // 전투: ▶ 는 웨이브 시작, 웨이브 중에는 배속(1→2→3×)
+    // 전투: ▶ 는 「미리 부르기」(카운트다운 중 누르면 바로 시작 + 보너스 골드 — main.js callWave), 웨이브 중에는 배속(1→2→3×)
     $('waveBtn').addEventListener('click', () => { if (this.game && this.game.wave) cb.onSpeed(); else cb.onWaveStart(); });
     $('rotateBtn').addEventListener('click', () => cb.onRotate());
     $('btnMenu').addEventListener('click', () => cb.onQuit());
+    // 일시정지: [⏸] → 오버레이. [계속]/[나가기(기존 onQuit — confirm 을 취소하면 일시정지가 그대로 남는다)]
+    $('pauseBtn').addEventListener('click', () => cb.onPause());
+    $('pauseResume').addEventListener('click', () => cb.onResume());
+    $('pauseQuit').addEventListener('click', () => cb.onQuit());
     $('waveBar').addEventListener('click', () => { $('nextDetail').hidden = !$('nextDetail').hidden; this.setPreview(); });
     // 결과
     $('endNext').addEventListener('click', () => cb.onNextStage());
@@ -267,6 +274,7 @@ NGN.UI = class UI {
     $('settingList').innerHTML = `
       <div class="row"><span class="grow">이름 <span class="sub" style="color:#6B5A48">${m.hasName() ? esc(m.state.name) : '아직 없음'}</span></span><button class="btn blue" data-k="name">바꾸기</button></div>
       <div class="row"><span class="grow">그림자</span><button class="btn ${s.shadows === false ? 'gray' : 'green'}" data-k="shadows">${s.shadows === false ? '꺼짐' : '켜짐'}</button></div>
+      <div class="row"><span class="grow">소리</span><button class="btn ${s.sound === false ? 'gray' : 'green'}" data-k="sound">${s.sound === false ? '꺼짐' : '켜짐'}</button></div>
       <div class="row"><span class="grow">진동(뽑기)</span><button class="btn ${s.vibrate === false ? 'gray' : 'green'}" data-k="vibrate">${s.vibrate === false ? '꺼짐' : '켜짐'}</button></div>
       <div class="row"><span class="grow"><b>저장 코드</b><br><span class="sub" style="color:#6B5A48">별·기록·티켓·뽑은 것 전부를 긴 글자 하나로. 폰이 바뀌거나 저장이 지워져도 이걸로 살아나요.</span></span></div>
       <div class="row"><button class="btn green" data-k="export" style="flex:1">내보내기</button><button class="btn blue" data-k="import" style="flex:1">가져오기</button></div>
@@ -297,6 +305,7 @@ NGN.UI = class UI {
   onGameStart(game, mode) {
     this.game = game; this.mode = mode || 'stage'; this.pickFam = null; this.selectedSlot = null; this.previewSlot = null; this.lastGold = null;
     this.hideAll(); $('game').hidden = false; $('nextDetail').hidden = true; $('pop').hidden = true;
+    this.setCountdown(null); this.bossBar(null); this.setDanger(false); this.showPause(false); // 지난 판의 잔상(카운트다운·보스 막대·경고·일시정지)을 지운다
     this.cb.onMenu(false);
     this.buildTowerBar(); this.refreshHud(); this.setPreview();
   }
@@ -325,12 +334,54 @@ NGN.UI = class UI {
     this.refreshTowerBar();
     if (this.popInst) this.renderPop();
   }
-  // ▶ 버튼: 쉬는 중엔 재생 표시, 웨이브 중엔 빨리감기 표시 + 배속 칩(1× 는 안 보인다)
+  // ▶ 버튼: 쉬는 중엔 재생 표시(+ 카운트다운 중이면 「미리 부르기」 보너스 칩 "+N"), 웨이브 중엔 빨리감기 표시 + 배속 칩(1× 는 안 보인다)
   renderWaveBtn() {
     const running = !!(this.game && this.game.wave), n = this.speed || 1;
-    $('waveBtn').innerHTML = (running ? '<svg viewBox="0 0 24 24"><path fill="#fff" d="M4 5v14l8-7zM13 5v14l8-7z"/></svg>' : '<svg viewBox="0 0 24 24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>') + (n > 1 || running ? `<span class="spd">${n}×</span>` : '');
+    const bonus = !running && this.cdSec !== null && this.cdBonus > 0 ? `<span class="bonus">${SVG.coin}+${this.cdBonus}</span>` : '';
+    $('waveBtn').innerHTML = (running ? '<svg viewBox="0 0 24 24"><path fill="#fff" d="M4 5v14l8-7zM13 5v14l8-7z"/></svg>' : '<svg viewBox="0 0 24 24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>') + (n > 1 || running ? `<span class="spd">${n}×</span>` : '') + bonus;
+    $('waveBtn').title = running ? '배속' : this.cdSec !== null ? '미리 부르기 — 빨리 부를수록 골드 보너스' : '웨이브 시작';
   }
   setSpeedLabel(n) { this.speed = n; this.renderWaveBtn(); }
+  // 카운트다운 줄(①·⑥): sec = 남은 초(null 이면 숨김), wv = 다음 웨이브(적 아이콘·보스 칩·성질 칩), bonus = 지금 미리 부르면 받을 골드.
+  // 매 프레임 불리니 DOM 은 값이 바뀔 때만 만진다(폰 성능): 웨이브가 바뀌면 아이콘을 다시 그리고, 초·보너스는 숫자만
+  setCountdown(sec, wv = null, bonus = 0) {
+    const box = $('countdown');
+    if (sec === null) { if (this.cdSec !== null) { this.cdSec = null; this.cdWave = null; this.cdBonus = 0; box.hidden = true; this.renderWaveBtn(); } return; }
+    const s = Math.max(0, Math.ceil(sec)), first = this.cdSec === null;
+    if (first) box.hidden = false;
+    if (wv && this.cdWave !== wv) {
+      this.cdWave = wv;
+      $('cdFoes').innerHTML = this.foeIcons(Object.assign({}, wv, { special: null })) + (wv.kind === 'boss' ? '<span class="spc boss">보스</span>' : '') + (wv.special ? `<span class="spc" style="background:${esc(wv.special.color || '#888')}">${esc(wv.special.이름)}</span>` : '');
+    }
+    if (s !== this.cdSec) { this.cdSec = s; const el = $('cdSec'); el.textContent = `다음 ${s}초`; el.classList.toggle('soon', s <= 3); }
+    if (bonus !== this.cdBonus || first) {
+      this.cdBonus = bonus;
+      const chip = $('waveBtn').querySelector('.bonus');
+      if (chip && bonus > 0) chip.innerHTML = `${SVG.coin}+${bonus}`; else this.renderWaveBtn();
+    }
+  }
+  // 보스 체력 막대(③): boss = 엔진의 적(e.hp·e.maxHp), null 이면 숨김. 폭·% 는 바뀔 때만 갱신, 깎이면 흰 번쩍
+  bossBar(boss) {
+    const bar = $('bossBar');
+    if (!boss) { if (this.bossPct !== null) { this.bossPct = null; bar.hidden = true; } return; }
+    const pct = Math.max(0, Math.min(100, Math.ceil(boss.hp / (boss.maxHp || boss.hp || 1) * 100)));
+    if (this.bossPct === null) bar.hidden = false;
+    else if (pct === this.bossPct) return;
+    else if (pct < this.bossPct) { bar.classList.remove('flash'); void bar.offsetWidth; bar.classList.add('flash'); }
+    this.bossPct = pct;
+    bar.querySelector('.fill').style.width = pct + '%';
+    $('bossPct').textContent = pct + '%';
+  }
+  // 성이 맞았을 때(④): 생명 알약이 크게 튀며 붉게 + "−N" 플로터, 화면 가장자리 붉은 번쩍
+  livesHit(n = 1) { if (navigator.vibrate && this.meta && this.meta.state.settings.vibrate !== false) { try { navigator.vibrate(70); } catch (e) {} } // 성이 맞으면 폰이 살짝 떤다(설정의 진동을 따른다)
+    const p = $('lifePill'); p.classList.remove('hit'); void p.offsetWidth; p.classList.add('hit');
+    const f = document.createElement('span'); f.className = 'lf'; f.textContent = `−${n}`; p.appendChild(f); setTimeout(() => f.remove(), 900);
+    const d = $('dmgFlash'); d.classList.remove('on'); void d.offsetWidth; d.classList.add('on');
+  }
+  // 경고 비네트(④): 적이 출구 가까이 오면 렌더러가 켠다(renderer.onDanger)
+  setDanger(on) { $('danger').hidden = !on; }
+  // 일시정지 오버레이(②)
+  showPause(on) { $('pauseOverlay').hidden = !on; }
   // 다음 웨이브: 상시 예고 줄은 없다(화면을 가려서 뺌). 막대를 누르면 펼쳐지는 자세히(nextDetail)와 카드의 상성 표시만 갱신한다
   setPreview() {
     const g = this.game; const wv = g.waveAt(g.stats.reachedWave + 1);
@@ -517,10 +568,12 @@ NGN.UI = class UI {
   // 안내 화살표. 글이 비면 화살표만(카드·▶ 위에서는 말풍선이 아래쪽 UI 를 한 줄 더 먹어서 글은 토스트로 준다)
   hint(x, y, text) { const h = $('hint'); if (x === null) { h.hidden = true; return; } h.hidden = false; h.style.left = x + 'px'; h.style.top = y + 'px'; const t = h.querySelector('.txt'); t.textContent = text; t.hidden = !text; }
   // 웨이브 시작 배너. 상시 예고 줄을 뺀 대신 여기에 적 아이콘·방어 방패를 함께 보여준다. 적 성질이 붙은 웨이브면 그 이름을 색 칩으로(checklist I-8)
-  banner(text, special = null, wv = null) {
-    const b = document.createElement('div'); b.id = 'banner';
-    b.innerHTML = esc(text) + (wv ? `<div>${this.foeIcons(Object.assign({}, wv, { special: null }))}</div>` : '') + (special ? `<div class="spcline"><span class="spc big" style="background:${esc(special.color || '#888')}">${esc(special.이름)}</span></div>` : '');
-    document.body.appendChild(b); setTimeout(() => b.remove(), 1700);
+  // cls: 'boss'(보스 등장 — 더 크고 붉은, 2초) · 'gold'(보스 처치 — 금색) · 'small'(웨이브 클리어 — 28px). sub = 둘째 줄(클리어 보너스 골드 등), subCls = 'leak' 면 붉게
+  banner(text, special = null, wv = null, cls = '', sub = '', subCls = '') {
+    const old = document.getElementById('banner'); if (old) old.remove(); // 겹치면(클리어 직후 보스 등장 등) 앞 것을 치운다
+    const b = document.createElement('div'); b.id = 'banner'; if (cls) b.className = cls;
+    b.innerHTML = esc(text) + (sub ? `<div class="sub ${subCls}">${sub}</div>` : '') + (wv ? `<div>${this.foeIcons(Object.assign({}, wv, { special: null }))}</div>` : '') + (special ? `<div class="spcline"><span class="spc big" style="background:${esc(special.color || '#888')}">${esc(special.이름)}</span></div>` : '');
+    document.body.appendChild(b); setTimeout(() => b.remove(), cls === 'boss' ? 2100 : 1700);
   }
   toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(this._tt); this._tt = setTimeout(() => { t.hidden = true; }, 1500); }
 

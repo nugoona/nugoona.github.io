@@ -6,6 +6,9 @@
 //   ?auto=dps        — AI 가 대신 플레이(시뮬레이터 대조용, 무한 모드 규칙). 전략: dps|affinity|cheap|balanced|adaptive
 //   ?deck=a,b,c,d,e  — 대조용 덱 · ?map=serpent|gen7 — 지도 지정 · ?speed=20 — 배속 · ?stage=3&diff=hard — 그 스테이지로 바로(개발용)
 //   ?hp=3            — 적 체력을 더 곱한다(개발용 — 성질 연출을 눈으로 볼 때 적이 너무 빨리 죽지 않게) · ?dailyseed=1005 — 오늘의 판을 그 씨앗으로(개발용)
+// 웨이브 흐름(2026-09-06, 사장님: "웨이브는 자동으로 시작돼야 — 버튼을 눌러야 오는 건 버그"): 판이 서면 12초, 웨이브가 끝나면 10초 뒤 다음 웨이브가 저절로 온다(카운트다운은 실제 시간, 배속 무관, 일시정지 중엔 멈춤).
+//   ▶ = 「미리 부르기」: 남은 초 × (1.5 + 웨이브 × 0.5) 골드 보너스(킹덤 러시 방식). 첫 판 튜토리얼(타워 하나 짓기 전)엔 카운트다운이 멈춘다. ?auto= 는 기존대로 즉시.
+//   보스 웨이브: 붉은 배너 + 0.9초 슬로우모션 + 흔들림, 보스가 살아 있는 동안 화면 위 체력 막대. 성이 맞으면 생명 알약이 튀고 가장자리가 붉게 번쩍(렌더러 onLeak). [⏸] 일시정지.
 window.NGN = window.NGN || {};
 
 // 서버 시각: 자기 주소로 HEAD 요청을 보내 응답의 Date 헤더를 읽는다. 폰 시계를 돌려도 소용없다(checklist I-9).
@@ -47,8 +50,10 @@ NGN.serverNow = async function serverNow() {
   if (models.ready) {
     const jobs = []; for (const f of data.families) for (const t of [1, 2, 3]) jobs.push([f, t, data.byFamily[f][t - 1].element]);
     for (let i = 0; i < jobs.length; i++) { const [f, t, el] = jobs[i]; L.set(96 + 2 * i / jobs.length, `타워 준비 ${i + 1}/${jobs.length}`); models.buildTower(f, t, { element: el }); if (i % 5 === 4) await new Promise((r) => setTimeout(r, 0)); }
-    for (const k of Object.keys(data.kenneyParts.enemies)) models.buildEnemy(k); // 적 6종도 — 새 종류가 처음 나올 때 멈추지 않게
+    for (const k of Object.keys(data.kenneyParts.enemies)) if (!k.startsWith('_')) models.buildEnemy(k); // 적 6종도 — 새 종류가 처음 나올 때 멈추지 않게
   }
+  // 세계에 모델을 붙인다 — 장식·성·입구가 창고 모델로 다시 지어진다(world.attachModels, 2026-09-06). 없으면 코드 도형 그대로
+  if (models.ready && typeof world.attachModels === 'function') { L.set(97.5, '성과 풍경을 세우는 중…'); world.attachModels(models); }
   L.set(98, '세계를 만드는 중…');
   // 서비스워커(PWA): 나눔 빌드(__NGN_PATHS__ 가 있다)에서만. 개발 서버는 저장본이 헷갈리니 ?sw=1 로만
   if ('serviceWorker' in navigator && location.protocol !== 'file:' && (window.__NGN_PATHS__ || params.get('sw'))) {
@@ -60,6 +65,7 @@ NGN.serverNow = async function serverNow() {
   const preview = models.ready ? new NGN.TowerPreview(models) : null; // 카드 그림(한 번 찍어 캐시)·상세 화면의 돌아가는 모형
   const meta = new NGN.Meta(data.gacha, data.stages, data.families);
   if (meta.state.settings.shadows === false) { world.renderer.shadowMap.enabled = false; world.sun.castShadow = false; }
+  if (NGN.sound) NGN.sound.on = meta.state.settings.sound !== false; // 효과음(fx.js NGN.Sound): 설정에서 끈 사람은 끈 채로
 
   let game = null, speed = Number(params.get('speed') || 1), acc = 0, last = performance.now(), ended = false, curMap = NGN.map, menuSpin = true;
   let mode = null, curStage = null, curDiff = 'normal', curDaily = null; // mode: 'stage' | 'infinite' | 'daily'
@@ -67,6 +73,13 @@ NGN.serverNow = async function serverNow() {
   const devHp = Number(params.get('hp') || 1) || 1; // 개발용 체력 배율
   const SPEEDS = [1, 2, 3];
   let tutorialStep = 0;
+  // 웨이브 자동 시작(①): nextWaveAt = 다음 웨이브까지 남은 초(null 이면 카운트다운 없음). frame() 이 실제 시간으로 줄인다 — 배속과 무관, 일시정지·튜토리얼 중엔 멈춤
+  const PREP_SEC = 12, BETWEEN_SEC = 10;
+  let nextWaveAt = null;
+  let paused = false; // 일시정지(②): 엔진 틱·카운트다운·연출 시간이 전부 멈춘다(화면은 그대로 그린다)
+  let slowmo = 1, slowmoLeft = 0; // 보스 등장 슬로우모션(③): acc 에 곱하는 계수. speed 는 안 건드린다(버튼 배속이 그대로 살아 있게)
+  let bossRef = null; // 지금 살아 있는 보스(체력 막대·처치 판정용)
+  let lastLives = null; // 생명이 줄었는지 프레임마다 본다 — 렌더러 onLeak 이 안 와도 성 피격 연출이 빠지지 않게(온 만큼은 여기서 다시 안 센다)
   // 서버 시각은 게임을 열 때 미리 받아 둔다(오늘의 판 버튼이 바로 반응하게). 실패하면 버튼을 누를 때 한 번 더
   let serverTime = null, serverAt = 0;
   const refreshServerTime = async () => { const t = await NGN.serverNow(); if (t) { serverTime = t; serverAt = performance.now(); } return t; };
@@ -89,15 +102,17 @@ NGN.serverNow = async function serverNow() {
     },
     onNextStage() { const n = curStage && meta.stageAfter(curStage.id); if (n && meta.isStageOpen(n.id) && meta.isDiffOpen(n.id, curDiff)) startStage(n, curDiff); else ui.showWorld(); },
     onRetry() { if (mode === 'stage' && curStage) startStage(curStage, curDiff); else if (mode === 'infinite') startInfinite(meta.unlockedFamilies(), curMap); else ui.showMenu(meta); },
-    onLeave() { game = null; ended = false; renderer.reset(); },
-    onWaveStart() { startWave(); },
+    onLeave() { game = null; ended = false; renderer.reset(); resetBattleFx(); },
+    onWaveStart() { callWave(); },
     onSpeed() { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] || 1; ui.setSpeedLabel(speed); },
     onRotate() { world.camAngle += Math.PI / 2; world.placeCamera(); },
+    onPause() { pause(); },
+    onResume() { resume(); },
     onQuit() {
-      if (!game || ended) { ui.showMenu(meta); return; }
+      if (!game || ended) { resetBattleFx(); ui.showMenu(meta); return; }
       if (mode === 'stage') { // 스테이지는 중간에 나가면 없던 판 — 별·티켓 없음
-        if (!confirm('그만두면 이 판은 없던 것이 됩니다. 나갈까요?')) return;
-        game = null; ended = false; renderer.reset(); ui.showWorld();
+        if (!confirm('그만두면 이 판은 없던 것이 됩니다. 나갈까요?')) return; // 취소하면 일시정지가 그대로 남는다(오버레이에서 눌렀을 때)
+        game = null; ended = false; renderer.reset(); resetBattleFx(); ui.showWorld();
       } else if (mode === 'daily') { // 오늘의 판은 하루 한 번 — 나가면 여기까지가 오늘 기록
         if (!confirm('오늘의 판은 하루 한 번입니다. 나가면 여기까지가 오늘 기록이 됩니다. 나갈까요?')) return;
         endGame(true, true);
@@ -126,17 +141,21 @@ NGN.serverNow = async function serverNow() {
     onDetailOpen(host, def) { if (preview) preview.attach(host, def.family, def.tier, def.element, Math.min(220, innerWidth - 80)); },
     onDetailClose() { if (preview) preview.detach(); },
     onBuild(slotId, fam) {
-      if (game.build(slotId, fam)) { renderer.syncTowers(game); ui.afterBuild(slotId); ui.toast(`${game.slots[slotId].def.name} 지음`); if (tutorialStep === 2) tutorialStep = 3; }
+      if (game.build(slotId, fam)) {
+        renderer.syncTowers(game); ui.afterBuild(slotId); ui.toast(`${game.slots[slotId].def.name} 지음`); NGN.sound && NGN.sound.play('build');
+        // 튜토리얼 3단계: 첫 타워를 지었다 → 멈춰 있던 카운트다운이 흐른다. 너무 짧게 남았으면 8초는 준다(조카가 화면을 읽을 시간)
+        if (tutorialStep === 2) { tutorialStep = 3; if (nextWaveAt !== null && nextWaveAt < 8) nextWaveAt = 8; setTimeout(() => ui.toast('곧 적이 와요 — ▶ 를 누르면 바로 시작(골드 보너스)'), 900); }
+      }
       else ui.toast(`골드가 모자라요 (${game.byFamily[fam][0].cost} 필요)`);
     },
     // 승급. 3단으로 올릴 때는 갈래(화력/광역)를 함께 받는다 — 엔진이 갈래 없는 3단 승급을 거절한다(checklist I-7)
     onUpgrade(inst, branch) {
-      if (game.upgrade(inst, branch || null)) { const B = game.branchDef(inst.branch); renderer.syncTowers(game); ui.refreshHud(); ui.toast(`${inst.def.name}${B && inst.def.tier >= 3 ? ' · ' + B.name : ''}(으)로 승급!`); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); }
+      if (game.upgrade(inst, branch || null)) { NGN.sound && NGN.sound.play('upgrade'); const B = game.branchDef(inst.branch); renderer.syncTowers(game); ui.refreshHud(); ui.toast(`${inst.def.name}${B && inst.def.tier >= 3 ? ' · ' + B.name : ''}(으)로 승급!`); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); }
       else ui.toast('골드가 모자라요');
     },
     // 3단부터 지어진 타워(기본기 2칸)의 갈래 고르기 — 무료, 한 번
     onChooseBranch(inst, branch) { if (game.chooseBranch(inst, branch)) { renderer.syncTowers(game); ui.refreshHud(); ui.toast(`${game.branchDef(branch).name} 갈래를 골랐다`); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); } },
-    onSell(inst) { const r = game.sell(inst); renderer.syncTowers(game); ui.clearSelection(); ui.refreshHud(); ui.toast(`팔아서 +${r}골드`); },
+    onSell(inst) { NGN.sound && NGN.sound.play('sell'); const r = game.sell(inst); renderer.syncTowers(game); ui.clearSelection(); ui.refreshHud(); ui.toast(`팔아서 +${r}골드`); },
     // 아이템 끼우기/빼기 (checklist I-11). 효과는 엔진 effectiveStats() 한 통로로 들어간다
     onEquip(inst, uid) { if (game.equip(inst, uid)) { ui.refreshHud(); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); } else ui.toast('칸이 다 찼어요'); },
     onUnequip(inst, uid) { if (game.unequip(inst, uid)) { ui.refreshHud(); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); } },
@@ -144,6 +163,7 @@ NGN.serverNow = async function serverNow() {
       const s = meta.state.settings;
       if (k === 'shadows') { s.shadows = s.shadows === false; world.renderer.shadowMap.enabled = s.shadows; world.sun.castShadow = s.shadows; world.root.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
       else if (k === 'vibrate') s.vibrate = s.vibrate === false;
+      else if (k === 'sound') { s.sound = s.sound === false; if (NGN.sound) { NGN.sound.on = s.sound; if (s.sound) { NGN.sound.wake(); NGN.sound.play('ui'); } } }
       else if (k === 'reset') { if (confirm('별·기록·티켓·뽑은 것을 전부 지울까요?')) { localStorage.removeItem('ngn-td-meta'); localStorage.removeItem('ngn-td-best'); location.reload(); return; } }
       meta.save(); ui.showSettings();
     },
@@ -156,6 +176,10 @@ NGN.serverNow = async function serverNow() {
   // 서버 시각이 도착하면(비동기) 메뉴가 열려 있을 때 오늘의 판 버튼을 다시 그린다
   refreshServerTime().then(() => { if (!game && !document.getElementById('menu').hidden) ui.showMenu(meta); });
   renderer.onNotice = (msg) => ui.toast(msg); // 아이템 드롭 같은 엔진 사건을 글로도 알린다
+  // 성 피격(④): 렌더러가 새는 적을 보고 부른다(render.js 담당이 만든다 — 여기서는 연결만). 적 하나 = 생명 1
+  renderer.onLeak = () => castleHit(1);
+  // 경고(④): 적이 출구 가까이 오면 렌더러가 true 로 부른다 → 가장자리 붉은 비네트
+  renderer.onDanger = (on) => ui.setDanger(!!on);
   const gachaUi = new NGN.GachaUI(meta, data, () => { if (!game) ui.showMenu(meta); { const gd = document.getElementById('gachaDot'); if (gd) gd.hidden = meta.state.tickets < 1; } });
 
   // 공통: 엔진 한 판 만들기. 강화 나무·뽑기 보상은 meta.perks() 하나로 합쳐져 effectiveStats() 한 통로로 들어간다.
@@ -169,7 +193,43 @@ NGN.serverNow = async function serverNow() {
     tutorialStep = meta.state.games === 0 && !ai ? 1 : 0;
     if (tutorialStep === 1) setTimeout(() => ui.toast('아래 카드에서 타워를 고르세요'), 600); // 말풍선 대신 토스트(화면을 안 가린다)
     world.warmup = 0;
+    resetBattleFx(); lastLives = game.lives;
+    castleUpdate();
+    scheduleWave(PREP_SEC); // 준비 시간 뒤 1웨이브가 저절로 온다(AI 플레이는 startInfinite 가 즉시 startWave)
     window.game = game;
+  }
+  // ---------- 웨이브 자동 시작(①) ----------
+  // 미리 부르기 보너스(킹덤 러시 방식): 남은 초 × (1.5 + 웨이브번호 × 0.5). 빨리 부를수록, 뒤 웨이브일수록 많다
+  const callBonus = (sec, wv) => Math.max(0, Math.round(sec * (1.5 + wv.wave * 0.5)));
+  const nextWave = () => (game && !ended ? game.waveAt(game.stats.reachedWave + 1) : null);
+  function scheduleWave(sec) {
+    if (auto) return; // AI 플레이는 finishWave 가 즉시 startWave — 카운트다운 없음
+    const wv = nextWave(); if (!wv) return;
+    nextWaveAt = sec; ui.setCountdown(sec, wv, callBonus(sec, wv));
+  }
+  // ▶ 「미리 부르기」: 카운트다운 중 누르면 즉시 시작 + 보너스 골드. 엔진은 안 건드리고 game.gold 에 직접 더한다.
+  // 🛑 시뮬레이터(sim/run.js)는 엔진 run() 경로라 이 보너스가 안 들어간다 — 사람에게만 유리한 방향이니 밸런스 기준선(보통 60/60)은 안 깨진다
+  function callWave() {
+    if (!game || game.wave || ended || paused) return;
+    const wv = nextWave(); if (!wv) return;
+    const bonus = nextWaveAt !== null ? callBonus(nextWaveAt, wv) : 0;
+    if (bonus > 0) { game.gold += bonus; ui.toast(`미리 불러서 +${bonus} 골드`); NGN.sound && NGN.sound.play('call'); }
+    startWave(); // 안에서 refreshHud → 골드 알약 bump
+  }
+  function pause() { if (!game || ended || paused) return; paused = true; ui.showPause(true); }
+  function resume() { if (!paused) return; paused = false; ui.showPause(false); last = performance.now(); }
+  // 나가기·결과 화면·새 판: 카운트다운·일시정지·보스 막대·경고·슬로우모 전부 초기화(타이머 잔존 버그 방지)
+  function resetBattleFx() { nextWaveAt = null; paused = false; slowmo = 1; slowmoLeft = 0; bossRef = null; ui.setCountdown(null); ui.showPause(false); ui.bossBar(null); ui.setDanger(false); }
+  // ---------- 성 피해(④) ----------
+  const castleRatio = () => (game ? Math.max(0, game.lives) / Math.max(1, (game.balance.lives || 0) + (game.perks && game.perks.lives || 0)) : 1);
+  // 성 상태 단계: 생명 비율을 world 에 알린다(world.js 담당이 만든다 — 1.0~0.6 멀쩡 / 0.6~0.3 연기·불 / 0.3~ 불길·문 부서짐). 가드 호출
+  function castleUpdate() { if (typeof world.setCastleDamage === 'function') world.setCastleDamage(castleRatio()); }
+  function castleHit(n) {
+    if (!game || ended) return;
+    lastLives = game.lives; // 렌더러가 알려준 만큼은 frame 의 생명 감시가 다시 안 센다
+    ui.livesHit(n);
+    if (typeof world.shake === 'function') world.shake(0.6);
+    castleUpdate();
   }
   // 스테이지: 웨이브 수·체력 배율·시작 골드·생명은 stages.json, 난이도 배율(쉬움 ×0.8 · 보통 ×1 · 어려움 ×2)은 difficulties. 카드 = 연 계열 전부. 끝이 있다(waveSource 없음)
   // 웨이브는 시뮬레이터와 같은 생성기(balanceForStage + waveFor)로 만든다 — 스테이지마다 적 순서가 다르고(I-2), 적 성질이 붙는다(I-8).
@@ -208,26 +268,40 @@ NGN.serverNow = async function serverNow() {
     if (!wv) return;
     game.startWave(wv);
     if (game.ai) game.ai(game);
+    nextWaveAt = null; ui.setCountdown(null); // 카운트다운 끝
     tutorialStep = 0; ui.hint(null);
-    ui.banner(mode !== 'infinite' && wv.wave === game.waves.length ? `마지막 웨이브 ${wv.wave}` : `웨이브 ${wv.wave}`, wv.special || null, wv);
+    if (wv.kind === 'boss') { // 보스 등장(③): 붉은 큰 배너 + 0.9초 슬로우모션(acc 계수, speed 는 그대로) + 흔들림(world.js 담당이 만드는 중 — 가드)
+      ui.banner('보스 등장!', wv.special || null, wv, 'boss'); NGN.sound && NGN.sound.play('boss');
+      slowmo = 0.25; slowmoLeft = 0.9;
+      if (typeof world.shake === 'function') world.shake(1.0);
+    } else { ui.banner(mode !== 'infinite' && wv.wave === game.waves.length ? `마지막 웨이브 ${wv.wave}` : `웨이브 ${wv.wave}`, wv.special || null, wv); NGN.sound && NGN.sound.play('wave'); }
     if (wv.special) ui.toast(`${wv.special.이름}: ${wv.special._설명}`);
     renderer.waveStart();
     ui.refreshHud();
     acc = 0;
   }
   function finishWave() {
+    const wvDef = game.wave.def;
     const leaks = game.endWave();
     renderer.consume(game);
+    const bossDown = !!(bossRef && bossRef.hp <= 0); // 보스를 잡아서 끝난 웨이브면 클리어 배너를 "보스 처치!"(금색)로(frame 의 감시보다 여기가 먼저라 거기선 못 본다)
+    bossRef = null; ui.bossBar(null); ui.setDanger(false);
+    castleUpdate();
     if (game.lives <= 0) return endGame(false);
+    NGN.sound && NGN.sound.play('clear');
+    // 클리어 배너(⑤): 안 새면 전액, 새면 절반 — engine.js endWave 와 같은 규칙(엔진의 waveEnd 사건은 렌더러가 소비하니 여기서 직접 계산)
+    const bonus = leaks === 0 ? wvDef.clearBonus : Math.floor(wvDef.clearBonus / 2);
+    const sub = leaks ? `${leaks}마리 샘 · ${NGN.SVG.coin} +${bonus}` : `완벽 방어! ${NGN.SVG.coin} +${bonus}`;
     if (game.stats.reachedWave === game.waves.length) {
       if (mode !== 'infinite' || auto) return endGame(true); // 스테이지·오늘의 판은 마지막 웨이브를 막으면 클리어
-      ui.banner('30웨이브 돌파! 무한 구간');
-    } else ui.toast(leaks ? `${leaks}마리 샘` : '완벽 방어! 보너스 골드');
+      ui.banner('30웨이브 돌파! 무한 구간', null, null, 'small', sub, leaks ? 'leak' : '');
+    } else ui.banner(bossDown ? '보스 처치!' : `웨이브 ${wvDef.wave} 클리어`, null, null, bossDown ? 'gold' : 'small', sub, leaks ? 'leak' : '');
     ui.setPreview(); ui.refreshHud();
-    if (auto) startWave();
+    if (auto) startWave(); else scheduleWave(BETWEEN_SEC); // 다음 웨이브는 10초 뒤 저절로(무한 구간도 같다)
   }
   function endGame(stopped, quit = false) {
-    ended = true; game.stats.cleared = stopped; game.finish();
+    ended = true; game.stats.cleared = stopped; game.finish(); NGN.sound && NGN.sound.play(stopped ? 'win' : 'lose');
+    resetBattleFx();
     const clearedWaves = stopped ? game.stats.reachedWave - (game.wave ? 1 : 0) : game.stats.reachedWave - 1;
     const result = { cleared: stopped, stopped, wave: Math.max(0, clearedWaves), fellAt: game.stats.reachedWave, lives: Math.max(0, game.lives), gold: game.gold, spent: game.spent };
     if (mode === 'stage') {
@@ -286,8 +360,10 @@ NGN.serverNow = async function serverNow() {
     for (const f of q) {
       const p = toScreen(f.x, f.y, f.h);
       if (p.x < 0 || p.x > innerWidth || p.y < 0 || p.y > innerHeight) continue;
-      const el = document.createElement('div'); el.className = 'fl' + (f.kill ? ' kill' : f.item ? ' item' : f.big ? ' big' : '');
-      el.textContent = f.text ? f.text : f.kill ? '처치!' : Math.round(f.dmg).toLocaleString();
+      const el = document.createElement('div'); el.className = 'fl' + (f.gold ? ' gold' : f.kill ? ' kill' : f.item ? ' item' : f.big ? ' big' : '');
+      // 처치 골드(⑤): 렌더러가 {text:'+12', gold:true} 를 넣는다 → 금색 + 동전 아이콘(글자는 esc 없이 숫자·부호뿐이라 innerHTML 이어도 안전)
+      if (f.gold) el.innerHTML = NGN.SVG.coin + String(f.text || '').replace(/[<>&]/g, '');
+      else el.textContent = f.text ? f.text : f.kill ? '처치!' : Math.round(f.dmg).toLocaleString();
       el.style.left = (p.x + (Math.random() - .5) * 24) + 'px'; el.style.top = p.y + 'px';
       floaters.appendChild(el); setTimeout(() => el.remove(), f.item ? 1600 : 850); // 부활!·분열!·아이템! 글자는 더 오래(조카가 읽어야 한다)
     }
@@ -297,11 +373,20 @@ NGN.serverNow = async function serverNow() {
   function frame(t) {
     requestAnimationFrame(frame);
     const dtMs = t - last;
-    const dt = Math.min(dtMs / 1000, 0.1); last = t;
-    if (game && game.wave) world.watchFrame(dtMs, t);
+    // 일시정지(②): 시간이 0 으로 흐른다 — 엔진·카운트다운·연출 전부 멈추고 화면만 그대로 그린다
+    const dt = paused ? 0 : Math.min(dtMs / 1000, 0.1); last = t;
+    if (game && game.wave && !paused) world.watchFrame(dtMs, t);
     if (menuSpin && !game) { world.camAngle += dt * 0.08; world.placeCamera(); } // 메뉴 배경: 지도가 천천히 돈다
-    if (game && game.wave && !ended) {
-      acc += dt * speed;
+    // 보스 슬로우모션(③): 0.9초 뒤 원래 배속으로. speed 변수는 안 건드린다
+    if (slowmoLeft > 0) { slowmoLeft -= dt; if (slowmoLeft <= 0) { slowmoLeft = 0; slowmo = 1; } }
+    // 카운트다운(①): 실제 시간으로 줄인다(배속 무관). 첫 판 튜토리얼 1·2단계(타워 하나를 짓기 전)엔 멈춘다 — 3단계(지은 뒤)부턴 흐른다
+    if (game && !game.wave && !ended && nextWaveAt !== null && dt > 0 && !(tutorialStep === 1 || tutorialStep === 2)) {
+      nextWaveAt -= dt;
+      if (nextWaveAt <= 0) startWave();
+      else { const wv = nextWave(); if (wv) ui.setCountdown(nextWaveAt, wv, callBonus(nextWaveAt, wv)); }
+    }
+    if (game && game.wave && !ended && !paused) {
+      acc += dt * speed * slowmo;
       let n = 0;
       while (acc >= NGN.DT && game.wave && n < 400) { game.step(); acc -= NGN.DT; n++; if (game.waveOver() || game.lives <= 0) break; }
       if (game.wave && (game.waveOver() || game.lives <= 0)) finishWave();
@@ -310,14 +395,24 @@ NGN.serverNow = async function serverNow() {
     if (preview) preview.tick(dt, t); // 카드 상세가 열려 있을 때만 그린다
     if (game) {
       if (speed > 4) game.events.length = 0; else renderer.consume(game);
-      // 다음 엔진 틱까지 얼마나 왔나 → 적 위치를 그 비율로 이어 그린다(A1). 웨이브 밖이면 1
-      renderer.update(dt, game, game.wave ? acc / NGN.DT : 1);
+      if (!ended) {
+        // 생명 감시(④): consume 뒤에 본다 — 렌더러 onLeak 이 먼저 와서 센 만큼은 건너뛰고, 안 온 만큼(고배속에서 사건을 버렸거나 아직 안 만들어졌으면 전부)만 여기서 연출
+        if (lastLives !== null && game.lives < lastLives) castleHit(lastLives - game.lives);
+        lastLives = game.lives;
+        // 보스 체력 막대(③): 살아 있는 보스를 찾아 매 프레임 넘긴다(DOM 은 ui.bossBar 가 값이 바뀔 때만 만진다). 사라진 순간 hp≤0 이었으면 처치 배너
+        const boss = game.wave ? game.enemies.find((e) => e.boss && e.hp > 0) : null;
+        if (boss) bossRef = boss;
+        else if (bossRef) { if (bossRef.hp <= 0) ui.banner('보스 처치!', null, null, 'gold'); bossRef = null; }
+        ui.bossBar(boss || null);
+      }
+      // 다음 엔진 틱까지 얼마나 왔나 → 적 위치를 그 비율로 이어 그린다(A1). 웨이브 밖이면 1. 슬로우모 중엔 연출 시간도 같이 느리게
+      renderer.update(dt * slowmo, game, game.wave ? acc / NGN.DT : 1);
       if (speed <= 4) flushFloaters();
       const ps = ui.popSlot(); if (ps) { const p = toScreen(ps.x, ps.y, 3.2), b = toScreen(ps.x, ps.y, 0); ui.placePop(p.x, p.y - 8, b.y); }
       if (tutorialStep === 1) { const b = document.querySelector('.tcard'); const r = b.getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top + 18, ''); } // 화살표 끝이 카드 그림에 걸치게(카드 위로 한 줄 더 안 먹게)
       else if (tutorialStep === 2 && ui.previewSlot !== null) { const r = document.getElementById('buildBtn').getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top - 6, '짓기를 누르세요'); }
       else if (tutorialStep === 2) { const s = NGN.map.SLOTS.reduce((a, c) => (NGN.map.coverageFor(c.id, 800, false) > NGN.map.coverageFor(a.id, 800, false) ? c : a), NGN.map.SLOTS[0]); const p = toScreen(s.x, s.y, 0.5); ui.hint(p.x, p.y - 10, '여기에 놓으세요'); }
-      else if (tutorialStep === 3) { const r = document.getElementById('waveBtn').getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top + 18, ''); }
+      // 3단계(타워를 지은 뒤): 예전엔 ▶ 를 가리켰지만 이제 웨이브는 저절로 온다. 카운트다운 줄은 화면 맨 위라 그 위에 화살표를 세울 자리가 없어(HUD 와 겹친다) 화살표 없이 토스트(onBuild)로만 알린다
       else ui.hint(null);
     } else renderer.update(dt, { towersBuilt: [], enemies: [], events: [] }); // 메뉴에서도 파티클 등은 굴린다
     world.render();
@@ -331,6 +426,8 @@ NGN.serverNow = async function serverNow() {
   else ui.showMenu(meta);
   L.done();
   requestAnimationFrame(frame);
+  // 화면을 벗어나면(다른 앱·화면 끔) 자동 일시정지(②) — 웨이브 중이거나 카운트다운 중일 때만. AI 플레이는 제외(대조용 자동 실행이 멈추면 안 된다)
+  document.addEventListener('visibilitychange', () => { if (document.hidden && game && !ended && !auto && (game.wave || nextWaveAt !== null)) pause(); });
 
   // 개발용 전시: 무한 모드 판에 열 계열을 자리 순서대로 tier 단까지 올려 짓는다(골드 무제한). ?showcase=3&map=serpent
   //   &only=fiery,frost — 그 계열만(판 가운데에 가까운 자리부터) · &zoom=2.5 — 카메라 당김 · &hp=50 — 적 체력(효과를 오래 보려고)
@@ -360,5 +457,6 @@ NGN.serverNow = async function serverNow() {
     return { calls: world.renderer.info.render.calls, triangles: world.renderer.info.render.triangles, pixelRatio: world.renderer.getPixelRatio(), shadows: world.renderer.shadowMap.enabled, quality: world.quality, avgMs: +avg.toFixed(1), p95Ms: +times[Math.floor(times.length * 0.95)].toFixed(1), fps: +(1000 / avg).toFixed(0), objects: world.root.children.length };
   }
   // setSpeed 는 개발용(성질 연출을 느린 배속으로 눈으로 볼 때). 화면 버튼은 1·2·3배만 준다
-  window.NGN.app = { preview, get game() { return game; }, get mode() { return mode; }, get stage() { return curStage; }, get diff() { return curDiff; }, get daily() { return curDaily; }, world, renderer, ui, startWave, startStage, startInfinite, startDaily, data, meta, gachaUi, models, genMap, measure, serverNow: () => nowFromServer(), refreshServerTime, setSpeed: (n) => { speed = n; ui.setSpeedLabel(n); } };
+  // callWave(미리 부르기)·pause()·resume()·paused·countdown(남은 초) 은 코디네이터가 DevTools 로 검증하는 손잡이
+  window.NGN.app = { preview, get game() { return game; }, get mode() { return mode; }, get stage() { return curStage; }, get diff() { return curDiff; }, get daily() { return curDaily; }, get paused() { return paused; }, get countdown() { return nextWaveAt; }, world, renderer, ui, startWave, callWave, pause, resume, startStage, startInfinite, startDaily, data, meta, gachaUi, models, genMap, measure, serverNow: () => nowFromServer(), refreshServerTime, setSpeed: (n) => { speed = n; ui.setSpeedLabel(n); } };
 })().catch((e) => { if (window.NGN_LOADING) window.NGN_LOADING.fail(e.message); document.body.insertAdjacentHTML('beforeend', `<pre style="color:#f88;padding:16px;position:relative;z-index:101">시작 실패: ${e.message}\n${e.stack}</pre>`); console.error(e); });

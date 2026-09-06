@@ -151,7 +151,7 @@
   .famRow .card { flex: 0 0 72px; min-height: 90px; }
 
   /* ---------- 게임 화면 (2026-09-06 참고: 레이드 러시 — 상단 얇은 한 줄, 하단은 낮게, 카드는 3D 그림) ----------
-     상단: [←] · 웨이브 진행 막대(칸이 채워진다 + N/M) · 우측에 생명·골드 작은 알약 두 줄. 예고 줄은 상시 표시 없음 — 막대를 누르면 펼쳐진다.
+     상단: [←] · 웨이브 진행 막대(칸이 채워진다 + N/M) · [⏸] · 우측에 생명·골드 작은 알약 두 줄. 막대 아래 카운트다운 줄(웨이브 사이에만: "다음 8초" + 적 아이콘), 그 아래 보스 체력 막대(보스가 살아 있을 때만). 자세한 예고는 막대를 누르면 펼쳐진다.
      하단: 판 아래 빈 땅에 카드 한 줄(그림 + 값, 이름은 고르면 뜬다) + 오른쪽 큰 ▶. 실측 숫자는 docs/checklist.md F1. */
   #hud { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 6px; right: 6px; z-index: 10; display: flex; gap: 6px; align-items: flex-start; pointer-events: none; }
   #hud > * { pointer-events: auto; }
@@ -163,15 +163,48 @@
   #waveBar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(#8CE86A, #46B83A); transition: width .4s; }
   #waveBar .ticks { position: absolute; inset: 0; background-image: repeating-linear-gradient(90deg, transparent 0, transparent calc(var(--seg) - 2px), rgba(0,0,0,.35) calc(var(--seg) - 2px), rgba(0,0,0,.35) var(--seg)); }
   #waveBar .num { position: absolute; right: 8px; top: 0; line-height: 18px; font-size: 15px; }
-  #waveBar .foes { display: inline-flex; gap: 1px; align-items: center; height: 16px; }
-  #waveBar .foes svg { width: 15px; height: 15px; }
-  #waveBar .foes .spc { font-size: 10px; line-height: 1.3; padding: 0 5px; }
+  /* 카운트다운 줄(웨이브 사이): 막대 아래 한 줄(높이 18px ≤ 22px). "다음 8초" 굵게 + 적 아이콘 + 보스·성질 칩. 글자 최소(참고: 레이드 러시 — 판을 안 가린다) */
+  #waveBar .cd { display: flex; gap: 6px; align-items: center; height: 18px; max-width: 100%; overflow: hidden; color: #fff; font-size: 13px; text-shadow: var(--stroke); white-space: nowrap; animation: fadeIn .25s; }
+  #waveBar .cd .sec { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+  #waveBar .cd .sec.soon { color: #FFC93C; animation: cdPulse .5s ease-in-out infinite alternate; } /* 3초 전부터 노랗게 깜빡 */
+  @keyframes cdPulse { from { transform: scale(1); } to { transform: scale(1.12); } }
+  #waveBar .cdfoes { display: inline-flex; gap: 1px; align-items: center; height: 16px; min-width: 0; overflow: hidden; }
+  #waveBar .cdfoes .foes { display: inline-flex; gap: 1px; align-items: center; }
+  #waveBar .cdfoes svg { width: 15px; height: 15px; flex: 0 0 auto; }
+  #waveBar .cdfoes .more { font-size: 11px; }
+  #waveBar .cdfoes .spc { font-size: 10px; line-height: 1.3; padding: 0 5px; margin-left: 3px; }
+  #waveBar .cdfoes .spc.boss { background: #B02A3A; border: 1px solid #FF8080; }
+  /* 보스 체력 막대: HUD 아래 한 줄(높이 20px), 알약 열(오른쪽 92px)을 피해서. 두꺼운 테두리 + 붉은 채움 + 깎일 때 흰 번쩍 */
+  #bossBar { position: fixed; top: calc(52px + env(safe-area-inset-top)); left: 52px; right: 92px; z-index: 10; display: flex; align-items: center; gap: 6px; pointer-events: none; color: #fff; text-shadow: var(--stroke); font-size: 13px; animation: fadeIn .3s; }
+  #bossBar .nm { flex: 0 0 auto; color: #FF8080; }
+  #bossBar .track { flex: 1; height: 16px; border-radius: 8px; background: rgba(20,10,12,.7); border: 3px solid #FFD0D0; box-shadow: 0 0 0 2px #7A1020, 0 2px 8px rgba(0,0,0,.5); position: relative; overflow: hidden; }
+  #bossBar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: linear-gradient(#FF6A5E, #C0202A); transition: width .15s; }
+  #bossBar .glint { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+  #bossBar.flash .glint { animation: bossFlash .18s ease-out; }
+  @keyframes bossFlash { 0% { opacity: .85; } 100% { opacity: 0; } }
+  #bossBar .pct { flex: 0 0 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  /* 성이 맞았을 때: 생명 알약이 크게 튀며 붉게 + "−N" 플로터 · 화면 가장자리 붉은 번쩍 */
+  #lifePill { position: relative; }
+  #lifePill.hit { animation: lifeHit .5s ease-out; border-color: #FF6060; background: rgba(120,16,20,.8); }
+  @keyframes lifeHit { 0% { transform: scale(1); } 30% { transform: scale(1.45); } 100% { transform: scale(1); } }
+  #lifePill .lf { position: absolute; left: -8px; top: 50%; transform: translate(-100%, -50%); font-size: 18px; color: #FF6060; text-shadow: var(--stroke); pointer-events: none; animation: lifeFl .9s ease-out forwards; }
+  @keyframes lifeFl { 0% { opacity: 1; transform: translate(-100%, -50%) scale(.8); } 30% { transform: translate(-100%, -70%) scale(1.25); } 100% { opacity: 0; transform: translate(-100%, -160%) scale(1); } }
+  #dmgFlash { position: fixed; inset: 0; z-index: 8; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(255,40,40,0) 55%, rgba(255,40,40,.55) 100%); }
+  #dmgFlash.on { animation: dmgFlash .35s ease-out; }
+  @keyframes dmgFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+  #danger { position: fixed; inset: 0; z-index: 8; pointer-events: none; background: radial-gradient(ellipse at center, rgba(255,40,40,0) 60%, rgba(255,40,40,.45) 100%); animation: dangerPulse 1.1s ease-in-out infinite alternate; }
+  @keyframes dangerPulse { from { opacity: .15; } to { opacity: .8; } }
+  /* 일시정지 오버레이(게임 화면 안에만 — 메뉴·결과에선 #game 이 숨겨져 같이 숨는다) */
+  #pauseOverlay { position: fixed; inset: 0; z-index: 35; background: rgba(8,12,18,.66); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; animation: fadeIn .2s; }
+  #pauseOverlay .ptitle { font-size: 44px; color: #fff; text-shadow: var(--stroke), 0 6px 0 rgba(0,0,0,.4); }
+  #pauseOverlay .prow { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  #pauseOverlay .btn.big { min-width: 220px; }
   .mpill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px 1px 5px; border-radius: 999px; background: rgba(20,26,34,.6); border: 2px solid rgba(255,255,255,.5); font-size: 15px; white-space: nowrap; color: #fff; min-width: 74px; justify-content: flex-start; }
   .mpill svg.i { font-size: 16px; }
   .mpill .num { text-shadow: none; }
   #hudRight { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
   #bagPill.has { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255,201,60,.5); animation: glowPulse 1s ease-in-out infinite alternate; }
-  #nextDetail { position: fixed; top: calc(56px + env(safe-area-inset-top)); left: 52px; right: 92px; z-index: 10; padding: 8px 10px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  #nextDetail { position: fixed; top: calc(74px + env(safe-area-inset-top)); left: 52px; right: 92px; z-index: 10; padding: 8px 10px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
   /* 하단 한 줄: [돌리기] [카드…] [▶]. 카드 = 타워 그림 + 값. 이름은 고른 카드 위에만 뜬다(글자 최소) */
   #bottom { position: fixed; left: 6px; right: 6px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 10; display: flex; gap: 6px; align-items: flex-end; pointer-events: none; }
   #bottom > * { pointer-events: auto; }
@@ -196,6 +229,9 @@
   #waveBtn svg { width: 34px; height: 34px; }
   #waveBtn.running { background: #6B7C86; border-color: #3E4A52; --sh: #3E4A52; box-shadow: 0 5px 0 #3E4A52; }
   #waveBtn .spd { position: absolute; bottom: -6px; right: -4px; background: var(--gold); color: #3a2a00; text-shadow: none; border: 2px solid #fff; border-radius: 999px; font-size: 11px; line-height: 14px; padding: 0 5px; }
+  /* 카운트다운 중 ▶ = 「미리 부르기」: 지금 누르면 받을 보너스 골드 칩("+N", 초마다 줄어든다) */
+  #waveBtn .bonus { position: absolute; top: -8px; right: -6px; background: var(--gold); color: #3a2a00; text-shadow: none; border: 2px solid #fff; border-radius: 999px; font-size: 11px; line-height: 14px; padding: 0 5px; display: inline-flex; align-items: center; gap: 1px; font-variant-numeric: tabular-nums; }
+  #waveBtn .bonus svg { width: 10px; height: 10px; }
   #rotateBtn { margin-bottom: 12px; }
   /* 타워 위 팝(승급·팔기·자세히) */
   #pop { position: fixed; z-index: 12; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
@@ -232,6 +268,8 @@
   .fl { position: absolute; transform: translate(-50%, -50%); font-size: 18px; color: #FFD34D; text-shadow: var(--stroke); animation: fl .8s ease-out forwards; will-change: transform, opacity; }
   .fl.big { font-size: 24px; color: #FF7A3D; }
   .fl.kill { color: #7CE76A; }
+  .fl.gold { color: var(--gold); font-size: 16px; display: inline-flex; align-items: center; gap: 2px; } /* 처치 골드 "+12" — 동전 아이콘 앞에 */
+  .fl.gold svg { width: 13px; height: 13px; }
   @keyframes fl { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.7); } 25% { transform: translate(-50%, -80%) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -140%) scale(1); } }
   #hint { position: fixed; z-index: 11; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
   #hint .arrow { width: 0; height: 0; border-left: 22px solid transparent; border-right: 22px solid transparent; border-top: 34px solid var(--gold); filter: drop-shadow(0 3px 0 var(--gold2)); animation: bob .8s ease-in-out infinite alternate; }
@@ -239,6 +277,14 @@
   @keyframes bob { from { transform: translateY(0); } to { transform: translateY(-10px); } }
   #banner { position: fixed; left: 0; right: 0; top: 34%; z-index: 30; text-align: center; font-size: 40px; color: #fff; text-shadow: var(--stroke), 0 6px 0 rgba(0,0,0,.4); pointer-events: none; animation: banner 1.6s ease-out forwards; }
   @keyframes banner { 0% { opacity: 0; transform: translateX(-60px) scale(.8); } 15% { opacity: 1; transform: translateX(0) scale(1.05); } 80% { opacity: 1; transform: translateX(0) scale(1); } 100% { opacity: 0; transform: translateX(60px); } }
+  /* 배너 변형: boss = 보스 등장(더 크고 붉은 빛) · gold = 보스 처치(금색) · small = 웨이브 클리어(28px, 판을 덜 가린다) */
+  #banner.boss { font-size: 52px; color: #FF7070; text-shadow: var(--stroke), 0 0 18px rgba(255,40,40,.9), 0 0 40px rgba(255,0,0,.6), 0 6px 0 rgba(0,0,0,.4); animation: bannerBoss 2s ease-out forwards; }
+  @keyframes bannerBoss { 0% { opacity: 0; transform: scale(2.2); } 12% { opacity: 1; transform: scale(1); } 80% { opacity: 1; transform: scale(1.04); } 100% { opacity: 0; transform: scale(1.1); } }
+  #banner.gold { color: var(--gold); text-shadow: var(--stroke), 0 0 18px rgba(255,201,60,.8), 0 6px 0 rgba(0,0,0,.4); }
+  #banner.small { font-size: 28px; }
+  #banner .sub { font-size: 20px; margin-top: 2px; color: var(--gold); display: inline-flex; align-items: center; gap: 4px; }
+  #banner .sub svg { width: 20px; height: 20px; }
+  #banner .sub.leak { color: #FF8080; }
   #toast { position: fixed; left: 50%; top: 42%; transform: translateX(-50%); z-index: 30; padding: 8px 16px; font-size: 16px; pointer-events: none; max-width: 90vw; text-align: center; }
   .bump { animation: bump .35s ease-out; }
   @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
@@ -462,14 +508,25 @@
 <div id="game" hidden>
   <div id="hud">
     <button class="ibtn" id="btnMenu" title="나가기"><svg viewBox="0 0 24 24"><path fill="#fff" d="M15 4 7 12l8 8 2-2-6-6 6-6z"/></svg></button>
-    <div id="waveBar"><div class="track"><div class="fill"></div><div class="ticks"></div><span class="num" id="waveNo">1/8</span></div><div class="foes" id="next"></div></div>
+    <div id="waveBar"><div class="track"><div class="fill"></div><div class="ticks"></div><span class="num" id="waveNo">1/8</span></div>
+      <!-- 카운트다운 줄(웨이브 사이에만): "다음 8초" + 다음 웨이브 적 아이콘 + 보스/성질 칩. 웨이브 중엔 사라진다 -->
+      <div class="cd" id="countdown" hidden><span class="sec" id="cdSec"></span><span class="cdfoes" id="cdFoes"></span></div>
+    </div>
+    <button class="ibtn" id="pauseBtn" title="일시정지"><svg viewBox="0 0 24 24"><path fill="#fff" d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
     <div id="hudRight">
       <span class="mpill" id="lifePill"><svg class="i" viewBox="0 0 24 24"><path fill="#E8443A" d="M12 21s-7.5-4.6-9.5-9.3C1 8 3.4 4.5 7 4.5c2 0 3.6 1.1 5 2.8 1.4-1.7 3-2.8 5-2.8 3.6 0 6 3.5 4.5 7.2C19.5 16.4 12 21 12 21z"/></svg><span class="num" id="lives">20</span></span>
       <span class="mpill" id="goldPill"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#F5B301"/><circle cx="12" cy="12" r="7" fill="#FFD84D"/><path d="M12 7v10M9.5 9.5h4a1.75 1.75 0 0 1 0 3.5h-3a1.75 1.75 0 0 0 0 3.5h4" stroke="#B8860B" stroke-width="1.8" fill="none"/></svg><span class="num gold" id="gold">60</span></span>
       <span class="mpill" id="bagPill" hidden title="가방 — 떨어진 아이템. 타워를 눌러 끼운다"></span>
     </div>
   </div>
+  <!-- 보스 체력 막대: 보스가 살아 있는 동안만 HUD 바로 아래 한 줄. 깎일 때 흰 번쩍(.flash) -->
+  <div id="bossBar" hidden><span class="nm">보스</span><div class="track"><div class="fill"></div><div class="glint"></div></div><span class="pct" id="bossPct">100%</span></div>
   <div id="nextDetail" class="panel" hidden></div>
+  <!-- 성이 맞았을 때 가장자리 붉은 번쩍(0.35초) · 적이 출구 가까이 오면 천천히 깜빡이는 붉은 비네트 -->
+  <div id="dmgFlash"></div>
+  <div id="danger" hidden></div>
+  <!-- 일시정지: 엔진·카운트다운·연출 전부 멈춤. [계속] [나가기] -->
+  <div id="pauseOverlay" hidden><div class="ptitle">일시정지</div><div class="prow"><button class="btn green big" id="pauseResume">계속</button><button class="btn gray mid" id="pauseQuit">나가기</button></div></div>
   <div id="bottom">
     <button class="ibtn" id="rotateBtn" title="돌리기"><svg viewBox="0 0 24 24"><path fill="#fff" d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg></button>
     <div id="towerBar"></div>
@@ -515,7 +572,7 @@
 <!-- 부팅: 스크립트를 하나씩 받으며 로딩 막대를 채운다(0~30%). 그 뒤 데이터·모델은 main.js 가 NGN_LOADING 으로 이어 채운다.
      파일 위치는 window.__NGN_PATHS__(나눔 빌드가 넣는다)로 바꾼다. 번들(단일 HTML)은 __NGN_INLINE__ 을 세워 이 목록을 안 받고 뒤에 인라인된 것을 쓴다.
      SCRIPTS 는 유효한 JSON 배열이어야 한다 — game/build.js·bundle.js 가 이 줄을 읽는다 -->
-<script>window.__NGN_VERSION__ = "dff27151dc"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
+<script>window.__NGN_VERSION__ = "974e5bb96d"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
 <script>
 (function () {
   const P = Object.assign({ sim: '../sim/', vendor: 'vendor/', data: '../data/', assets: '../assets/' }, window.__NGN_PATHS__ || {});

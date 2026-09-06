@@ -137,3 +137,54 @@ NGN.Lightning = class Lightning {
   }
   clear() { for (const L of this.live) { this.root.remove(L.mesh); L.geo.dispose(); } this.live = []; }
 };
+
+// ---------- 효과음(2026-09-06, checklist D) — 파일 없이 Web Audio 합성 ----------
+// 표준 TD 에 당연히 있는 것. 발사(계열 타입별 음색)·맞음·처치·골드·건설·승급·웨이브 시작·보스·성 피해·미리 부르기·클리어.
+// 폰은 첫 터치 뒤에만 소리가 난다(브라우저 규칙) → 첫 pointerdown 에서 AudioContext 를 켠다. 설정에서 끌 수 있다(meta.state.settings.sound === false).
+// 같은 소리는 0.04초 안에 겹치지 않게 막는다(떼거리 웨이브에서 발사음이 수십 개 겹치면 귀가 아프다)
+NGN.Sound = class Sound {
+  constructor() { this.ctx = null; this.on = true; this.last = new Map(); this.master = null; const wake = () => { this.wake(); }; addEventListener('pointerdown', wake, { passive: true }); addEventListener('keydown', wake); }
+  wake() { try { if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.gain.value = 0.55; this.master.connect(this.ctx.destination); } if (this.ctx.state === 'suspended') this.ctx.resume(); } catch (e) { this.ctx = null; } }
+  // 기본 음: type(osc) · f0→f1 주파수 · dur 길이 · vol · 노이즈 섞기
+  tone(o) {
+    if (!this.on || !this.ctx || this.ctx.state !== 'running') return;
+    const now = performance.now(), key = o.key || o.type + o.f0; if (now - (this.last.get(key) || 0) < (o.gap || 40)) return; this.last.set(key, now);
+    const c = this.ctx, t = c.currentTime + (o.delay || 0), dur = o.dur || 0.12;
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.vol || 0.3, t + (o.attack || 0.005)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); g.connect(this.master);
+    if (o.type !== 'noise') { const osc = c.createOscillator(); osc.type = o.type || 'square'; osc.frequency.setValueAtTime(o.f0 || 440, t); osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.f1 || o.f0 || 440), t + dur); osc.connect(g); osc.start(t); osc.stop(t + dur + 0.02); }
+    if (o.type === 'noise' || o.noise) { const n = Math.floor(c.sampleRate * dur); const buf = c.createBuffer(1, n, c.sampleRate); const d = buf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n); const src = c.createBufferSource(); src.buffer = buf; const f = c.createBiquadFilter(); f.type = o.filter || 'lowpass'; f.frequency.value = o.fc || 1200; src.connect(f); f.connect(g); src.start(t); }
+  }
+  // 이름으로 부른다(render.js·main.js). 계열 공격 타입별 발사음이 다르다
+  play(name, opt = {}) {
+    const T = {
+      shot_physical: { type: 'triangle', f0: 900, f1: 300, dur: 0.08, vol: 0.18, key: 'shot' }, // 화살
+      shot_elemental: { type: 'noise', fc: 900, dur: 0.16, vol: 0.22, key: 'shot' }, // 불
+      shot_energy: { type: 'sine', f0: 1200, f1: 1800, dur: 0.1, vol: 0.14, key: 'shot' }, // 얼음·빛
+      shot_essence: { type: 'sine', f0: 300, f1: 160, dur: 0.18, vol: 0.16, key: 'shot' }, // 유령
+      shot_decay: { type: 'square', f0: 220, f1: 140, dur: 0.1, vol: 0.12, key: 'shot' }, // 독
+      shot_arcane: { type: 'sawtooth', f0: 500, f1: 900, dur: 0.1, vol: 0.12, key: 'shot' },
+      bolt: { type: 'noise', fc: 3000, filter: 'highpass', dur: 0.14, vol: 0.28, key: 'bolt' }, // 번개
+      cannon: { type: 'noise', fc: 400, dur: 0.22, vol: 0.4, key: 'cannon' },
+      hit: { type: 'square', f0: 200, f1: 120, dur: 0.05, vol: 0.08, key: 'hit', gap: 60 },
+      kill: { type: 'square', f0: 600, f1: 1200, dur: 0.12, vol: 0.18, key: 'kill' },
+      gold: { type: 'sine', f0: 1500, f1: 2200, dur: 0.09, vol: 0.14, key: 'gold', gap: 70 },
+      build: { type: 'triangle', f0: 300, f1: 600, dur: 0.18, vol: 0.25, key: 'build' },
+      upgrade: { type: 'sine', f0: 500, f1: 1000, dur: 0.25, vol: 0.25, key: 'upgrade' },
+      sell: { type: 'triangle', f0: 600, f1: 250, dur: 0.18, vol: 0.2, key: 'sell' },
+      wave: { type: 'sawtooth', f0: 220, f1: 440, dur: 0.35, vol: 0.22, key: 'wave' },
+      call: { type: 'sine', f0: 880, f1: 1320, dur: 0.15, vol: 0.2, key: 'call' },
+      clear: { type: 'sine', f0: 660, f1: 990, dur: 0.3, vol: 0.25, key: 'clear' },
+      boss: { type: 'sawtooth', f0: 110, f1: 55, dur: 0.9, vol: 0.4, key: 'boss', noise: true, fc: 300 },
+      bossKill: { type: 'noise', fc: 500, dur: 0.8, vol: 0.5, key: 'bossKill' },
+      castle: { type: 'noise', fc: 350, dur: 0.4, vol: 0.45, key: 'castle' },
+      lose: { type: 'sawtooth', f0: 300, f1: 80, dur: 0.8, vol: 0.3, key: 'lose' },
+      win: { type: 'sine', f0: 523, f1: 1046, dur: 0.6, vol: 0.3, key: 'win' },
+      ui: { type: 'sine', f0: 700, f1: 700, dur: 0.05, vol: 0.1, key: 'ui' },
+    };
+    const o = T[name]; if (!o) return;
+    this.tone(Object.assign({}, o, opt));
+    if (name === 'clear' || name === 'win') { this.tone(Object.assign({}, o, { f0: o.f0 * 1.25, f1: o.f1 * 1.25, delay: 0.12, key: name + '2' })); this.tone(Object.assign({}, o, { f0: o.f0 * 1.5, f1: o.f1 * 1.5, delay: 0.24, key: name + '3' })); }
+    if (name === 'bossKill') { this.tone({ type: 'sawtooth', f0: 80, f1: 30, dur: 0.9, vol: 0.4, key: 'bossKill2' }); }
+  }
+};
+NGN.sound = new NGN.Sound();

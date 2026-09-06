@@ -6,6 +6,19 @@
 // 부품은 바운딩 박스를 재 두고 바닥·중심을 맞춰 쌓는다(팩마다 원점이 달라서 — space 팩은 (1.5,0,1) 에 놓여 있다). 못 불러오면 render.js 가 코드로 그린 폴백을 쓴다.
 window.NGN = window.NGN || {};
 
+// 부품 표(kenney_parts.json) 어디에 있든 { p: '팩/이름' } · { model: '팩/이름' } 을 전부 모은다. '_' 로 시작하는 설명 칸은 건너뛴다
+NGN.collectPieces = function collectPieces(obj, set = new Set()) {
+  if (Array.isArray(obj)) { for (const v of obj) { if (typeof v === 'string' && v.includes('/')) set.add(v); else collectPieces(v, set); } return [...set]; }
+  if (obj && typeof obj === 'object') {
+    for (const [k, v] of Object.entries(obj)) {
+      if (k.startsWith('_')) continue;
+      if ((k === 'p' || k === 'model') && typeof v === 'string' && v.includes('/')) set.add(v);
+      else collectPieces(v, set);
+    }
+  }
+  return [...set];
+};
+
 NGN.Models = class Models {
   constructor(parts) {
     this.parts = parts; // data/kenney_parts.json
@@ -13,13 +26,9 @@ NGN.Models = class Models {
     this.ready = false; this.failed = false;
     this.fxTexture = null;
   }
-  // 표에 나오는 부품 전부(타워 stack + 적)
-  pieceList() {
-    const set = new Set();
-    for (const fam of Object.values(this.parts.towers)) for (const st of Object.values(fam.stack)) for (const e of st) set.add(typeof e === 'string' ? e : e.p);
-    for (const e of Object.values(this.parts.enemies)) set.add(e.model);
-    return [...set];
-  }
+  // 표에 나오는 부품 전부 — 표 어디에 있든 '팩/이름' 꼴의 p·model 값을 재귀로 모은다(타워 stack · 적 model·props · 장식 scenery · 성·입구 landmarks).
+  // game/build.js·bundle.js 도 같은 규칙으로 복사한다(NGN.collectPieces 와 동일)
+  pieceList() { return NGN.collectPieces(this.parts); }
   async loadAll(onProgress) {
     if (!this.parts || typeof THREE.GLTFLoader === 'undefined') { this.failed = true; return false; }
     const inline = window.__NGN_MODELS__ || null;
@@ -48,7 +57,7 @@ NGN.Models = class Models {
         scene.updateMatrixWorld(true);
         scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         const box = new THREE.Box3().setFromObject(scene);
-        this.templates.set(name, { scene, size: box.getSize(new THREE.Vector3()), min: box.min.clone(), center: box.getCenter(new THREE.Vector3()) });
+        this.templates.set(name, { scene, size: box.getSize(new THREE.Vector3()), min: box.min.clone(), center: box.getCenter(new THREE.Vector3()), anims: gltf.animations || [] }); // anims: 캐릭터 팩의 걷기·달리기·죽기 클립(적에 쓴다)
         step(name); resolve(true);
       }, undefined, (err) => { console.warn('모델 못 읽음', name, err && err.message); step(name); resolve(false); });
     });
@@ -68,7 +77,8 @@ NGN.Models = class Models {
   // 모든 팩의 colormap 을 한 장(1024², 256 칸 16개)으로: 팩마다 [회색조 칸, 원색 칸], 마지막에 흰 칸(텍스처 없는 재질용).
   // 회색조는 밝기·명암만 남기고 색은 꼭짓점 색(속성색)이 정한다 — Kenney 원색(보라·주황)이 속성색을 묻어 버려서(design.md 12-10)
   buildAtlas() {
-    const CELL = 256, N = 4;
+    // 2026-09-06 팩이 10 → 17개로 늘어(적 캐릭터·장식·성) 4×4=16 칸을 넘친다 → 8×8=64 칸(2048²). 칸 크기 256 은 그대로(Kenney colormap 은 512² 팔레트라 축소해도 색이 안 뭉개진다)
+    const CELL = 256, N = 8;
     const canvas = document.createElement('canvas'); canvas.width = canvas.height = CELL * N;
     const ctx = canvas.getContext('2d');
     // 🔴 팩 이름으로 묶는다 — GLB 파일마다 같은 colormap 을 따로 읽어 Image 객체가 다 달라서, 이미지로 묶으면 파일 60개가 칸 16개를 넘쳐 뒤쪽 팩이 흰 칸으로 떨어졌다(실측 2026-09-06)
@@ -93,6 +103,25 @@ NGN.Models = class Models {
   }
   has(name) { return this.templates.has(name); }
   size(name) { const t = this.templates.get(name); return t ? t.size : null; }
+
+  // 장식·성·입구용 조각 하나 → { geometry, material }. 바닥이 y=0, 중심이 x/z=0, 배율 1(배율·위치는 InstancedMesh 행렬로).
+  // P = { p: '팩/이름', raw?: 원색 유지(기본 true — 장식은 Kenney 원색이 예쁘다), tint?: '#색'(회색조 칸 × 이 색 — 눈 테마의 흰 나무 등), recolor?: {재질이름: 색} (텍스처 없는 nature·space 팩) }
+  // 같은 조각·같은 색은 한 번만 만들어 나눠 쓴다. 재질은 아틀라스 하나(꼭짓점 색) — 종류가 달라도 재질은 같아 셰이더 전환이 없다. world.js 가 InstancedMesh 로 그린다
+  pieceGeometry(P) {
+    if (typeof P === 'string') P = { p: P };
+    if (!this.atlas || !this.templates.has(P.p)) return null;
+    this.pieceGeo = this.pieceGeo || new Map();
+    const key = P.p + '|' + (P.tint || '') + '|' + (P.raw === false ? 'g' : 'r') + '|' + JSON.stringify(P.recolor || null);
+    if (!this.pieceGeo.has(key)) {
+      const Q = { p: P.p, raw: P.raw !== false && !P.tint, tint: P.tint, recolor: P.recolor };
+      const placed = this.place(Q, 0); if (!placed) return null;
+      const g = new THREE.Group(); g.add(placed.obj);
+      const merged = this.mergeGroup(g, { outline: false, accent: new THREE.Color(P.tint || 0xffffff), base: new THREE.Color(P.tint || 0xffffff) });
+      this.sceneryMat = this.sceneryMat || new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true });
+      this.pieceGeo.set(key, merged.body ? { geometry: merged.body, material: this.sceneryMat, height: placed.height, size: this.templates.get(P.p).size.clone() } : null);
+    }
+    return this.pieceGeo.get(key);
+  }
 
   // 여러 조각 메시를 하나로(같은 아틀라스 재질을 쓰므로 가능). 조각마다 userData.piece(표의 객체)·userData.family 로 색·칸을 정한다.
   // 머리(piece.head)로 표시된 조각은 별도 지오메트리로 모은다(적을 향해 돌리려고). 돌려주는 값: { body, head, headPivot }
@@ -253,24 +282,94 @@ NGN.Models = class Models {
     out.userData.fx = src.fx.map((f) => ({ kind: f.kind, x: f.x * scale, y: f.y * scale, z: f.z * scale }));
     return out;
   }
-  buildEnemy(kind) {
+  // ---------- 적: 창고 캐릭터 팩(뼈대 애니메이션) ----------
+  // 2026-09-06 적 6종을 UFO 하나 돌려쓰던 것에서 캐릭터 팩(mini-dungeon 오크 · cube-pets 여우·코끼리·병아리·앵무새·사자)으로. 사장님: "몹이 다 똑같아. 외형이 다 똑같단 말이야."
+  // 창고 캐릭터는 걷기·달리기 클립이 들어 있다. 두 종류가 섞여 있다 — 미니 팩은 진짜 스킨(뼈 7개, SkinnedMesh 2장), 큐브펫은 부위별 메시(몸통·꼬리·다리 4개가 노드 애니메이션).
+  // 둘 다 "뼈 하나 + SkinnedMesh 하나"로 통일한다: 부위 메시는 그 노드를 뼈로 삼아 가중치 100% 로 붙인다. 그러면 적 하나 = 그리기 1회, 애니메이션은 GPU 스키닝.
+  // 색은 아틀라스 원색 칸 × 꼭짓점 색(spec.tint — 부위 이름별로 곱하는 색). 눈·코 같은 어두운 부분은 그대로 남고 밝은 부분만 물든다.
+  enemyTemplate(kind) {
     const spec = this.parts.enemies[kind] || this.parts.enemies.basic;
-    const key = 'enemy:' + kind;
-    if (!this.enemyGeo) this.enemyGeo = new Map();
-    if (!this.enemyGeo.has(key)) {
-      const t = this.templates.get(spec.model); if (!t || !this.atlas) return null;
-      const P = { p: spec.model, tint: spec.tint };
-      const placed = this.place(P, -t.size.y * 0.5); // 중심을 원점에
-      if (!placed) return null;
-      const g = new THREE.Group(); g.add(placed.obj);
-      const merged = this.mergeGroup(g, { outline: false });
-      this.enemyMat = this.enemyMat || new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true });
-      this.enemyGeo.set(key, merged.body);
-    }
-    const mesh = new THREE.Mesh(this.enemyGeo.get(key), this.enemyMat); mesh.castShadow = true;
-    const g = new THREE.Group(); g.add(mesh);
-    g.scale.setScalar(this.parts.enemyScale * spec.scale);
+    this.enemyTpl = this.enemyTpl || new Map();
+    if (this.enemyTpl.has(kind)) return this.enemyTpl.get(kind);
+    const t = this.templates.get(spec.model); if (!t || !this.atlas) return null;
+    const scene = t.scene; scene.updateMatrixWorld(true);
+    const pack = spec.model.split('/')[0];
+    const cellNo = this.cells.has(pack) ? this.cells.get(pack).color : this.whiteCell;
+    const cx = (cellNo % this.atlasN) * this.atlasCell, cy = Math.floor(cellNo / this.atlasN) * this.atlasCell, cs = this.atlasCell;
+    // 뼈 = 장면의 모든 노드(부위 메시 노드 포함). 순서를 고정해 복제본이 같은 번호를 쓴다
+    const bones = []; scene.traverse((o) => { if (o !== scene) bones.push(o); });
+    const idx = new Map(bones.map((b, i) => [b, i]));
+    const tints = spec.tint && typeof spec.tint === 'object' ? spec.tint : { '*': spec.tint || '#ffffff' };
+    const tintFor = (name) => new THREE.Color(tints[name] || tints['*'] || '#ffffff');
+    const pos = [], nor = [], uv = [], col = [], si = [], sw = [];
+    const v = new THREE.Vector3(), n3 = new THREE.Matrix3(), uv2 = new THREE.Vector2();
+    scene.traverse((o) => {
+      if (!o.isMesh || !o.geometry.attributes.position) return;
+      const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+      const P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
+      // 스킨 메시: 원본 bindMatrix 를 위치에 곱하고 뼈 번호를 우리 번호로 옮긴다. 부위 메시: 그 노드의 세계 행렬을 곱하고 자기 노드에 100% 붙인다
+      const m = o.isSkinnedMesh ? o.bindMatrix.clone() : o.matrixWorld.clone(); n3.getNormalMatrix(m);
+      const boneMap = o.isSkinnedMesh ? o.skeleton.bones.map((b) => idx.get(b)) : null;
+      const self = idx.get(o);
+      const color = tintFor(o.name);
+      let uvM = null; if (o.material.map) { o.material.map.updateMatrix(); uvM = o.material.map.matrix; }
+      const flip = m.determinant() < 0;
+      for (let tri = 0; tri < P.count; tri += 3) {
+        const order = flip ? [tri, tri + 2, tri + 1] : [tri, tri + 1, tri + 2];
+        for (const i of order) {
+          v.fromBufferAttribute(P, i).applyMatrix4(m); pos.push(v.x, v.y, v.z);
+          if (N) { v.fromBufferAttribute(N, i).applyMatrix3(n3).normalize(); nor.push(v.x, v.y, v.z); } else nor.push(0, 1, 0);
+          if (U) { uv2.set(U.getX(i), U.getY(i)); if (uvM) uv2.applyMatrix3(uvM); } else uv2.set(0.5, 0.5);
+          uv.push(cx + Math.min(1, Math.max(0, uv2.x)) * cs, cy + Math.min(1, Math.max(0, uv2.y)) * cs);
+          col.push(color.r, color.g, color.b);
+          if (SI && boneMap) { si.push(boneMap[SI.getX(i)] || 0, boneMap[SI.getY(i)] || 0, boneMap[SI.getZ(i)] || 0, boneMap[SI.getW(i)] || 0); sw.push(SW.getX(i), SW.getY(i), SW.getZ(i), SW.getW(i)); }
+          else { si.push(self, 0, 0, 0); sw.push(1, 0, 0, 0); }
+        }
+      }
+    });
+    if (!pos.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+    geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+    geo.computeBoundingSphere();
+    // 뼈 역행렬: 스킨 메시의 뼈는 원본 skeleton 것을, 나머지는 세계 행렬의 역
+    const inverses = bones.map((b) => b.matrixWorld.clone().invert());
+    scene.traverse((o) => { if (o.isSkinnedMesh) o.skeleton.bones.forEach((b, i) => { inverses[idx.get(b)] = o.skeleton.boneInverses[i].clone(); }); });
+    // 뼈대 복제용 표(이름·부모·자세)
+    const tree = bones.map((b) => ({ name: b.name, parent: b.parent === scene ? -1 : idx.get(b.parent), p: b.position.clone(), q: b.quaternion.clone(), s: b.scale.clone() }));
+    const clips = {}; for (const c of t.anims) clips[c.name] = c;
+    const tpl = { geometry: geo, inverses, tree, clips, spec, size: t.size.clone(), min: t.min.clone(), center: t.center.clone() };
+    this.enemyTpl.set(kind, tpl);
+    return tpl;
+  }
+  // 적 하나: 뼈대 복제 + SkinnedMesh + AnimationMixer. 발바닥이 y=0, 중심이 x/z=0. 돌려주는 그룹의 userData 에 mixer·actions·bones(이름→노드)·height 가 있다
+  buildEnemy(kind) {
+    const T = this.enemyTemplate(kind); if (!T) return null;
+    const spec = T.spec;
+    this.enemyMat = this.enemyMat || new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true, skinning: true }); // r128 은 skinning 플래그가 있어야 뼈 셰이더가 붙는다
+    const inner = new THREE.Group(); inner.position.set(-T.center.x, -T.min.y, -T.center.z);
+    const bones = T.tree.map((e) => { const b = new THREE.Bone(); b.name = e.name; b.position.copy(e.p); b.quaternion.copy(e.q); b.scale.copy(e.s); return b; });
+    T.tree.forEach((e, i) => { if (e.parent < 0) inner.add(bones[i]); else bones[e.parent].add(bones[i]); });
+    const mesh = new THREE.SkinnedMesh(T.geometry, this.enemyMat); mesh.castShadow = true; mesh.frustumCulled = false;
+    inner.add(mesh); inner.updateMatrixWorld(true);
+    mesh.bind(new THREE.Skeleton(bones, T.inverses), new THREE.Matrix4());
+    const mixer = new THREE.AnimationMixer(inner);
+    const actions = {}; for (const [name, clip] of Object.entries(T.clips)) actions[name] = mixer.clipAction(clip);
+    const byName = {}; for (const b of bones) byName[b.name] = b;
+    const g = new THREE.Group(); g.add(inner);
+    const scale = this.parts.enemyScale * (spec.scale || 1);
+    g.scale.setScalar(scale);
+    g.userData = { mixer, actions, bones: byName, inner, mesh, height: T.size.y * scale, width: Math.max(T.size.x, T.size.z) * scale, anim: spec.anim || 'walk', animSpeed: spec.animSpeed || 1, spec };
     return g;
+  }
+  // 적에게 붙이는 소품(갑옷 방패 등): 장식 조각을 뼈에 매단다. 그리기 +1
+  enemyProp(P) {
+    const pg = this.pieceGeometry(P); if (!pg) return null;
+    const m = new THREE.Mesh(pg.geometry, pg.material); m.castShadow = true; return m;
   }
 };
 

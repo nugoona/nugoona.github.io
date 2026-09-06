@@ -1,9 +1,16 @@
 'use strict';
-// 3D 세계: 지형·길·타워 자리·나무·바위·조명·카메라. 외부 파일 없이 코드로 그린다(테마 색은 NGN.THEMES).
-// 좌표: sim/map.js 의 지도 단위(원본 사거리 단위)를 1/100 로 줄여 그대로 쓴다. 길 길이·자리·줄 간격이 곧 밸런스라 바꾸지 않는다.
+// 3D 세계: 지형·길·타워 자리·장식·성·입구·카메라. 테마 색은 NGN.THEMES.
+// 좌표: sim/map.js 의 지도 단위(원본 사거리 단위)를 1/100 로 줄여 그대로 쓴다(1칸 = 100 = 1 세계 단위). 길 길이·자리·줄 간격이 곧 밸런스라 바꾸지 않는다.
 //
-// 성능(폰): 타일·언덕·나무·바위·꽃·점선·자리 점은 전부 InstancedMesh — 종류마다 그리기 1회. 픽셀 비율 상한 1.5, 폰은 안티앨리어싱 끔, 그림자맵 1024.
-// 자동 품질: 프레임 시간이 20ms 를 30프레임 연속 넘으면 단계를 낮춘다(픽셀 비율 → 그림자 끄기 → 시야 줄이기).
+// 2026-09-06 창고(Kenney CC0)로 세계를 채운다(사장님: "디펜스인데 맨 마지막에 성이 없어. 그냥 나가는 통로야" · "창고에 있는 건 최대한 다 써").
+//   ⑴ 출구 = 성(castle 팩 조립, 길과 직각, 길 끝이 성문 안으로) — 생명이 줄면 3단계로 그을리고 깃발이 사라지고 탑이 무너진다(setCastleDamage)
+//   ⑵ 입구 = 동굴(nature 절벽 + 어둠 원판 + 적 진영 깃발·목책·화로) — world.portal 자리에 렌더러가 소용돌이를 뿌린다
+//   ⑶ 길 위 진행 화살표(캔버스 데칼, 인스턴스 2회) · 길 위 잔돌
+//   ⑷ 테마별 장식 세트(data/kenney_parts.json scenery — 테마당 40여 종, 500개 이상) — 정점을 하나로 구워 메시 2개(그림자 있는 판 둘레 / 없는 먼 땅) = 그리기 2회
+//   모델이 아직 없으면(attachModels 전·못 읽음) 옛 코드 도형(원뿔 나무·다면체 바위·깃발)으로 그린다 — 폴백.
+// 성능(폰): 움직이지 않는 창고 조각(장식·성·동굴)은 mergeStatic 으로 한 메시에 굽는다(종류가 85가지여도 그리기 1~2회 — 실측 본 패스 128 → 53회).
+//   타일·언덕·잔돌·화살표·점선·자리 점은 InstancedMesh(한 종류 = 1회). 픽셀 비율 상한 1.5, 폰은 안티앨리어싱 끔, 그림자맵 1024.
+// 자동 품질: 프레임 시간이 17ms 를 30프레임 연속 넘으면 단계를 낮춘다(픽셀 비율 → 그림자 끄기 → 시야 줄이기).
 window.NGN = window.NGN || {};
 
 NGN.SCALE = 1 / 100;
@@ -30,6 +37,7 @@ NGN.DEFENSE_KO = { LUA: '루아', SOL: '솔', HEL: '헬', MYT: '미트', SIF: '�
 NGN.ATTACK_KO = { physical: '물리', decay: '부패', energy: '에너지', elemental: '원소', essence: '정수', arcane: '비전' };
 
 // 여러 인스턴스를 한 번에 그리는 도우미: 위치·회전·크기 목록 → InstancedMesh
+// frustumCulled 를 끈다 — InstancedMesh 는 지오메트리 하나의 경계(원점 근처 작은 공)로 컬링을 판단해서, 판 밖에 퍼진 장식이 카메라를 돌리면 통째로 사라진다
 function instanced(geo, mat, items, root) {
   if (!items.length) return null;
   const m = new THREE.InstancedMesh(geo, mat, items.length);
@@ -39,10 +47,41 @@ function instanced(geo, mat, items, root) {
     const s = it.s === undefined ? 1 : it.s; o.scale.set(it.sx || s, it.sy || s, it.sz || s);
     o.updateMatrix(); m.setMatrixAt(i, o.matrix);
   });
-  m.castShadow = !!items[0].cast; m.receiveShadow = true; m.instanceMatrix.needsUpdate = true;
+  m.castShadow = items.some((it) => it.cast); m.receiveShadow = true; m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; // 하나라도 그림자를 원하면 켠다(종류 하나 = 그림자 패스 1회)
   root.add(m);
   return m;
 }
+// 여러 종류의 조각 인스턴스를 정점 하나로 굽는다 → 메시 하나 = 그리기 1회(종류가 85가지여도). 장식·성·동굴은 움직이지 않으니 이게 InstancedMesh(종류당 1회)보다 낫다.
+// list = [{ g: {geometry(비인덱스, position/normal/uv/color)}, items: [{x,y,z,rx,ry,rz,s,sx,sy,sz}] }]. 삼각형 수는 인스턴스와 같다(코디네이터 실측: 본 패스 340회가 문제였다, 2026-09-06)
+function mergeStatic(list) {
+  let n = 0; const srcs = [];
+  for (const { g, items } of list) { const src = g.geometry.index ? g.geometry.toNonIndexed() : g.geometry; srcs.push(src); n += src.attributes.position.count * items.length; }
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2), col = new Float32Array(n * 3);
+  const o = new THREE.Object3D(), v = new THREE.Vector3(), nm = new THREE.Matrix3();
+  let k = 0;
+  list.forEach(({ items }, li) => {
+    const src = srcs[li], p = src.attributes.position, nr = src.attributes.normal, u = src.attributes.uv, c = src.attributes.color, cnt = p.count;
+    for (const it of items) {
+      o.position.set(it.x, it.y, it.z); o.rotation.set(it.rx || 0, it.ry || 0, it.rz || 0);
+      const s = it.s === undefined ? 1 : it.s; o.scale.set(it.sx || s, it.sy || s, it.sz || s); o.updateMatrix(); nm.getNormalMatrix(o.matrix);
+      for (let i = 0; i < cnt; i++, k++) {
+        v.fromBufferAttribute(p, i).applyMatrix4(o.matrix); pos[k * 3] = v.x; pos[k * 3 + 1] = v.y; pos[k * 3 + 2] = v.z;
+        if (nr) v.fromBufferAttribute(nr, i).applyMatrix3(nm).normalize(); else v.set(0, 1, 0);
+        nor[k * 3] = v.x; nor[k * 3 + 1] = v.y; nor[k * 3 + 2] = v.z;
+        if (u) { uv[k * 2] = u.getX(i); uv[k * 2 + 1] = u.getY(i); }
+        if (c) { col[k * 3] = c.getX(i); col[k * 3 + 1] = c.getY(i); col[k * 3 + 2] = c.getZ(i); } else { col[k * 3] = col[k * 3 + 1] = col[k * 3 + 2] = 1; }
+      }
+    }
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+// 방향 (dx,dz) → y 회전: 물체의 로컬 +x 축이 그 방향을 보게 한다(길 상자·화살표·성·동굴이 전부 이 규칙)
+function headingRy(dx, dz) { return Math.atan2(-dz, dx); }
+const hexOf = (c) => '#' + new THREE.Color(c).getHexString();
+const DEG = Math.PI / 180;
 
 NGN.World = class World {
   constructor(stage) {
@@ -84,7 +123,18 @@ NGN.World = class World {
     this.camAngle = 0;
     this.zoom = 1;
     this.frameTimes = []; this.lastDrop = 0;
+    // 창고 모델(attachModels 로 들어온다) · 카메라 흔들림 · 성 피격 · 불 자리(렌더러가 읽는다)
+    this.models = null; this.parts = null;
+    this.camBase = new THREE.Vector3(); this.shakeT = 0; this.shakeS = 0; this.hitT = 0;
+    this.fireSpots = []; this.castleFireSpots = []; this.flagMeshes = []; this.castleFires = [[], [], []]; this.damageStage = 0;
     addEventListener('resize', () => this.resize());
+    this.setMap(NGN.map);
+  }
+
+  // 모델 로딩이 끝난 뒤 main.js 가 부른다. 그때부터 창고 장식·성·동굴로 다시 짓는다(못 읽었으면 코드 도형 그대로)
+  attachModels(models) {
+    this.models = models && models.ready ? models : null;
+    this.parts = this.models ? models.parts : null;
     this.setMap(NGN.map);
   }
 
@@ -93,7 +143,7 @@ NGN.World = class World {
     NGN.map = map;
     while (this.root.children.length) this.root.remove(this.root.children[0]);
     const C = Object.assign({}, NGN.C, NGN.THEMES[map.theme] || {});
-    this.C = C;
+    this.C = C; this.theme = NGN.THEMES[map.theme] ? map.theme : 'grass';
     this.scene.background = new THREE.Color(C.sky);
     this.scene.fog.color = new THREE.Color(C.fog);
     const mat = (color, opts) => new THREE.MeshLambertMaterial(Object.assign({ color }, opts || {}));
@@ -113,15 +163,67 @@ NGN.World = class World {
     this.camera.aspect = this.stage.clientWidth / Math.max(1, this.stage.clientHeight) || this.camera.aspect;
     this.baseAngle = this.camDist(0) <= this.camDist(Math.PI / 2) ? 0 : Math.PI / 2;
     this.camAngle = this.baseAngle;
+    // 성·동굴·불 자리는 지도마다 새로
+    this.fireSpots = []; this.castleFireSpots = []; this.castleFires = [[], [], []]; this.flagMeshes = []; this.gateMesh = null;
+    this.castle = null; this.castleIntact = []; this.castleRuin = []; this.damageStage = 0; this.keepOut = []; this.missing = this.missing || new Set();
+    this.castleBox = null; this.portalBox = null; // 이전 지도의 성 범위가 카메라 계산에 남지 않게
     this.buildGround();
     this.buildPaths();
     this.buildSlots();
+    this.buildLandmarks(); // 장식보다 먼저 — 장식이 성·동굴 자리를 피해야 한다
+    // 성·동굴 범위가 생겼으니 기본 방향을 다시 고른다(위 계산은 판 모서리만 알았다)
+    this.baseAngle = this.camDist(0) <= this.camDist(Math.PI / 2) ? 0 : Math.PI / 2;
+    this.camAngle = this.baseAngle;
     this.buildScenery();
     this.resize();
   }
   toWorld(x, y, h = 0) { return new THREE.Vector3((x - this.cx) * NGN.SCALE, h, (y - this.cz) * NGN.SCALE); }
 
-  // 지형: 바닥 한 장 + 체커 타일(인스턴스 1회) + 가장자리 언덕(인스턴스 2회).
+  // ---------- 창고 조각 도우미 ----------
+  // 조각 하나 → { g: {geometry, material, height, size}, key }. nature 팩은 텍스처가 없어 테마 기본 재질색(scenery.natureColors)을 깔고 항목의 recolor 를 덮는다.
+  // 없는 조각은 한 번만 경고하고 null(그 자리는 비운다 — 게임은 계속)
+  piece(P) {
+    if (!this.models) return null;
+    const pack = P.p.split('/')[0];
+    const Q = { p: P.p, raw: P.raw, tint: P.tint };
+    if (pack === 'nature' || pack === 'space') { const base = (this.parts.scenery && this.parts.scenery.natureColors && this.parts.scenery.natureColors[this.theme]) || {}; Q.recolor = Object.assign({}, base, P.recolor || {}); }
+    else if (P.recolor) Q.recolor = P.recolor;
+    const g = this.models.pieceGeometry(Q);
+    if (!g) { if (!this.missing.has(P.p)) { this.missing.add(P.p); console.warn('장식 조각 없음', P.p); } return null; }
+    return { g, key: P.p + '|' + (P.tint || '') + '|' + (P.raw === false ? 'g' : 'r') + '|' + JSON.stringify(Q.recolor || null) };
+  }
+  // 조각 인스턴스 모음: 같은 조각·같은 색끼리 묶어 두고 flush() 때 정점 하나로 굽거나(merged — 장식·성·동굴) 종류당 InstancedMesh 로 만든다
+  // box(Box3)를 주면 놓은 조각마다 로컬 범위를 넓혀 준다(회전은 무시하고 가로·세로 중 큰 쪽을 반지름으로 — 카메라 범위용이라 넉넉해도 된다).
+  // InstancedMesh 는 Box3.setFromObject 가 인스턴스 행렬을 무시해서 이렇게 직접 잰다
+  collector(root, box) {
+    const groups = new Map();
+    return {
+      add: (P, it) => {
+        const r = this.piece(P); if (!r) return null;
+        (groups.get(r.key) || groups.set(r.key, { g: r.g, items: [] }).get(r.key)).items.push(it);
+        if (box) { const sz = r.g.size, s = it.s || 1, rad = Math.max(sz.x * (it.sx || s), sz.z * (it.sz || s)) / 2; box.expandByPoint(new THREE.Vector3(it.x - rad, it.y, it.z - rad)); box.expandByPoint(new THREE.Vector3(it.x + rad, it.y + sz.y * (it.sy || s), it.z + rad)); }
+        return r.g;
+      },
+      // merged=true: 종류를 가리지 않고 정점 하나로 굽는다 — 그림자를 만드는 것(cast)과 안 만드는 것 둘로만 나눠 메시 최대 2개. 아니면 종류당 InstancedMesh
+      flush: (material, merged) => {
+        const out = [];
+        if (merged) {
+          const near = [], far = [];
+          for (const { g, items } of groups.values()) { const a = items.filter((it) => it.cast), b = items.filter((it) => !it.cast); if (a.length) near.push({ g, items: a }); if (b.length) far.push({ g, items: b }); }
+          for (const [list, cast] of [[near, true], [far, false]]) {
+            if (!list.length) continue;
+            const m = new THREE.Mesh(mergeStatic(list), material || list[0].g.material);
+            m.castShadow = cast; m.receiveShadow = true; root.add(m); out.push(m);
+          }
+          return out;
+        }
+        for (const { g, items } of groups.values()) { const m = instanced(g.geometry, material || g.material, items, root); if (m) out.push(m); }
+        return out;
+      },
+    };
+  }
+
+  // 지형: 바닥 한 장 + 체커 타일(인스턴스 1회) + 가장자리 언덕(창고 절벽 블록 인스턴스 1회 — 없으면 상자 2회).
   // 땅은 판보다 훨씬 넓게(가로 +40 · 세로 +70 칸) — 세로 폰에서 정사각 판은 가로에 막혀 위아래가 남는데, 거기가 하늘색으로 비면 "지도가 작다"로 보인다.
   // 참고 게임(레이드 러시)처럼 땅이 화면을 끝까지 채우게 한다(2026-09-06)
   buildGround() {
@@ -134,21 +236,27 @@ NGN.World = class World {
       tiles.push({ x, y: 0.03, z });
     }
     instanced(new THREE.BoxGeometry(TILE, 0.06, TILE), this.M.grassAlt, tiles, this.root);
-    const hillsA = [], hillsB = [];
+    const hillsA = [], hillsB = [], blocks = []; this.hillSpots = [];
     for (let i = 0; i < 60; i++) {
       const ang = i / 60 * Math.PI * 2;
       const x = Math.cos(ang) * (W / 2 - 1.2), z = Math.sin(ang) * (D / 2 - 1.2);
       if (Math.abs(x) < W / 2 - 3.2 && Math.abs(z) < D / 2 - 3.2) continue;
       const h = 0.8 + ((i * 7) % 5) * 0.35;
       (i % 2 ? hillsA : hillsB).push({ x, y: h / 2, z, sx: 1, sy: h, sz: 1, cast: true });
+      blocks.push({ x, y: 0, z, sx: TILE, sy: h, sz: TILE, cast: true });
+      this.hillSpots.push({ x, y: h, z });
     }
-    const hill = new THREE.BoxGeometry(TILE, 1, TILE);
-    instanced(hill, this.M.cliff, hillsA, this.root); instanced(hill, this.M.grassAlt, hillsB, this.root);
+    // 창고 절벽 블록(풀 뚜껑 + 흙 옆면)을 테마 색으로 — 눈 테마는 돌 블록
+    const C = this.C, cliffP = this.theme === 'snow' ? { p: 'nature/cliff_block_stone', recolor: { grass: hexOf(C.grassAlt), stone: hexOf(C.cliff) } } : { p: 'nature/cliff_block_rock', recolor: { grass: hexOf(C.grassAlt), dirt: hexOf(C.cliff) } };
+    const cliff = this.piece(cliffP);
+    if (cliff) instanced(cliff.g.geometry, cliff.g.material, blocks, this.root);
+    else { const hill = new THREE.BoxGeometry(TILE, 1, TILE); instanced(hill, this.M.cliff, hillsA, this.root); instanced(hill, this.M.grassAlt, hillsB, this.root); }
   }
 
-  // 길: 폴리라인 구간마다 상자(구간 수만큼) + 입구·출구 깃발 + 공중 점선(인스턴스 1회)
+  // 길: 폴리라인 구간마다 상자(구간 수만큼) + 진행 화살표 데칼(인스턴스 2회 — 입구 쪽 3개는 진하게) + 길 위 잔돌(인스턴스 1회) + 공중 점선(인스턴스 1회)
   buildPaths() {
     const road = NGN.map.GROUND_PATH, ROAD_W = 2.2;
+    const segs = [];
     for (let i = 0; i < road.length - 1; i++) {
       const a = this.toWorld(road[i][0], road[i][1]), b = this.toWorld(road[i + 1][0], road[i + 1][1]);
       const len = a.distanceTo(b);
@@ -157,13 +265,34 @@ NGN.World = class World {
       seg.position.copy(a).lerp(b, 0.5); seg.position.y = 0.06; seg.rotation.y = rot; seg.receiveShadow = true; this.root.add(seg);
       const edge = new THREE.Mesh(new THREE.BoxGeometry(len + ROAD_W + 0.5, 0.08, ROAD_W + 0.5), this.M.roadEdge);
       edge.position.copy(seg.position); edge.position.y = 0.02; edge.rotation.y = rot; edge.receiveShadow = true; this.root.add(edge);
+      segs.push({ a, b, len, dx: (b.x - a.x) / len, dz: (b.z - a.z) / len, ry: rot });
     }
-    this.flag(this.toWorld(road[0][0], road[0][1]), NGN.C.flagIn);
-    this.flag(this.toWorld(road[road.length - 1][0], road[road.length - 1][1]), NGN.C.flagOut);
+    this.roadSegs = segs;
+    this.buildArrows(segs);
     const air = NGN.map.air.points, dots = [];
     for (let i = 0; i < air.length; i += 6) { const p = this.toWorld(air[i][0], air[i][1], 3.2); dots.push({ x: p.x, y: p.y, z: p.z }); }
     instanced(new THREE.SphereGeometry(0.16, 6, 4), this.M.air, dots, this.root);
     this.entry = this.toWorld(road[0][0], road[0][1], 0.2);
+  }
+  // 길 위 진행 화살표: 캔버스에 그린 꺾쇠(창고엔 화살표 모델이 없다) → 반투명 흰 데칼. 구간마다 gap 칸 간격, 입구 근처 3개는 진하게(별도 인스턴스 = 그리기 +1)
+  buildArrows(segs) {
+    const A = Object.assign({ gap: 2.6, size: 1.3, opacity: 0.35, strong: 0.6, strongCount: 3 }, (this.parts && this.parts.landmarks && this.parts.landmarks.arrow) || {});
+    if (!this.arrowTex) {
+      const c = document.createElement('canvas'); c.width = c.height = 64; const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(12, 10); ctx.lineTo(38, 32); ctx.lineTo(12, 54); ctx.lineTo(26, 54); ctx.lineTo(52, 32); ctx.lineTo(26, 10); ctx.closePath(); ctx.fill();
+      this.arrowTex = new THREE.CanvasTexture(c); this.arrowTex.minFilter = THREE.LinearFilter;
+    }
+    const geo = new THREE.PlaneGeometry(A.size, A.size); geo.rotateX(-Math.PI / 2); // 바닥에 눕힌다(캔버스 오른쪽 = +x)
+    const soft = [], strong = [];
+    let n = 0;
+    segs.forEach((s, i) => {
+      const last = i === segs.length - 1;
+      for (let t = i === 0 ? 2.2 : A.gap * 0.6; t < s.len - (last ? 3.4 : 0.6); t += A.gap) {
+        (n++ < A.strongCount ? strong : soft).push({ x: s.a.x + s.dx * t, y: 0.15, z: s.a.z + s.dz * t, ry: s.ry });
+      }
+    });
+    const mk = (o) => new THREE.MeshBasicMaterial({ map: this.arrowTex, transparent: true, opacity: o, depthWrite: false });
+    instanced(geo, mk(A.opacity), soft, this.root); instanced(geo, mk(A.strong), strong, this.root);
   }
   flag(pos, color) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.4, 5), this.M.wood);
@@ -195,14 +324,100 @@ NGN.World = class World {
     m.material.emissive.setHex(on ? 0x443300 : 0x000000);
   }
 
-  // 풍경: 침엽수·둥근 나무·바위·꽃·연못. 길·자리와 안 겹치는 곳에 고정 시드로. 전부 인스턴스
+  // ---------- 성(출구)·동굴(입구) ----------
+  // 길 마지막 구간 방향으로 성을, 첫 구간 방향으로 동굴을 세운다. 모델이 없으면 옛 깃발 둘(입구 초록·출구 빨강)
+  buildLandmarks() {
+    const road = NGN.map.GROUND_PATH;
+    const end = this.toWorld(road[road.length - 1][0], road[road.length - 1][1]), prev = this.toWorld(road[road.length - 2][0], road[road.length - 2][1]);
+    const start = this.toWorld(road[0][0], road[0][1]), next = this.toWorld(road[1][0], road[1][1]);
+    const dirOut = end.clone().sub(prev).normalize(), dirIn = next.clone().sub(start).normalize();
+    // 렌더러가 읽는 자리 — 모델이 없어도 채워 둔다(파티클은 그 자리에 뿌려진다)
+    this.castleGate = end.clone(); this.castleTop = end.clone().setY(4); this.portal = start.clone().setY(1.2);
+    const L = this.parts && this.parts.landmarks;
+    if (!this.models || !L || !L.castle || !L.castle.length) { this.flag(start, NGN.C.flagIn); this.flag(end, NGN.C.flagOut); return; }
+    this.buildCastle(L, end, dirOut);
+    this.buildPortal(L, start, dirIn);
+  }
+  // 성: 조립표(landmarks.castle)를 성 단위 × castleScale 로 놓는다. 같은 조각은 InstancedMesh 로 묶고(벽 9개 = 그리기 1회), 성문 문짝·깃발만 개별 메시(움직여야 해서).
+  // 재질은 장식 아틀라스 재질을 복제한 성 전용 하나 — 그을음(setCastleDamage)이 성만 어둡게 하려고. 테마: castleTheme[테마].tint(성벽) · flag(깃발)
+  buildCastle(L, at, dir) {
+    const CS = L.castleScale || 1.7, T = (L.castleTheme || {})[this.theme] || {};
+    const g = new THREE.Group(); g.position.copy(at); g.rotation.y = headingRy(dir.x, dir.z); this.root.add(g); g.updateMatrixWorld(true);
+    this.castle = g;
+    const box = new THREE.Box3(); // 성의 로컬 범위 — 카메라가 성까지 담게(boardExtent)
+    const stat = this.collector(g, box), intact = this.collector(g, box), ruin = this.collector(g, box);
+    const fires = [[], [], []]; let topLocal = null, topY = 0;
+    const singles = [];
+    for (const E of L.castle) {
+      const lx = (E.x || 0) * CS, ly = (E.y || 0) * CS, lz = (E.z || 0) * CS;
+      if (E.fire) { fires[E.fire].push(g.localToWorld(new THREE.Vector3(lx, ly, lz))); continue; }
+      const P = { p: E.p, raw: E.raw, recolor: E.recolor, tint: E.role === 'flag' ? (T.flag || E.tint) : (T.tint || E.tint) };
+      const s = CS * (E.s || 1);
+      const it = { x: lx, y: ly, z: lz, ry: (E.ry || 0) * DEG, s, sx: E.sx ? s * E.sx : undefined, sy: E.sy ? s * E.sy : undefined, sz: E.sz ? s * E.sz : undefined, cast: true };
+      let gg;
+      if (E.role === 'gate' || E.role === 'flag') { const r = this.piece(P); if (!r) continue; gg = r.g; singles.push({ E, it, gg }); }
+      else gg = (E.role === 'ruin' ? ruin : E.role === 'intact' ? intact : stat).add(P, it);
+      if (gg && E.top) { topY = ly + gg.height * s; topLocal = new THREE.Vector3(lx, topY, lz); }
+    }
+    if (!this.models.sceneryMat) return; // 조각을 하나도 못 만들었다
+    this.castleMat = this.castleMat || this.models.sceneryMat.clone();
+    this.castleMat.color.setHex(0xFFFFFF);
+    stat.flush(this.castleMat, true); // 성 몸통 전체 = 메시 1개
+    this.castleIntact = intact.flush(this.castleMat, true); this.castleRuin = ruin.flush(this.castleMat, true);
+    for (const m of this.castleRuin) m.visible = false;
+    for (const { E, it, gg } of singles) {
+      const m = new THREE.Mesh(gg.geometry, this.castleMat);
+      m.position.set(it.x, it.y, it.z); m.rotation.y = it.ry; m.scale.set(it.sx || it.s, it.sy || it.s, it.sz || it.s); m.castShadow = true; g.add(m);
+      if (E.role === 'gate') this.gateMesh = m; else this.flagMeshes.push(m);
+    }
+    this.castleGate = g.localToWorld(new THREE.Vector3(0, 0, 0));
+    this.castleTop = topLocal ? g.localToWorld(topLocal.clone()) : g.localToWorld(new THREE.Vector3(CS, 2.4 * CS, 0));
+    this.castleFires = [[], fires[1], fires[1].concat(fires[2])];
+    this.castleFireSpots = [];
+    this.castleBox = box.isEmpty() ? null : box.applyMatrix4(g.matrixWorld); // 세계 좌표 범위(회전된 상자를 감싸는 축 정렬 상자)
+    const c = g.localToWorld(new THREE.Vector3(1.0 * CS, 0, 0)); this.keepOut.push({ x: c.x, z: c.z, r: 3.4 * CS });
+  }
+  // 동굴(입구): 절벽 블록 더미 + 동굴 입(cliff_cave) + 어둠 원판 + 적 진영 깃발·걸개·목책·화로. 전부 인스턴스(장식 재질 공유). portalTheme[테마]: swap(_rock→_stone)·recolor·flag
+  buildPortal(L, at, dir) {
+    const PS = L.portalScale || 2.0, T = (L.portalTheme || {})[this.theme] || {};
+    const g = new THREE.Group(); g.position.copy(at); g.rotation.y = headingRy(dir.x, dir.z); this.root.add(g); g.updateMatrixWorld(true);
+    const box = new THREE.Box3();
+    const col = this.collector(g, box);
+    for (const E of L.portal || []) {
+      const lx = (E.x || 0) * PS, ly = (E.y || 0) * PS, lz = (E.z || 0) * PS, s = PS * (E.s || 1);
+      if (E.dark) { const d = new THREE.Mesh(new THREE.CircleGeometry(E.r * PS, 18), new THREE.MeshBasicMaterial({ color: 0x08040C, transparent: true, opacity: 0.9, depthWrite: false })); d.position.set(lx, ly + E.r * PS, lz); d.rotation.y = Math.PI / 2; g.add(d); continue; }
+      if (E.portal) { this.portal = g.localToWorld(new THREE.Vector3(lx, ly, lz)); continue; }
+      let name = E.p; if (T.swap && name.startsWith('nature/')) name = name.replace(T.swap[0], T.swap[1]);
+      const P = { p: name, raw: E.raw, recolor: name.startsWith('nature/') ? Object.assign({}, T.recolor || {}, E.recolor || {}) : E.recolor, tint: E.role === 'flag' ? (T.flag || E.tint) : E.tint };
+      col.add(P, { x: lx, y: ly, z: lz, ry: (E.ry || 0) * DEG, s, cast: true });
+      if (E.fire) this.fireSpots.push(g.localToWorld(new THREE.Vector3(lx, ly + 0.28 * s, lz)));
+    }
+    col.flush(null, true); // 동굴 전체 = 메시 1개
+    this.portalBox = box.isEmpty() ? null : box.applyMatrix4(g.matrixWorld);
+    const c = g.localToWorld(new THREE.Vector3(-0.3 * PS, 0, 0)); this.keepOut.push({ x: c.x, z: c.z, r: 2.6 * PS });
+  }
+  // 성 피격: 성문 문짝이 움찔·깃발이 흔들린다(0.3초). 파티클은 렌더러가 castleGate 자리에
+  castleHit() { this.hitT = 0.3; }
+  // 생명 비율(1→0) → 3단계: ≥0.6 멀쩡 / <0.6 그을음 + 깃발 하나 사라짐 / <0.3 성문 기울어짐·탑 하나 무너짐(잔해로 바꿈)·깃발 전부 사라짐. castleFireSpots 를 단계마다 채운다
+  setCastleDamage(ratio) {
+    const stage = ratio >= 0.6 ? 0 : ratio >= 0.3 ? 1 : 2;
+    if (stage === this.damageStage) return;
+    this.damageStage = stage;
+    this.castleFireSpots = this.castle ? this.castleFires[stage].map((v) => v.clone()) : [];
+    if (!this.castle) return;
+    this.castleMat.color.setHex(stage === 0 ? 0xFFFFFF : stage === 1 ? 0x9A8E86 : 0x6E6260);
+    this.flagMeshes.forEach((m, i) => { m.visible = stage === 0 || (stage === 1 && i > 0); });
+    for (const m of this.castleIntact) m.visible = stage < 2;
+    for (const m of this.castleRuin) m.visible = stage >= 2;
+    if (this.gateMesh) { this.gateMesh.rotation.z = stage >= 2 ? -0.42 : 0; this.gateMesh.rotation.x = stage >= 2 ? 0.18 : 0; }
+  }
+  // 카메라 흔들림(0.6~1.0). 보스 등장·성 피격 때 렌더러가 부른다. render() 가 감쇠시키며 camBase 에 난수 오프셋을 더한다
+  shake(strength) { this.shakeT = 0.55; this.shakeS = Math.max(this.shakeS, strength || 0.8); }
+
+  // ---------- 장식 ----------
+  // 풍경: 연못 둘(용암 테마면 용암 못) + 테마 장식 세트(창고 모델, 인스턴스) — 모델이 없으면 옛 코드 도형. 같은 시드(NGN.map.seed)면 같은 배치
   buildScenery() {
-    const road = NGN.map.ground.points, slots = NGN.map.SLOTS, B = NGN.map.BOUNDS;
-    const free = (x, y) => {
-      for (const p of road) if ((p[0] - x) ** 2 + (p[1] - y) ** 2 < 220 ** 2) return false;
-      for (const s of slots) if ((s.x - x) ** 2 + (s.y - y) ** 2 < 260 ** 2) return false;
-      return true;
-    };
+    const B = NGN.map.BOUNDS;
     let seed = 7 + (NGN.map.seed || 0) * 13;
     const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
     // 연못 둘(지도 바깥쪽 좌우) — 용암 테마면 용암 못
@@ -214,6 +429,144 @@ NGN.World = class World {
       const bank = new THREE.Mesh(new THREE.CylinderGeometry(r * NGN.SCALE * 1.2, r * NGN.SCALE * 1.25, 0.08, 14), this.M.roadEdge);
       bank.position.set(p.x, 0.02, p.z); this.root.add(bank);
     }
+    const set = this.models && this.parts && this.parts.scenery && (this.parts.scenery[this.theme] || this.parts.scenery.grass);
+    if (set && set.length) this.buildKenneyScenery(set, ponds, rnd);
+    else this.buildSceneryFallback(ponds, rnd);
+    this.buildPathStones(rnd);
+  }
+  // 길과 자리와 성·동굴에서 떨어졌나(세계 단위). 길은 폴리라인 구간까지의 거리로 잰다
+  roadDist(x, z) {
+    let d = Infinity;
+    for (const s of this.roadSegs) { const t = Math.max(0, Math.min(s.len, (x - s.a.x) * s.dx + (z - s.a.z) * s.dz)); d = Math.min(d, Math.hypot(x - s.a.x - s.dx * t, z - s.a.z - s.dz * t)); }
+    return d;
+  }
+  // 창고 장식 배치. zone 마다 후보 자리를 만들고(edge 판 둘레 ±3.5칸 · far 늘어난 땅 · road 길 옆 · water 연못 둑 · pond 연못 위 · hill 언덕 위) 가중치로 종류를 고른다.
+  // 겹침은 발자국 반지름(모델 크기 × 배율)으로 막는다(격자 해시). 목표: 판 둘레 230 + 먼 땅 300 + 길 옆·물가·언덕 → 500개 이상, 전부 인스턴스
+  buildKenneyScenery(set, ponds, rnd) {
+    const B = NGN.map.BOUNDS, S = NGN.SCALE;
+    const hw = (B.maxX - B.minX) * S / 2, hd = (B.maxY - B.minY) * S / 2;
+    const slots = NGN.map.SLOTS.map((s) => this.toWorld(s.x, s.y));
+    const pondsW = ponds.map(([x, y, r]) => { const p = this.toWorld(x, y); return { x: p.x, z: p.z, r: r * S }; });
+    const col = this.collector(this.root);
+    // 자리 검사: 길 2.2 · 자리 2.6 · 성/동굴 keepOut · 연못(둑까지). 길 옆(road) 후보는 길 검사를 건너뛴다(일부러 길 옆이니까)
+    const freeAt = (x, z, r, skipRoad) => {
+      if (!skipRoad && this.roadDist(x, z) < 2.2 + r) return false;
+      for (const p of slots) if ((p.x - x) ** 2 + (p.z - z) ** 2 < (2.6 + r) ** 2) return false;
+      for (const k of this.keepOut) if ((k.x - x) ** 2 + (k.z - z) ** 2 < (k.r + r) ** 2) return false;
+      for (const p of pondsW) if ((p.x - x) ** 2 + (p.z - z) ** 2 < (p.r * 1.25 + 0.6 + r) ** 2) return false;
+      return true;
+    };
+    const cells = new Map(); const CELL = 4;
+    const cellKey = (cx, cz) => cx + ',' + cz;
+    const overlaps = (x, z, r) => {
+      const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const c = cells.get(cellKey(cx + i, cz + j)); if (c) for (const o of c) if ((o.x - x) ** 2 + (o.z - z) ** 2 < ((o.r + r) * 0.72) ** 2) return true; }
+      return false;
+    };
+    const mark = (x, z, r) => { const k = cellKey(Math.floor(x / CELL), Math.floor(z / CELL)); (cells.get(k) || cells.set(k, []).get(k)).push({ x, z, r }); };
+    // 종류 풀
+    const pools = { edge: [], far: [], road: [], water: [], pond: [], hill: [] };
+    for (const it of set) for (const z of (it.zone === 'any' ? ['edge', 'far'] : [it.zone || 'edge'])) if (pools[z]) pools[z].push(it);
+    const counts = new Map();
+    const pick = (pool) => {
+      let tot = 0; const c = [];
+      for (const it of pool) { if (it.max && (counts.get(it) || 0) >= it.max) continue; c.push(it); tot += it.n || 1; }
+      if (!c.length) return null;
+      let r = rnd() * tot; for (const it of c) { r -= it.n || 1; if (r <= 0) return it; }
+      return c[c.length - 1];
+    };
+    const footprint = (it) => {
+      if (it.r) return it.r;
+      const p = it.p || (it.parts && it.parts[0] && it.parts[0].p); const sz = p && this.models.size(p);
+      return sz ? Math.max(sz.x, sz.z) / 2 : 0.4;
+    };
+    let placed = 0;
+    // 항목 하나를 자리에 놓는다(묶음이면 조각들을 회전시켜 함께). fire 항목은 불 자리로
+    const put = (it, sp) => {
+      const s = it.s ? it.s[0] + rnd() * (it.s[1] - it.s[0]) : 1;
+      const r = footprint(it) * s;
+      if (!sp.noOverlap && overlaps(sp.x, sp.z, r)) return false;
+      const ry = sp.ry !== undefined ? sp.ry : rnd() * Math.PI * 2;
+      // 낱개 항목은 조각 하나(오프셋 0·배율 1) — 항목의 s 는 [최소,최대] 배열이라 하위 칸으로 읽으면 안 된다(실측: NaN 배율로 전부 안 보였다)
+      const parts = it.parts || [{ p: it.p }];
+      let ok = false;
+      for (const sub of parts) {
+        const ox = (sub.x || 0) * s, oz = (sub.z || 0) * s, c = Math.cos(ry), sn = Math.sin(ry);
+        const P = { p: sub.p, tint: sub.tint || it.tint, raw: sub.raw !== undefined ? sub.raw : it.raw, recolor: sub.recolor || it.recolor };
+        // 그림자 패스는 캐스터 종류마다 그리기 +1 — 판 둘레(edge)·물가의 큰 것(나무·바위·풍차, 키 0.7칸 이상)만 그림자를 만든다.
+        // 먼 땅(far)·언덕(hill)은 전부 끔, 길 옆(road)은 키 1.2칸 이상만(울타리·잔돌·표지판·가로등 제외). 코디네이터 실측: CPU 4배 감속에서 340회·22ms 가 나와 20~30회를 줄여야 했다
+        const sz = this.models.size(sub.p), hgt = sz ? sz.y * s * (sub.s || 1) : 9;
+        const tall = sp.zone !== 'far' && sp.zone !== 'hill' && hgt >= (sp.zone === 'road' ? 1.2 : 0.7);
+        if (col.add(P, { x: sp.x + ox * c + oz * sn, y: (sp.y || 0) + (sub.y || 0) * s, z: sp.z - ox * sn + oz * c, ry: ry + (sub.ry || 0) * DEG, s: s * (sub.s || 1), cast: tall })) ok = true;
+      }
+      if (!ok) return false;
+      mark(sp.x, sp.z, r); counts.set(it, (counts.get(it) || 0) + 1); placed++;
+      if (it.fire) this.fireSpots.push(new THREE.Vector3(sp.x, (sp.y || 0) + 0.06 * s, sp.z));
+      return true;
+    };
+    // 자리 만들기
+    const genEdge = () => { const x = -hw - 3.5 + rnd() * (2 * hw + 7), z = -hd - 3.5 + rnd() * (2 * hd + 7); return freeAt(x, z, 0.5) ? { x, z, zone: 'edge' } : null; };
+    const genFar = () => {
+      const x = -(hw + 18) + rnd() * (2 * hw + 36), z = -(hd + 33) + rnd() * (2 * hd + 66);
+      if (Math.abs(x) < hw + 3.5 && Math.abs(z) < hd + 3.5) return null; // 판 둘레는 edge 몫
+      return freeAt(x, z, 0.5) ? { x, z, zone: 'far' } : null;
+    };
+    const roadSpots = [];
+    this.roadSegs.forEach((sg, i) => {
+      const nx = -sg.dz, nz = sg.dx;
+      for (let t = 1.6; t < sg.len - 1.6; t += 2.4 + rnd() * 0.8) for (const side of [1, -1]) {
+        const off = side * (1.1 + 1.0 + rnd() * 0.5), x = sg.a.x + sg.dx * t + nx * off, z = sg.a.z + sg.dz * t + nz * off;
+        if (this.roadDist(x, z) < 1.9 || !freeAt(x, z, 0.4, true)) continue;
+        roadSpots.push({ x, z, ry: sg.ry, zone: 'road' });
+      }
+    });
+    const waterSpots = [], pondSpots = [];
+    for (const p of pondsW) {
+      for (let i = 0; i < 14; i++) { const a = rnd() * Math.PI * 2, d = p.r * 1.25 + 0.4 + rnd() * 1.0; const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; if (freeAt(x, z, 0.3)) waterSpots.push({ x, z, zone: 'water', faceRy: headingRy(p.x - x, p.z - z), bridgeX: p.x + Math.cos(a) * p.r * 1.05, bridgeZ: p.z + Math.sin(a) * p.r * 1.05 }); }
+      for (let i = 0; i < 8; i++) { const a = rnd() * Math.PI * 2, d = rnd() * p.r * 0.7; pondSpots.push({ x: p.x + Math.cos(a) * d, y: 0.11, z: p.z + Math.sin(a) * d, zone: 'pond' }); }
+    }
+    const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    shuffle(roadSpots); shuffle(waterSpots); shuffle(pondSpots);
+    const hillSpots = shuffle(this.hillSpots.map((h) => ({ x: h.x, y: h.y, z: h.z, noOverlap: true, zone: 'hill' })));
+    const spotOf = (zone) => zone === 'edge' ? genEdge() : zone === 'far' ? genFar() : zone === 'road' ? roadSpots.pop() : zone === 'water' ? waterSpots.pop() : zone === 'pond' ? pondSpots.pop() : hillSpots.pop();
+    const withFace = (it, sp) => { if (!sp) return sp; if (it.face && sp.faceRy !== undefined) return { x: sp.bridgeX, z: sp.bridgeZ, ry: sp.faceRy, noOverlap: true, zone: 'water' }; return sp; };
+    // ① 최소 개수가 있는 것(풍차·물레방아·밭·다리·잔해)부터 — 자리가 남아 있을 때
+    for (const it of set) for (let k = 0; k < (it.min || 0); k++) for (let tries = 0; tries < 60; tries++) { const zone = it.zone === 'any' ? (rnd() < 0.5 ? 'edge' : 'far') : it.zone; const sp = withFace(it, spotOf(zone)); if (sp && put(it, sp)) break; }
+    // ② 판 둘레 230 · 먼 땅 300
+    for (let i = 0, n = 0; i < 5000 && n < 230; i++) { const sp = genEdge(); if (!sp) continue; const it = pick(pools.edge); if (!it) break; if (put(it, sp)) n++; }
+    for (let i = 0, n = 0; i < 6000 && n < 300; i++) { const sp = genFar(); if (!sp) continue; const it = pick(pools.far); if (!it) break; if (put(it, sp)) n++; }
+    // ③ 길 옆(후보의 65%) · 물가 · 연못 위 · 언덕 위
+    while (roadSpots.length) { const sp = roadSpots.pop(); if (rnd() > 0.65) continue; const it = pick(pools.road); if (!it) break; put(it, sp); }
+    while (waterSpots.length) { const sp = waterSpots.pop(); const it = pick(pools.water); if (!it) break; put(it, withFace(it, sp)); }
+    while (pondSpots.length) { const sp = pondSpots.pop(); const it = pick(pools.pond); if (!it) break; put(it, sp); }
+    while (hillSpots.length) { const sp = hillSpots.pop(); if (rnd() > 0.6) continue; const it = pick(pools.hill); if (!it) break; put(it, sp); }
+    this.sceneryMeshes = col.flush(null, true); // 장식 전체 = 메시 2개(그림자 있는 판 둘레 / 없는 먼 땅)
+    this.sceneryCount = placed;
+  }
+  // 길 위 잔돌(nature/path_stone, 길 색에 맞춰 — 흙길에 질감). 구간마다 2.2칸 간격으로 절반 확률. 인스턴스 1회. 모델 없으면 건너뛴다
+  buildPathStones(rnd) {
+    if (!this.models) return;
+    const C = this.C, road = new THREE.Color(C.road), light = road.clone().offsetHSL(0, -0.05, 0.08), dark = new THREE.Color(C.roadEdge);
+    const P = { p: 'nature/path_stone', recolor: { stone: hexOf(light), stoneDark: hexOf(dark), _defaultMat: hexOf(road) } };
+    const items = [];
+    this.roadSegs.forEach((sg, i) => {
+      const last = i === this.roadSegs.length - 1, nx = -sg.dz, nz = sg.dx;
+      for (let t = i === 0 ? 3.0 : 1.2; t < sg.len - (last ? 3.6 : 0.8); t += 2.2) {
+        if (rnd() > 0.5) continue;
+        const off = (rnd() - 0.5) * 1.1;
+        items.push({ x: sg.a.x + sg.dx * t + nx * off, y: 0.125, z: sg.a.z + sg.dz * t + nz * off, ry: sg.ry + (rnd() - 0.5) * 0.7, s: 1.0 + rnd() * 0.4 });
+      }
+    });
+    const r = this.piece(P); if (r) instanced(r.g.geometry, r.g.material, items, this.root);
+  }
+  // 옛 코드 도형 장식(모델이 없을 때): 침엽수·둥근 나무·바위·꽃. 길·자리와 안 겹치는 곳에 고정 시드로. 전부 인스턴스
+  buildSceneryFallback(ponds, rnd) {
+    const road = NGN.map.ground.points, slots = NGN.map.SLOTS, B = NGN.map.BOUNDS;
+    const free = (x, y) => {
+      for (const p of road) if ((p[0] - x) ** 2 + (p[1] - y) ** 2 < 220 ** 2) return false;
+      for (const s of slots) if ((s.x - x) ** 2 + (s.y - y) ** 2 < 260 ** 2) return false;
+      return true;
+    };
     const trunks = [], cones1 = [], cones2 = [], rounds1 = [], rounds2 = [], rocks1 = [], rocks2 = [], flowers = [[], [], [], []];
     let placed = 0;
     // 판 둘레 ±3칸에 110개 + 늘어난 땅(가로 ±20 · 세로 ±35칸)에 140개 더 — 전부 인스턴스라 그리기 횟수는 그대로
@@ -242,6 +595,7 @@ NGN.World = class World {
     instanced(rockGeo, this.M.stone, rocks1, this.root); instanced(rockGeo, this.M.stoneDark, rocks2, this.root);
     const flowerGeo = new THREE.SphereGeometry(0.14, 6, 5);
     [0xE86A8A, 0xF2D25A, 0xF2F2F2, 0x9B6FE0].forEach((c, i) => instanced(flowerGeo, new THREE.MeshLambertMaterial({ color: c }), flowers[i], this.root));
+    this.sceneryCount = placed;
   }
 
   // ---------- 카메라 ----------
@@ -257,11 +611,19 @@ NGN.World = class World {
   // 실측(2026-09-06, 390×844, 20개 지도): 위 줄 대비 아래 줄 타워 폭 비율 1.03~1.10(옛 42°·72° 는 1.04~1.13 에 각도 차이까지 겹쳤다), 판 x 8~382 · y 134~637(HUD·카드 바와 안 겹침)
   // 카메라 방향(camAngle)에 따라 판의 가로·세로 폭이 달라진다 — 네 모서리를 돌려 재고, 그 폭으로 거리를 정한다.
   // 가로로 긴 지도(스테이지 9·10·14·15 등)는 setMap 이 기본 방향을 90° 돌려 긴 변을 세로로 세운다(세로 폰은 가로가 한계라 그쪽이 더 크게 나온다)
+  // 2026-09-06 성·동굴(castleBox·portalBox, 세계 좌표)의 네 모서리도 함께 돌려 잰다 — 출구가 판 끝(x=0)이면 성 절반이 화면 밖으로 나갔다(코디네이터 실측).
+  // 돌린 좌표계(rx=화면 가로, rz=카메라 쪽)에서 최소·최대를 잡아 폭·깊이·중심을 돌려준다. 중심은 placeCamera 가 look 지점으로 쓴다(판 중심이 아니라 판+성+동굴의 중심).
+  // 모델이 없을 땐 상자가 없어 옛 계산과 같다(판 모서리 넷 → 중심 0)
   boardExtent(angle) {
     const c = Math.cos(angle), s = Math.sin(angle), hw = this.width / 2, hd = this.depth / 2;
-    let x = 0, z = 0;
-    for (const [px, pz] of [[hw, hd], [hw, -hd], [-hw, hd], [-hw, -hd]]) { x = Math.max(x, Math.abs(px * c - pz * s)); z = Math.max(z, Math.abs(px * s + pz * c)); }
-    return { w: x * 2, d: z * 2 };
+    const pts = [[hw, hd], [hw, -hd], [-hw, hd], [-hw, -hd]];
+    let h = 0;
+    for (const b of [this.castleBox, this.portalBox]) if (b) { pts.push([b.min.x, b.min.z], [b.min.x, b.max.z], [b.max.x, b.min.z], [b.max.x, b.max.z]); h = Math.max(h, b.max.y); }
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const [px, pz] of pts) { const rx = px * c - pz * s, rz = px * s + pz * c; minX = Math.min(minX, rx); maxX = Math.max(maxX, rx); minZ = Math.min(minZ, rz); maxZ = Math.max(maxZ, rz); }
+    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+    // 돌린 중심을 세계 좌표로 되돌린다(화면 가로축 = (c, -s) · 카메라 쪽 = (s, c))
+    return { w: maxX - minX, d: maxZ - minZ, h, center: new THREE.Vector3(cx * c + cz * s, 0, -cx * s + cz * c) };
   }
   camDist(angle) {
     const fov = this.camera.fov * Math.PI / 180, aspect = this.camera.aspect || 0.5;
@@ -269,7 +631,8 @@ NGN.World = class World {
     const pitch = (portrait ? 62 : 56) * Math.PI / 180;
     const e = this.boardExtent(angle);
     // 여백: 가로 2.4칸(가장자리 자리 원판이 잘리지 않을 만큼) · 세로 4칸
-    const needV = e.d * Math.sin(pitch) + (portrait ? 4 : 5), needH = e.w + (portrait ? 2.4 : 8);
+    // 성 꼭대기(e.h)는 화면 세로로 h·cos(기울기)만큼 더 올라온다 — 그만큼 세로 여백에 더한다(가로 여백은 그대로 2.4칸)
+    const needV = e.d * Math.sin(pitch) + e.h * Math.cos(pitch) + (portrait ? 4 : 5), needH = e.w + (portrait ? 2.4 : 8);
     const distV = (needV / 2) / Math.tan(fov / 2), distH = (needH / 2) / Math.tan(fov / 2) / aspect;
     return Math.max(distV, distH);
   }
@@ -280,9 +643,11 @@ NGN.World = class World {
     const dist = this.camDist(this.camAngle) / this.zoom;
     const cy = Math.sin(pitch) * dist, cr = Math.cos(pitch) * dist;
     const off = portrait ? 4.5 : 1.5;
-    const look = new THREE.Vector3(Math.sin(this.camAngle) * off, 0, Math.cos(this.camAngle) * off);
+    // look 지점 = 판+성+동굴을 합친 범위의 중심 + 카메라 쪽 오프셋(off — 판을 화면 위쪽에 두는 옛 규칙 그대로)
+    const look = this.boardExtent(this.camAngle).center.add(new THREE.Vector3(Math.sin(this.camAngle) * off, 0, Math.cos(this.camAngle) * off));
     this.camera.position.set(look.x + Math.sin(this.camAngle) * cr, cy, look.z + Math.cos(this.camAngle) * cr);
     this.camera.lookAt(look);
+    this.camBase.copy(this.camera.position); // 흔들림(shake)의 기준 위치
     this.dist = dist;
     // 안개는 판 너머(카메라 거리의 1.15배)부터 — 판 위 물체는 안개에 안 먹는다. 카메라 거리로 정해야 화각을 바꿔도 뿌예지지 않는다
     this.scene.fog.near = dist * (this.quality <= 0 ? 1.05 : 1.15); this.scene.fog.far = dist * (this.quality <= 0 ? 1.5 : 2.0);
@@ -297,7 +662,7 @@ NGN.World = class World {
     this.frameTimes.push(dtMs); if (this.frameTimes.length > 30) this.frameTimes.shift();
     if (this.frameTimes.length < 30 || now - this.lastDrop < 5000 || this.quality <= 0) return;
     const avg = this.frameTimes.reduce((a, b) => a + b, 0) / 30;
-    if (avg > 20) { this.lowerQuality(); this.lastDrop = now; this.frameTimes.length = 0; }
+    if (avg > 17) { this.lowerQuality(); this.lastDrop = now; this.frameTimes.length = 0; }
   }
   lowerQuality() {
     this.quality--;
@@ -306,5 +671,21 @@ NGN.World = class World {
     else if (this.quality <= 0) { this.renderer.setPixelRatio(Math.min(devicePixelRatio, 0.75)); this.placeCamera(); }
     console.log('품질 낮춤 →', this.quality, '픽셀비율', this.renderer.getPixelRatio(), '그림자', this.renderer.shadowMap.enabled);
   }
-  render() { this.renderer.render(this.scene, this.camera); }
+  // 매 프레임: 카메라 흔들림 감쇠(camBase + 난수 오프셋) · 성 피격 움찔(성문·깃발) · 그리기
+  render() {
+    const now = performance.now(), dt = Math.min(0.1, (now - (this.lastT || now)) / 1000); this.lastT = now;
+    if (this.shakeT > 0) {
+      this.shakeT = Math.max(0, this.shakeT - dt);
+      const k = this.shakeS * (this.shakeT / 0.55) * 0.5;
+      this.camera.position.set(this.camBase.x + (Math.random() - 0.5) * k, this.camBase.y + (Math.random() - 0.5) * k * 0.6, this.camBase.z + (Math.random() - 0.5) * k);
+      this.shaking = true;
+    } else if (this.shaking) { this.camera.position.copy(this.camBase); this.shaking = false; this.shakeS = 0; }
+    if (this.hitT > 0) {
+      this.hitT = Math.max(0, this.hitT - dt);
+      const k = this.hitT / 0.3;
+      if (this.gateMesh) this.gateMesh.rotation.y = Math.sin(now * 0.05) * 0.14 * k;
+      for (const f of this.flagMeshes) f.rotation.z = Math.sin(now * 0.04) * 0.22 * k;
+    }
+    this.renderer.render(this.scene, this.camera);
+  }
 };

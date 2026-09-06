@@ -86,6 +86,39 @@ class Particles {
   clear() { this.n = 0; this.geo.setDrawRange(0, 0); }
 }
 
+// 적 머리 위·발밑 표시를 적 전체가 나눠 쓰는 InstancedMesh 넷(방어 고리 · 성질 고리 · 체력 막대 뒤판 · 앞판)으로 그린다 — 적 하나마다 4회씩 그리던 것을 전체 4회로(2026-09-06 성능 실측: 적 35마리에서 그리기 340회·22ms).
+// 색은 인스턴스 색(instanceColor)으로, 위치·크기는 매 프레임 행렬로. 막대는 카메라를 본다
+class EnemyOverlays {
+  constructor(root, geo, cap = 256) {
+    const mk = (g, mat) => { const m = new THREE.InstancedMesh(g, mat, cap); m.frustumCulled = false; m.count = 0; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.setColorAt(0, new THREE.Color(1, 1, 1)); m.instanceColor.setUsage(THREE.DynamicDrawUsage); root.add(m); return m; };
+    this.ring = mk(geo.ring, new THREE.MeshBasicMaterial({ color: 0xFFFFFF }));
+    this.ring2 = mk(geo.ring, new THREE.MeshBasicMaterial({ color: 0xFFFFFF }));
+    this.glow = mk(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: geo.glowTex, color: 0xFFFFFF, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.glow.renderOrder = 1;
+    this.back = mk(geo.hp, new THREE.MeshBasicMaterial({ color: 0x3A1F1F }));
+    this.front = mk(geo.hp, new THREE.MeshBasicMaterial({ color: 0xFFFFFF }));
+    this.ring.renderOrder = 1; this.ring2.renderOrder = 1; this.back.renderOrder = 2; this.front.renderOrder = 3;
+    this.n = { ring: 0, ring2: 0, back: 0, front: 0, glow: 0 };
+    this._o = new THREE.Object3D(); this._c = new THREE.Color(); this._right = new THREE.Vector3();
+  }
+  begin() { this.n.ring = this.n.ring2 = this.n.back = this.n.front = this.n.glow = 0; }
+  glowAt(pos, size, colorHex) { this.put(this.glow, 'glow', pos, EnemyOverlays.FLATN, size, size, size, colorHex); }
+  put(mesh, key, pos, quat, sx, sy, sz, colorHex) { const i = this.n[key]++; if (i >= mesh.count && i >= 256) return; const o = this._o; o.position.copy(pos); o.quaternion.copy(quat); o.scale.set(sx, sy, sz); o.updateMatrix(); mesh.setMatrixAt(i, o.matrix); mesh.setColorAt(i, this._c.setHex(colorHex)); }
+  // 발밑 고리(납작하게)
+  ringAt(pos, r, colorHex, second = false) { const q = EnemyOverlays.FLAT; this.put(second ? this.ring2 : this.ring, second ? 'ring2' : 'ring', pos, q, r, r, r, colorHex); }
+  // 체력 막대: 카메라를 보는 막대 두 장. 앞판은 왼쪽 정렬(비율만큼 짧아진다)
+  barAt(pos, camera, w, ratio, colorHex) {
+    this.put(this.back, 'back', pos, camera.quaternion, w, 1, 1, 0x3A1F1F);
+    this._right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    const fw = w * Math.max(0, ratio); const p = pos.clone().addScaledVector(this._right, -(w - fw) / 2).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), -0.02);
+    this.put(this.front, 'front', p, camera.quaternion, Math.max(0.001, fw), 1.02, 1.02, colorHex);
+  }
+  end() { for (const k of ['ring', 'ring2', 'back', 'front', 'glow']) { const m = this[k]; m.count = this.n[k]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } }
+  clear() { this.begin(); this.end(); }
+}
+EnemyOverlays.FLAT = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+EnemyOverlays.FLATN = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)); // 평면은 +Z 가 앞 — 위를 보게
+
 NGN.Renderer = class Renderer {
   constructor(world, data, models = null) {
     this.world = world; this.data = data;
@@ -100,7 +133,7 @@ NGN.Renderer = class Renderer {
     };
     this.mat = {
       eye: new THREE.MeshBasicMaterial({ color: 0xFFF2C4 }), eyeRed: new THREE.MeshBasicMaterial({ color: 0xFF4040 }),
-      hpBack: new THREE.MeshBasicMaterial({ color: 0x3A1F1F }), hpFront: new THREE.MeshBasicMaterial({ color: 0x5FD36B }),
+      hpBack: new THREE.MeshBasicMaterial({ color: 0x3A1F1F }), hpFront: new THREE.MeshBasicMaterial({ color: 0x5FD36B }), hpMid: new THREE.MeshBasicMaterial({ color: 0xF2C230 }), hpLow: new THREE.MeshBasicMaterial({ color: 0xE84A3A }),
       slowed: lam(0x9FD8F0), wood: lam(0x7A5A3A), gold: glow(0xE8C34A, { emissiveIntensity: 0.3 }),
       bolt: new THREE.LineBasicMaterial({ color: 0xBFE8FF, transparent: true, opacity: 0.95 }),
     };
@@ -119,10 +152,15 @@ NGN.Renderer = class Renderer {
     this.floatQueue = []; this.floatBudget = 0;
     this.makeFx();
     this._tmpObj = new THREE.Object3D();
-    this.onNotice = null; // (글) => void — 아이템 드롭 같은 사건을 화면 글로 알릴 때 main.js 가 채운다
+    this.onNotice = null; // (글) => void — 아이템 드롭 같은 엔진 사건을 화면 글로 알릴 때 main.js 가 채운다
+    this.onLeak = null; // (적) => void — 적이 성에 닿았다(생명 알약 연출, main.js)
+    this.onDanger = null; // (켜짐) => void — 적이 성 가까이 왔다/물러났다(화면 가장자리 경고, main.js)
+    this.onBossKill = null; // (적) => void — 보스를 잡았다(배너, main.js)
+    this.dangerOn = false; // (글) => void — 아이템 드롭 같은 사건을 화면 글로 알릴 때 main.js 가 채운다
     // 적 성질(checklist I-8) 표시색: 적 발밑에 그 색 고리를 더 그린다
     this.specialMat = {};
-    for (const sp of (data.specials && data.specials.specials) || []) this.specialMat[sp.id] = glow(new THREE.Color(sp.color || '#ffffff').getHex(), { emissiveIntensity: 0.8 });
+    this.specialColor = {};
+    for (const sp of (data.specials && data.specials.specials) || []) { this.specialMat[sp.id] = glow(new THREE.Color(sp.color || '#ffffff').getHex(), { emissiveIntensity: 0.8 }); this.specialColor[sp.id] = new THREE.Color(sp.color || '#ffffff').getHex(); }
     this.branchColor = {};
     const B = (data.balance && data.balance.tier3Branches) || {};
     for (const k of Object.keys(B)) if (!k.startsWith('_')) this.branchColor[k] = { hex: new THREE.Color(B[k].color || '#E8C34A').getHex(), css: B[k].color || '#E8C34A', name: B[k].name };
@@ -143,6 +181,9 @@ NGN.Renderer = class Renderer {
   makeFx() {
     if (this.lightning) this.lightning.clear();
     this.particles = this.models && this.models.fxTexture && NGN.Sprites ? new NGN.Sprites(this.world.root, this.models.fxTexture) : new Particles(this.world.root);
+    if (this.overlays) for (const k of ['ring', 'ring2', 'back', 'front']) this.world.root.remove(this.overlays[k]);
+    if (!this.glowTex) this.glowSprite(0xffffff, 1); this.geo.glowTex = this.glowTex;
+    this.overlays = new EnemyOverlays(this.world.root, this.geo);
     this.lightning = NGN.Lightning ? new NGN.Lightning(this.world.root) : null;
   }
   // 그림 칸 번호(fx.js CELL). 옛 점 파티클이면 무시된다
@@ -166,6 +207,18 @@ NGN.Renderer = class Renderer {
     sp.scale.set(3.6, 0.9, 1); sp.renderOrder = 5;
     return sp;
   }
+  // 3단 갈래 깃발: 깃대(나무색)와 천(갈래색)을 꼭짓점 색으로 칠한 지오메트리 하나. 갈래 색마다 한 번만 만든다
+  flagGeometry(colorHex) {
+    this._flagGeo = this._flagGeo || new Map(); if (this._flagGeo.has(colorHex)) return this._flagGeo.get(colorHex);
+    const pole = new THREE.CylinderGeometry(0.05, 0.05, 2.0, 5).toNonIndexed(), cloth = new THREE.PlaneGeometry(0.9, 0.55).toNonIndexed();
+    cloth.translate(0.45, 0.7, 0);
+    const pos = [], nor = [], col = []; const wood = new THREE.Color(0x7A5A3A), c = new THREE.Color(colorHex).multiplyScalar(1.25);
+    const push = (g, color, both) => { const p = g.attributes.position, n = g.attributes.normal; const put = (i, flip) => { pos.push(p.getX(i), p.getY(i), p.getZ(i)); nor.push(n.getX(i) * (flip ? -1 : 1), n.getY(i) * (flip ? -1 : 1), n.getZ(i) * (flip ? -1 : 1)); col.push(color.r, color.g, color.b); }; for (let i = 0; i < p.count; i += 3) { put(i); put(i + 1); put(i + 2); if (both) { put(i, true); put(i + 2, true); put(i + 1, true); } } };
+    push(pole, wood, false); push(cloth, c, true); // 천은 양면
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    this._flagGeo.set(colorHex, geo); return geo;
+  }
+  flagMat() { return this._flagMat = this._flagMat || new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xFFFFFF, emissiveIntensity: 0.12 }); }
   cachedMat(kind, color, make) { const k = kind + ':' + color; if (!this._matCache.has(k)) this._matCache.set(k, make()); return this._matCache.get(k); }
   // 발밑 빛: 가운데가 밝고 가장자리로 사라지는 원(캔버스 한 장을 모두가 나눠 쓴다)
   glowSprite(color, size) {
@@ -196,16 +249,16 @@ NGN.Renderer = class Renderer {
     const shell = (m, parent) => { const h = new THREE.Mesh(m.geometry.userData.outline || m.geometry, this.outlineMat(ec)); h.position.copy(m.position); h.scale.set(1.06, 1.04, 1.06); h.position.y -= 0.01; h.renderOrder = -1; parent.add(h); hulls.push(h); };
     if (body.userData.bodyMesh) shell(body.userData.bodyMesh, body); else body.children.forEach((m) => { if (m.isMesh) shell(m, body); });
     if (body.userData.headMesh) shell(body.userData.headMesh, body.userData.head);
-    const glowSp = this.glowSprite(ec, 4.2 + tier * 0.3); glowSp.position.y = 0.25; wrap.add(glowSp);
+    const glowSize = 4.2 + tier * 0.3, glowColor = ec; // 발밑 빛은 오버레이 인스턴스가 매 프레임 그린다(update)
     if (tier >= 3) {
       // 3단 표식: 갈래 깃발(화력 빨강 / 광역 파랑, balance.json 색). 갈래 안 고른 3단은 금색. 2단까지는 표식 없음 — 높이가 말해 준다
       const bc = branch && this.branchColor[branch] ? this.branchColor[branch].hex : 0xE8C34A;
-      const pole = add(new THREE.CylinderGeometry(0.05, 0.05, 2.0, 5), M.wood, 1.35, 1.3, -0.9, false);
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.55), new THREE.MeshLambertMaterial({ color: bc, emissive: bc, emissiveIntensity: 0.35, side: THREE.DoubleSide })); flag.position.set(0.45, 0.7, 0); pole.add(flag);
+      // 깃대+천을 한 지오메트리(꼭짓점 색)로 — 타워마다 그리기 2회이던 것을 1회로(2026-09-06 성능)
+      add(this.flagGeometry(bc), this.flagMat(), 1.35, 1.3, -0.9, false);
     }
     const anim = {};
     if (def.aura) { anim.spin = add(new THREE.TorusGeometry(1.7 + tier * 0.15, 0.06, 6, 30), glow(0xA8E06A, { emissiveIntensity: 0.6 }), 0, 1.4, 0, false); anim.spin.rotation.x = Math.PI / 2.4; }
-    wrap.userData = { anim, starCount: -1, height, body, hulls, head: body.userData.head || null, headAnim: body.userData.headAnim || null, headBaseY: body.userData.headBaseY || 0, fx: body.userData.fx || [], baseScale: body.scale.x, recoil: 0, born: this.time, family: def.family, fxAt: 0 };
+    wrap.userData = { glowSize, glowColor, anim, starCount: -1, height, body, hulls, head: body.userData.head || null, headAnim: body.userData.headAnim || null, headBaseY: body.userData.headBaseY || 0, fx: body.userData.fx || [], baseScale: body.scale.x, recoil: 0, born: this.time, family: def.family, fxAt: 0 };
     return wrap;
   }
   // 코드로 그린 실루엣(Kenney 를 못 읽을 때의 폴백)
@@ -267,56 +320,98 @@ NGN.Renderer = class Renderer {
   }
 
   // ---------- 적 ----------
+  // 2026-09-06 적 6종이 전부 다른 창고 캐릭터(오크·여우·코끼리·병아리·앵무새·사자)로 — 뼈대 애니메이션(걷기·달리기)이 돈다(models.buildEnemy).
+  // 종류별 코드 동작(kenney_parts.enemies.motion): 떼거리 hop 종종걸음 · 단단한 놈 stomp 쿵쿵 · 공중 hover 떠서 흔들림 · 빠른 놈 dash(먼지) · 보스 stomp + 붉은 기운
+  // 적 하나 = 몸(스키닝 1회) + 방어 고리 1회 + 체력 막대 2회 (+ 성질 고리 1회 + 성질 소품 1회 + 보스 발밑 빛 1회)
   enemyMesh(e) {
     const g = new THREE.Group();
     const G = this.geo;
     const kBody = this.models ? this.models.buildEnemy(e.kind) : null;
-    let scale = 1.3;
-    if (kBody) g.add(kBody);
-    else { const fm = this.foeMat[e.kind] || this.foeMat.basic; const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 9), fm); body.castShadow = true; g.add(body); scale = 1.6 * (e.kind === 'boss' ? 2.6 : e.kind === 'tank' ? 1.55 : e.kind === 'swarm' ? 0.95 : 1.25); }
-    const rs = this.data.kenneyParts && this.data.kenneyParts.enemies[e.kind] ? this.data.kenneyParts.enemies[e.kind].scale : 1;
-    const ring = new THREE.Mesh(G.ring, this.defMat[e.defense]); ring.rotation.x = Math.PI / 2; ring.position.y = -0.35; ring.scale.setScalar(Math.max(0.7, rs * 1.1)); g.add(ring);
-    // 적 성질(checklist I-8): 방어 고리 바깥에 성질 색 고리를 하나 더 — 무슨 성질인지 보여야 한다
-    if (e.special && this.specialMat[e.special]) { const sr = new THREE.Mesh(G.ring, this.specialMat[e.special]); sr.rotation.x = Math.PI / 2; sr.position.y = -0.3; sr.scale.setScalar(Math.max(0.7, rs * 1.1) * 1.35); g.add(sr); }
-    const back = new THREE.Mesh(G.hp, this.mat.hpBack); back.position.y = 1.0 * Math.max(1, rs); back.scale.x = 1.2;
-    const front = new THREE.Mesh(G.hp, this.mat.hpFront); front.position.copy(back.position); front.scale.x = 1.2; front.position.z = 0.01;
-    g.add(back, front);
-    g.userData = { front, back, bob: (e.id * 1.7) % 6.28, kind: e.kind, hitFlash: 0, fresh: true, mesh: kBody || g.children[0] };
+    let scale = 1.3, height = 1.2, width = 1;
+    const spec = (this.data.kenneyParts && this.data.kenneyParts.enemies[e.kind]) || {};
+    if (kBody) {
+      g.add(kBody); scale = 1; height = kBody.userData.height; width = kBody.userData.width;
+      const u = kBody.userData; const act = u.actions[u.anim] || u.actions.walk || u.actions.run || Object.values(u.actions)[0];
+      if (act) { act.play(); act.timeScale = u.animSpeed; act.time = Math.random() * act.getClip().duration; kBody.userData.action = act; }
+    } else { const fm = this.foeMat[e.kind] || this.foeMat.basic; const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 9), fm); body.position.y = 0.45; body.castShadow = true; g.add(body); scale = 1.6 * (e.kind === 'boss' ? 2.6 : e.kind === 'tank' ? 1.55 : e.kind === 'swarm' ? 0.95 : 1.25); }
+    const rs = Math.max(0.7, width * 0.55);
+    // 방어 고리·성질 고리·체력 막대는 EnemyOverlays(인스턴스)가 매 프레임 그린다 — 여기서는 색·크기만 기억
+    const ringColor = NGN.DEFENSE_COLOR[e.defense] || 0xFFFFFF;
+    const spColor = e.special && this.specialColor[e.special] !== undefined ? this.specialColor[e.special] : null;
+    if (kBody && (e.kind === 'swarm' || e.kind === 'fast' || e.kind === 'flyer')) kBody.userData.mesh.castShadow = false; // 작은 적 그림자 없음 — 떼거리 40마리가 그림자 패스를 40회 더 먹는다
+    // 적 성질(checklist I-8): 몸에 소품(갑옷=둥근 방패 · 중갑=네모 방패 · 부활=깃발). 파티클은 syncEnemies 가 성질별로
+    if (e.special && kBody && this.models && this.data.kenneyParts.specialProps && this.data.kenneyParts.specialProps[e.special]) {
+      const P = this.data.kenneyParts.specialProps[e.special]; const prop = this.models.enemyProp(P);
+      // 소품은 몸 크기에 맞춰 옆구리(방패)·등 뒤(깃발)에. 뼈에 매달지 않고 몸통 그룹에 고정 — 종류마다 뼈 위치가 달라 뼈 기준으로는 코끼리 몸속에 파묻혔다(실측)
+      if (prop) { const T = this.models.enemyTemplate(e.kind), sz = T.size, ph = this.models.size(P.p); const k = (sz.y * (P.h || 0.6)) / Math.max(1e-3, ph.y); prop.scale.setScalar(k); prop.position.set(sz.x * (P.x === undefined ? 0.6 : P.x), sz.y * (P.y === undefined ? 0.5 : P.y), sz.z * (P.z || 0)); if (P.ry) prop.rotation.y = P.ry; kBody.userData.inner.add(prop); }
+    }
+    // 보스 발밑 붉은 빛은 오버레이 인스턴스(syncEnemies)
+    g.userData = { barW: e.boss ? 2.4 : 1.2, barY: height + 0.45, rs, ringColor, spColor, bob: (e.id * 1.7) % 6.28, kind: e.kind, hitFlash: 0, fresh: true, mesh: kBody, body: kBody, height, motion: spec.motion || 'none', mixer: kBody ? kBody.userData.mixer : null, action: kBody ? kBody.userData.action : null, bones: kBody ? kBody.userData.bones : {}, fxAt: 0 };
     g.scale.setScalar(scale);
+    if (e.boss && this.world.shake) this.world.shake(0.8); // 보스 등장: 땅이 울린다
     return g;
   }
   // alpha = 다음 엔진 틱까지 얼마나 왔나(0~1). 직전 틱(px,py)과 현재 틱(x,y) 사이를 이어 그린다 — 엔진은 10Hz 지만 화면은 매 프레임 움직인다
-  syncEnemies(game, now, alpha = 1) {
+  syncEnemies(game, now, alpha = 1, dt = 0) {
     const seen = new Set();
     const a = Math.max(0, Math.min(1, alpha));
+    const waveTime = game.wave ? game.wave.time : 0;
+    let danger = false; const P = this.particles, c = (n) => this.cell(n);
+    const OV = this.overlays; if (!this._ovBegun) OV.begin(); this._ovBegun = false; this.frameNo = (this.frameNo || 0) + 1;
+    const many = game.enemies.length > 16; // 적이 많으면 뼈대 애니메이션을 한 프레임 걸러(30Hz) — CPU 4배 감속 폰 기준
     for (const e of game.enemies) {
       seen.add(e.id);
       let g = this.enemyMeshes.get(e.id);
       if (!g) { g = this.enemyMesh(e); this.world.root.add(g); this.enemyMeshes.set(e.id, g); }
-      const h = e.flying ? 3.2 : (e.kind === 'boss' ? 1.1 : e.kind === 'tank' ? 0.7 : 0.55);
+      const u = g.userData;
+      const slowed = e.slowUntil > waveTime && e.slowRatio > 0;
       const ix = (e.px === undefined ? e.x : e.px) + (e.x - (e.px === undefined ? e.x : e.px)) * a;
       const iy = (e.py === undefined ? e.y : e.py) + (e.y - (e.py === undefined ? e.y : e.py)) * a;
-      // 걸을 때 살짝 눌렸다 늘어나기(스쿼시) + 통통
-      const bob = Math.abs(Math.sin(now * 6 + g.userData.bob));
-      const p = this.world.toWorld(ix, iy, h + bob * (e.kind === 'tank' ? 0.05 : 0.15));
+      // 종류별 동작
+      const t = now + u.bob; let h = e.flying ? 3.2 : 0.02; let tilt = 0, roll = 0;
+      if (u.motion === 'hop') h += Math.abs(Math.sin(t * 13)) * 0.28; // 병아리: 종종 뛴다
+      else if (u.motion === 'stomp') { roll = Math.sin(t * 4.2) * 0.05; h += Math.max(0, Math.sin(t * 4.2)) * 0.04; } // 코끼리·사자: 좌우로 무겁게
+      else if (u.motion === 'hover') { h += Math.sin(t * 2.6) * 0.35 + Math.sin(t * 7.1) * 0.08; roll = Math.sin(t * 2.6) * 0.12; } // 앵무새: 떠서 흔들림
+      else if (u.motion === 'dash') { tilt = -0.08; }
+      const p = this.world.toWorld(ix, iy, h);
       g.position.copy(p);
-      const u = g.userData;
-      if (u.mesh) { const sq = 1 + (bob - 0.5) * 0.12; u.mesh.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq)); }
-      // 회전: 진행 방향을 목표로 부드럽게(사원수 보간)
+      // 뼈대 애니메이션: 감속되면 반으로
+      if (u.mixer && dt > 0) { if (u.action) u.action.timeScale = (u.body.userData.animSpeed || 1) * (slowed ? 0.45 : 1); if (!many) u.mixer.update(dt); else if ((this.frameNo + e.id) % 2 === 0) u.mixer.update(dt * 2); }
+      // 앵무새 날개: 클립에 날갯짓이 약해 코드로 더 펄럭인다
+      if (u.motion === 'hover' && u.bones['wing-left']) { const f = Math.sin(now * 22) * 0.8; u.bones['wing-left'].rotation.z = 0.4 + f; u.bones['wing-right'].rotation.z = -0.4 - f; }
+      // 회전: 진행 방향을 목표로 부드럽게(사원수 보간) + 동작 기울기
       const ahead = NGN.map.positionAt(e.path, e.s + 60);
       const q = this.world.toWorld(ahead[0], ahead[1], p.y);
       if (q.distanceToSquared(p) > 1e-4) { this._tmpObj.position.copy(p); this._tmpObj.lookAt(q); g.quaternion.slerp(this._tmpObj.quaternion, u.fresh ? 1 : 0.18); u.fresh = false; }
+      if (u.body) { u.body.rotation.z = roll; u.body.rotation.x = tilt; }
       const ratio = Math.max(0, e.hp / e.maxHp);
-      u.front.scale.x = 1.2 * ratio; u.front.position.x = -(1.2 - u.front.scale.x) / 2;
+      // 오버레이: 발밑 방어 고리(+성질 고리) · 머리 위 체력 막대(초록→노랑→빨강)
+      const feet = this._feet = this._feet || new THREE.Vector3(); feet.set(p.x, e.flying ? 0.08 : p.y + 0.08, p.z);
+      if (e.boss) OV.glowAt(feet, u.rs * 6, 0xFF3030);
+      OV.ringAt(feet, u.rs, u.ringColor);
+      if (u.spColor !== null) { feet.y += 0.04; OV.ringAt(feet, u.rs * 1.35, u.spColor, true); }
+      const barPos = this._bar = this._bar || new THREE.Vector3(); barPos.set(p.x, p.y + u.barY, p.z);
+      OV.barAt(barPos, this.world.camera, u.barW, ratio, ratio > 0.5 ? 0x5FD36B : ratio > 0.25 ? 0xF2C230 : 0xE84A3A);
       // 재생(적 성질): 체력이 차오르는 동안 0.5초마다 초록 알갱이가 위로 — 체력바만으로는 "왜 안 줄지?"를 못 알아본다
-      if (e.regenPerSec && e.hp > 0 && ratio < 0.995 && now - (u.regenAt || 0) > 0.5) { u.regenAt = now; this.particles.emit(p.clone().setY(p.y + 0.6), 4, 0x3DBB5C, { speed: 0.6, up: 2.2, ttl: 0.6, grav: 0 }); }
+      if (e.regenPerSec && e.hp > 0 && ratio < 0.995 && now - (u.regenAt || 0) > 0.5) { u.regenAt = now; P.emit(p.clone().setY(p.y + u.height * 0.6), 4, 0x3DBB5C, { cell: c('cross'), size: 0.6, sizeEnd: 0.2, speed: 0.6, up: 2.2, ttl: 0.6, grav: 0 }); }
+      // 성질·상태별 상시 파티클(0.12초마다): 감속=서리 눈꽃 · 날쌤/질주/여우=발밑 먼지 · 부활=보라 기운 · 분열=분홍 방울 · 미끄러움=물방울 · 보스=붉은 불씨
+      if (now - u.fxAt > 0.12) {
+        u.fxAt = now;
+        if (slowed) P.emit(p.clone().setY(p.y + u.height * 0.5), 1, 0xBFEFFF, { cell: c('snowflake'), size: 0.9, sizeEnd: 1.3, ttl: 0.5, speed: 0.4, up: 0.6, grav: 0, spin: 2, spread: 0.6 });
+        if ((e.special === 'swift' || e.special === 'blitz' || u.motion === 'dash') && !e.flying) P.emit(p.clone().setY(0.15), 1, 0xC9B28A, { cell: c('smoke'), size: 0.7, sizeEnd: 1.4, ttl: 0.45, speed: 0.5, up: 0.5, grav: -0.3, blend: 'normal', spread: 0.4 });
+        if (e.special === 'revive' && !e.revived) P.emit(p.clone().setY(p.y + u.height * 0.7), 1, 0xB15BE8, { cell: c('swirl'), size: 1.0, sizeEnd: 0.3, ttl: 0.7, speed: 0.3, up: 1.2, grav: -0.5, spin: 3, spread: 0.5 });
+        if (e.special === 'flock') P.emit(p.clone().setY(p.y + u.height * 0.5), 1, 0xFF5FB0, { cell: c('dot'), size: 0.5, sizeEnd: 0.1, ttl: 0.5, speed: 1.2, up: 1.0, grav: 1, spread: 0.5 });
+        if (e.special === 'slippery') P.emit(p.clone().setY(p.y + u.height * 0.4), 1, 0x7FE0FF, { cell: c('dot'), size: 0.4, sizeEnd: 0.1, ttl: 0.5, speed: 0.8, up: 0.3, grav: 6, spread: 0.5 });
+        if (e.boss) P.emit(p.clone().setY(p.y + 0.4), 2, 0xFF5030, { cell: c('fire'), size: 1.2, sizeEnd: 0.3, ttl: 0.6, speed: 1.2, up: 2.2, grav: -1, spread: 1.6 });
+      }
       // 맞으면 잠깐 움찔(작아졌다 돌아옴)
       if (u.hitFlash > 0) { u.hitFlash -= 1 / 60; const s = g.scale.x; g.scale.setScalar(s * (1 - u.hitFlash * 0.25)); u.hitFlash = Math.max(0, u.hitFlash); g.scale.setScalar(s); }
-      u.front.quaternion.copy(g.quaternion).invert().multiply(this.world.camera.quaternion);
-      u.back.quaternion.copy(u.front.quaternion);
       u.lastPos = p;
+      if (e.s > e.path.length * 0.82) danger = true; // 성 가까이 온 적 — 화면 가장자리 경고
     }
-    for (const [id, g] of this.enemyMeshes) if (!seen.has(id)) { this.enemyMeshes.delete(id); this.dying.push({ g, t: 0, kind: g.userData.kind, leaked: g.userData.leaked }); }
+    OV.end();
+    if (danger !== this.dangerOn) { this.dangerOn = danger; if (this.onDanger) this.onDanger(danger); }
+    for (const [id, g] of this.enemyMeshes) if (!seen.has(id)) { this.enemyMeshes.delete(id); this.dying.push({ g, t: 0, kind: g.userData.kind, leaked: g.userData.leaked, mixer: g.userData.mixer }); }
   }
 
   // ---------- 효과 ----------
@@ -347,6 +442,7 @@ NGN.Renderer = class Renderer {
         const to = this.world.toWorld(ev.target.x, ev.target.y, ev.target.flying ? 3.2 : 0.7);
         // 총구 섬광(계열별 그림) + 반동
         this.flashFx(top, S.color, 1.6 + (tw.def.tier - 1) * 0.4);
+        if (NGN.sound) NGN.sound.play(S.kind === 'bolt' ? 'bolt' : S.kind === 'cannonball' ? 'cannon' : 'shot_' + type);
         if (S.muzzle) this.particles.emit(top, 1, S.color, { cell: this.cell(S.muzzle), size: 2.2 + tw.def.tier * 0.4, sizeEnd: 0.6, ttl: 0.16, speed: 0, up: 0, grav: 0, spread: 0, spin: 0 });
         if (g) { g.userData.recoil = 1; g.userData.aim = Math.atan2(to.x - g.position.x, to.z - g.position.z); }
         if (S.kind === 'bolt') { // 폭풍기둥: 투사체 없이 진짜 번개(LightningStrike)가 바로 꽂힌다 + 맞는 자리에 링. 번개 라이브러리가 없으면 지그재그 선
@@ -372,9 +468,14 @@ NGN.Renderer = class Renderer {
       } else if (ev.type === 'kill') {
         const at = this.world.toWorld(ev.enemy.x, ev.enemy.y, ev.enemy.flying ? 3.2 : 0.9);
         this.particles.emit(at, ev.enemy.boss ? 60 : 16, ev.enemy.boss ? 0xFF6060 : 0xFFE9A8, { speed: ev.enemy.boss ? 6 : 3.5, up: 4, ttl: 0.8 });
-        if (ev.enemy.boss) { this.ringFx(at.clone().setY(0.4), 0xFF6060, 6, 0.7); this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: 2.2, kill: true }); }
-      } else if (ev.type === 'leak') {
+        // 골드가 튀어나온다(표준 TD): 금화 알갱이가 위로 튀고 "+N" 금색 글자. 새끼(분열)는 보상 0 이라 안 뜬다
+        if (NGN.sound) { NGN.sound.play('kill'); if (ev.enemy.reward > 0) NGN.sound.play('gold', { delay: 0.06 }); }
+        if (ev.enemy.reward > 0) { this.particles.emit(at, ev.enemy.boss ? 18 : 5, 0xFFD34D, { cell: this.cell('dot'), size: 0.55, sizeEnd: 0.25, speed: 2.2, up: 4.5, ttl: 0.7, grav: 12, spread: 0.3 }); if (this.floatQueue.length < 14) this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: ev.enemy.flying ? 4.2 : 2.4, text: '+' + Math.round(ev.enemy.reward), gold: true }); }
+        if (ev.enemy.boss) { if (NGN.sound) NGN.sound.play('bossKill'); this.bossExplosion(at); this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: 3.4, kill: true, text: '보스 처치!' }); if (this.onBossKill) this.onBossKill(ev.enemy); }
+      } else if (ev.type === 'leak') { // 적이 성에 닿았다: 성문에 폭발·불꽃·잔해, 성이 움찔, 화면 흔들림, 생명 알약(main.js onLeak)
         const g = this.enemyMeshes.get(ev.enemy.id); if (g) g.userData.leaked = true;
+        this.castleHitFx(ev.enemy); if (NGN.sound) NGN.sound.play('castle');
+        if (this.onLeak) this.onLeak(ev.enemy);
       } else if (ev.type === 'levelup') {
         const g = this.towerMeshes.get(ev.tower.id);
         if (g) { this.particles.emit(g.position.clone().setY(g.position.y + 2), 24, 0xF2B632, { speed: 2, up: 4, ttl: 0.9, grav: 5 }); this.ringFx(g.position.clone().setY(0.4), 0xF2B632, 3, 0.6); }
@@ -383,7 +484,7 @@ NGN.Renderer = class Renderer {
         this.particles.emit(at, 30, 0xFFD34D, { speed: 2.5, up: 5, ttl: 1.0, grav: 4 });
         this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: 2.4, item: true, text: '아이템!' });
         if (this.onNotice) this.onNotice(`${ev.item.이름} 획득 — 타워를 눌러 끼우세요`);
-      } else if (ev.type === 'revive') { // 부활: 보라 링 + 파티클 + "부활!" 글자 — 조카가 "왜 안 죽지?"를 알아야 한다
+      } else if (ev.type === 'revive') { if (NGN.sound) NGN.sound.play('shot_essence', { vol: 0.3, key: 'revive' }); // 부활: 보라 링 + 파티클 + "부활!" 글자 — 조카가 "왜 안 죽지?"를 알아야 한다
         const at = this.world.toWorld(ev.enemy.x, ev.enemy.y, 0.4);
         this.ringFx(at, 0xB15BE8, 3, 0.5); this.particles.emit(at.clone().setY(0.9), 12, 0xB15BE8, { speed: 2, up: 3, ttl: 0.6 });
         this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: ev.enemy.flying ? 3.6 : 2.0, text: '부활!', item: true });
@@ -408,6 +509,39 @@ NGN.Renderer = class Renderer {
       else if (f.kind === 'mist') { if (Math.random() < 0.5) P.emit(at, 1, 0x9B5CFF, { cell: this.cell('swirl'), size: 1.4, sizeEnd: 0.4, ttl: 0.9, speed: 0.5, up: 0.8, grav: -0.6, spread: 1.0, spin: 2 }); }
     }
     if (u.family === 'skink' && Math.random() < 0.5) { at.copy(g.position).setY(g.position.y + 0.6); P.emit(at, 1, 0xB8FF70, { cell: this.cell('dot'), size: 0.45, sizeEnd: 0.1, ttl: 1.2, speed: 1.2, up: 1.5, grav: -0.8, spread: 1.6 }); }
+  }
+  // 보스 처치: 흰→노랑→붉은 폭발 세 겹 + 불 + 검은 연기 + 잔해 + 링 셋 + 화면 흔들림
+  bossExplosion(at) {
+    const P = this.particles, c = (n) => this.cell(n);
+    P.emit(at, 1, 0xFFFFFF, { cell: c('burst'), size: 4, sizeEnd: 9, ttl: 0.18, speed: 0, up: 0, grav: 0, spread: 0 });
+    P.emit(at, 1, 0xFFE060, { cell: c('burst'), size: 5, sizeEnd: 12, ttl: 0.32, speed: 0, up: 0, grav: 0, spread: 0 });
+    P.emit(at, 1, 0xFF5030, { cell: c('burst'), size: 6, sizeEnd: 14, ttl: 0.5, speed: 0, up: 0, grav: 0, spread: 0 });
+    P.emit(at, 30, 0xFF8A3A, { cell: c('fire'), size: 1.8, sizeEnd: 0.4, ttl: 0.9, speed: 6, up: 6, grav: -1, spread: 0.8 });
+    P.emit(at, 16, 0x2B2B2B, { cell: c('smoke'), size: 2.0, sizeEnd: 5, ttl: 1.6, speed: 2.5, up: 3, grav: -0.6, blend: 'normal', spread: 1.0, fadeIn: 0.15 });
+    P.emit(at, 24, 0x8A6A5A, { cell: c('debris'), size: 1.0, sizeEnd: 0.5, ttl: 1.1, speed: 8, up: 7, grav: 14, blend: 'normal', spread: 0.5, spin: 6 });
+    P.emit(at, 40, 0xFFD34D, { cell: c('star4'), size: 0.9, sizeEnd: 0.2, ttl: 1.0, speed: 7, up: 6, grav: 8, spread: 0.5 });
+    this.ringFx(at.clone().setY(0.4), 0xFF6060, 8, 0.8); this.ringFx(at.clone().setY(0.5), 0xFFE060, 5, 0.6); this.ringFx(at.clone().setY(0.6), 0xFFFFFF, 3, 0.4);
+    if (this.world.shake) this.world.shake(1.2);
+  }
+  // 적이 성에 닿았을 때: 성문 자리에 폭발·불꽃·돌조각, 성이 움찔, 화면 흔들림. 성이 없으면(폴백) 그 적의 자리
+  castleHitFx(enemy) {
+    const P = this.particles, c = (n) => this.cell(n);
+    const at = (this.world.castleGate ? this.world.castleGate.clone() : this.world.toWorld(enemy.x, enemy.y, 0)).setY(0.9);
+    P.emit(at, 1, 0xFFE060, { cell: c('burst'), size: 2.5, sizeEnd: 5, ttl: 0.25, speed: 0, up: 0, grav: 0, spread: 0 });
+    P.emit(at, 10, 0xFF8A3A, { cell: c('fire'), size: 1.3, sizeEnd: 0.3, ttl: 0.6, speed: 2.5, up: 3.5, grav: -1, spread: 0.6 });
+    P.emit(at, 8, 0x8A8A8A, { cell: c('debris'), size: 0.9, sizeEnd: 0.4, ttl: 0.8, speed: 4, up: 5, grav: 14, blend: 'normal', spread: 0.6, spin: 5 });
+    P.emit(at, 5, 0x333333, { cell: c('smoke'), size: 1.4, sizeEnd: 3, ttl: 1.2, speed: 1, up: 2, grav: -0.6, blend: 'normal', spread: 0.6, fadeIn: 0.1 });
+    this.ringFx(at.clone().setY(0.4), 0xFF6060, 4, 0.5);
+    if (this.world.castleHit) this.world.castleHit();
+    if (this.world.shake) this.world.shake(0.6);
+  }
+  // 상시 랜드마크 효과(0.1초마다): 입구 포탈의 보라 소용돌이 · 성이 상한 단계만큼 불꽃·연기(world.castleFireSpots) · 용암 지도의 불 자리(world.fireSpots)
+  landmarkFx(dt) {
+    this.lmAt = (this.lmAt || 0) + dt; if (this.lmAt < 0.1) return; this.lmAt = 0;
+    const P = this.particles, c = (n) => this.cell(n), W = this.world;
+    if (W.portal) { P.emit(W.portal, 2, 0x9B5CFF, { cell: c('swirl'), size: 1.6, sizeEnd: 0.5, ttl: 0.9, speed: 0.4, up: 0.5, grav: -0.3, spin: 4, spread: 1.0 }); if (Math.random() < 0.4) P.emit(W.portal, 1, 0x5A2AAA, { cell: c('smoke'), size: 1.6, sizeEnd: 3, ttl: 1.4, speed: 0.3, up: 0.8, grav: -0.4, blend: 'normal', spread: 0.8, fadeIn: 0.2 }); }
+    for (const at of W.castleFireSpots || []) { P.emit(at, 2, 0xFF8A2A, { cell: c('fire'), size: 1.4, sizeEnd: 0.3, ttl: 0.5, speed: 0.3, up: 2.6, grav: -1, spread: 0.5 }); if (Math.random() < 0.5) P.emit(at, 1, 0x222222, { cell: c('smoke'), size: 1.2, sizeEnd: 3.2, ttl: 1.6, speed: 0.2, up: 1.8, grav: -0.5, blend: 'normal', spread: 0.4, fadeIn: 0.15 }); }
+    for (const at of W.fireSpots || []) { if (Math.random() < 0.7) P.emit(at, 1, 0xFF7A2A, { cell: c('fire'), size: 1.1, sizeEnd: 0.3, ttl: 0.45, speed: 0.3, up: 2.2, grav: -1, spread: 0.4 }); }
   }
   // 웨이브 시작: 입구에 빛 기둥과 링
   waveStart() {
@@ -490,13 +624,16 @@ NGN.Renderer = class Renderer {
     for (let i = this.dying.length - 1; i >= 0; i--) {
       const d = this.dying[i]; d.t += dt;
       if (d.leaked) { this.world.root.remove(d.g); this.dying.splice(i, 1); continue; }
-      const k = d.t / 0.45;
-      d.g.position.y += (3.5 - k * 9) * dt; d.g.rotation.y += dt * 9; d.g.scale.multiplyScalar(Math.max(0.01, 1 - dt * 3.5));
+      const dur = d.kind === 'boss' ? 0.9 : 0.45, k = d.t / dur;
+      if (d.mixer) d.mixer.update(dt * 0.5);
+      d.g.position.y += (3.5 - k * 9) * dt * (d.kind === 'boss' ? 0.6 : 1); d.g.rotation.y += dt * (d.kind === 'boss' ? 4 : 9); d.g.scale.multiplyScalar(Math.max(0.01, 1 - dt * (d.kind === 'boss' ? 1.6 : 3.5)));
       if (k >= 1) { this.world.root.remove(d.g); this.dying.splice(i, 1); }
     }
-    // 타워: 건설 솟아오름(0.35초 바운스)·반동·고리 회전
+    // 타워: 건설 솟아오름(0.35초 바운스)·반동·고리 회전 (+ 발밑 빛을 오버레이에)
+    this.overlays.begin(); this._ovBegun = true;
     for (const g of this.towerMeshes.values()) {
       const u = g.userData;
+      if (u.glowSize) { const gp = this._glowP = this._glowP || new THREE.Vector3(); gp.set(g.position.x, 0.26, g.position.z); this.overlays.glowAt(gp, u.glowSize * g.scale.x, u.glowColor); }
       const age = this.time - u.born;
       if (age < 0.4) { const k = age / 0.4; const s = k < 0.7 ? k / 0.7 * 1.12 : 1.12 - (k - 0.7) / 0.3 * 0.12; g.scale.setScalar(Math.max(0.01, s)); }
       else if (g.scale.x !== 1) g.scale.setScalar(1);
@@ -517,6 +654,7 @@ NGN.Renderer = class Renderer {
     this.particles.update(dt, this.world.camera, this.world.renderer.domElement.height);
     if (this.lightning) this.lightning.update(dt);
     this.syncTowers(game);
-    this.syncEnemies(game, this.time, alpha);
+    this.syncEnemies(game, this.time, alpha, dt);
+    this.landmarkFx(dt);
   }
 };
