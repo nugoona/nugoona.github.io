@@ -57,7 +57,23 @@ NGN.Models = class Models {
         scene.updateMatrixWorld(true);
         scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         const box = new THREE.Box3().setFromObject(scene);
-        this.templates.set(name, { scene, size: box.getSize(new THREE.Vector3()), min: box.min.clone(), center: box.getCenter(new THREE.Vector3()), anims: gltf.animations || [] }); // anims: 캐릭터 팩의 걷기·달리기·죽기 클립(적에 쓴다)
+        // 🔴 UV 가 0~1 밖으로 나가는 조각 = **텍스처를 반복해 붙이는** 팩(retro-fantasy·blocky-characters 실측 UV 0~13).
+        //    우리 아틀라스는 그림 한 장을 한 칸에 넣고 UV 를 그 칸으로 옮겨 적는 구조라, 반복을 재현할 수 없다(잘라 쓰면 줄무늬가 된다 — 실측).
+        //    그런 조각은 텍스처를 포기하고 **재질 이름별 색**으로 칠한다(nature·space 팩과 같은 길). tiled 로 표시해 둔다.
+        // 🔴 판정은 **KHR_texture_transform 을 적용한 뒤**의 UV 로 해야 한다. 원본 UV 로 재면 그 변환으로 팔레트 한 점을 찍는
+        //    기존 팩까지 걸려 텍스처를 잃는다(실측: 412개 중 200개가 잘못 걸렸다).
+        let tiled = false;
+        const uvv = new THREE.Vector2();
+        scene.traverse((o) => {
+          if (tiled || !o.isMesh || !o.geometry || !o.geometry.attributes.uv) return;
+          const u = o.geometry.attributes.uv;
+          let m = null; if (o.material && o.material.map) { o.material.map.updateMatrix(); m = o.material.map.matrix; }
+          for (let i = 0; i < u.count; i++) {
+            uvv.set(u.getX(i), u.getY(i)); if (m) uvv.applyMatrix3(m);
+            if (uvv.x < -0.02 || uvv.x > 1.02 || uvv.y < -0.02 || uvv.y > 1.02) { tiled = true; return; }
+          }
+        });
+        this.templates.set(name, { scene, tiled, size: box.getSize(new THREE.Vector3()), min: box.min.clone(), center: box.getCenter(new THREE.Vector3()), anims: gltf.animations || [] }); // anims: 캐릭터 팩의 걷기·달리기·죽기 클립(적에 쓴다)
         step(name); resolve(true);
       }, undefined, (err) => { console.warn('모델 못 읽음', name, err && err.message); step(name); resolve(false); });
     });
@@ -76,13 +92,51 @@ NGN.Models = class Models {
   }
   // 모든 팩의 colormap 을 한 장(1024², 256 칸 16개)으로: 팩마다 [회색조 칸, 원색 칸], 마지막에 흰 칸(텍스처 없는 재질용).
   // 회색조는 밝기·명암만 남기고 색은 꼭짓점 색(속성색)이 정한다 — Kenney 원색(보라·주황)이 속성색을 묻어 버려서(design.md 12-10)
+  // 그림 하나를 가리키는 안정된 열쇠. GLB 마다 Image 객체가 따로라 객체로는 못 묶고, 팩 이름으로 묶으면 그림이 여러 장인 팩이 깨진다.
+  // 🔴 이 로더는 그림을 **ImageBitmap** 으로 읽어 온다 — `src` 가 없고 텍스처 이름은 죄다 'colormap' 이라 이름으로 묶으면 전부 한 칸이 된다(실측 2026-09-07).
+  //    그래서 **그림 내용의 지문**(16×16 으로 줄여 픽셀을 훑은 문자열)으로 묶는다. 내용이 같으면 GLB 가 달라도 한 칸을 나눠 쓰고, 다르면 각자 자리를 잡는다.
+  imgKey(tex) {
+    if (!tex || !tex.image) return null;
+    const im = tex.image;
+    if (im.src) return im.src; // 일반 Image 로 온 경우엔 URL 이 곧 신원이다
+    this._fp = this._fp || new WeakMap();
+    if (this._fp.has(im)) return this._fp.get(im);
+    let key;
+    try {
+      const S = 16;
+      const c = this._fpCanvas || (this._fpCanvas = document.createElement('canvas'));
+      c.width = c.height = S;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.clearRect(0, 0, S, S); g.drawImage(im, 0, 0, S, S);
+      const d = g.getImageData(0, 0, S, S).data;
+      let s = '';
+      for (let i = 0; i < d.length; i += 8) s += (d[i] >> 3).toString(32); // 밝기를 성글게 훑는다 — 압축 잡음에 흔들리지 않게
+      key = 'fp:' + s;
+    } catch (e) { key = 'tex:' + tex.uuid; }
+    this._fp.set(im, key);
+    return key;
+  }
   buildAtlas() {
-    // 2026-09-06 팩이 10 → 17개로 늘어(적 캐릭터·장식·성) 4×4=16 칸을 넘친다 → 8×8=64 칸(2048²). 칸 크기 256 은 그대로(Kenney colormap 은 512² 팔레트라 축소해도 색이 안 뭉개진다)
-    const CELL = 256, N = 8;
+    // 🔴 2026-09-07(K-2-13) 칸의 열쇠를 「팩 이름」에서 「그림 자체」로 바꿨다.
+    //    옛 방식은 팩에서 처음 만난 그림 한 장만 넣어서, 그림이 여러 장인 팩(retro-fantasy 10장 · blocky-characters 18장)은
+    //    첫 장만 들어가고 나머지 조각이 흰 칸으로 떨어졌다 — 그 두 팩 123개를 못 쓰던 이유다(사장님: "아깝다고 하고 왜 안하는거야?").
+    //    이제 그림마다 자리를 잡고, 칸이 모자라면 아틀라스를 8×8 → 16×16 으로 알아서 키운다(용량 제약은 계약 K-0 에서 폐기됐다).
+    const CELL = 256;
+    // ⑴ 필요한 그림을 먼저 모은다(출처가 같으면 한 장). 로드된 조각이 실제로 쓰는 것만 들어간다
+    const imgs = new Map(); // 열쇠 → Image
+    for (const [, { scene }] of this.templates) {
+      scene.traverse((o) => {
+        if (!o.isMesh || !o.material || !o.material.map || !o.material.map.image) return;
+        const k = this.imgKey(o.material.map);
+        if (k && !imgs.has(k)) imgs.set(k, o.material.map.image);
+      });
+    }
+    // ⑵ 그림마다 두 칸(회색조·원색) + 흰 칸 하나. 8×8=64 로 모자라면 16×16=256(4096²)
+    const need = imgs.size * 2 + 1;
+    const N = need <= 64 ? 8 : 16;
     const canvas = document.createElement('canvas'); canvas.width = canvas.height = CELL * N;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true }); // 회색조 변환에 getImageData 를 여러 번 부른다 — 이 옵션이 없으면 크롬이 경고를 낸다(2026-09-06 콘솔 warn 점검)
-    // 🔴 팩 이름으로 묶는다 — GLB 파일마다 같은 colormap 을 따로 읽어 Image 객체가 다 달라서, 이미지로 묶으면 파일 60개가 칸 16개를 넘쳐 뒤쪽 팩이 흰 칸으로 떨어졌다(실측 2026-09-06)
-    this.cells = new Map(); // 팩 → { gray: n, color: n }
+    const ctx = canvas.getContext('2d', { willReadFrequently: true }); // 회색조 변환에 getImageData 를 여러 번 부른다 — 이 옵션이 없으면 크롬이 경고를 낸다
+    this.cells = new Map(); // 그림 열쇠 → { gray: 칸번호, color: 칸번호 }
     let n = 0;
     const place = (img, gray) => {
       const idx = n++; const x = (idx % N) * CELL, y = Math.floor(idx / N) * CELL;
@@ -90,16 +144,15 @@ NGN.Models = class Models {
       if (gray) { const d = ctx.getImageData(x, y, CELL, CELL); const a = d.data; for (let i = 0; i < a.length; i += 4) { const l = 0.3 * a[i] + 0.59 * a[i + 1] + 0.11 * a[i + 2]; const v = Math.min(255, l * 0.6 + 80); a[i] = a[i + 1] = a[i + 2] = v; } ctx.putImageData(d, x, y); }
       return idx;
     };
-    for (const [name, { scene }] of this.templates) {
-      const pack = name.split('/')[0]; if (this.cells.has(pack)) continue;
-      let img = null; scene.traverse((o) => { if (!img && o.isMesh && o.material && o.material.map && o.material.map.image) img = o.material.map.image; });
-      if (!img || n > N * N - 3) continue;
-      this.cells.set(pack, { gray: place(img, true), color: place(img, false) });
+    for (const [k, img] of imgs) {
+      if (n > N * N - 3) { console.warn('아틀라스 칸이 모자란다 — 그림 하나를 못 넣었다', k); continue; }
+      this.cells.set(k, { gray: place(img, true), color: place(img, false) });
     }
     ctx.fillStyle = '#fff'; ctx.fillRect((n % N) * CELL, Math.floor(n / N) * CELL, CELL, CELL); this.whiteCell = n++;
     const tex = new THREE.CanvasTexture(canvas);
     tex.flipY = false; tex.encoding = THREE.sRGBEncoding; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false;
     this.atlas = tex; this.atlasCell = 1 / N; this.atlasN = N;
+    this.atlasInfo = { images: imgs.size, cells: n, grid: N, px: CELL * N };
   }
   has(name) { return this.templates.has(name); }
   size(name) { const t = this.templates.get(name); return t ? t.size : null; }
@@ -146,9 +199,12 @@ NGN.Models = class Models {
       const mat = o.material;
       // 칸·색
       let cell, color;
-      const pack = P.p ? P.p.split('/')[0] : null;
-      if (mat.map && pack && this.cells.has(pack)) {
-        const c = this.cells.get(pack);
+      // 칸은 **이 메시가 쓰는 그림**으로 찾는다(팩 이름이 아니라). 한 팩 안에 그림이 여러 장이어도 메시마다 제 칸을 쓴다(K-2-13).
+      // 단 UV 를 반복하는 조각(tiled)은 아틀라스로 못 옮긴다 — 흰 칸 + 재질색 길로 보낸다
+      const tpl = P.p ? this.templates.get(P.p) : null;
+      const ik = (mat.map && !(tpl && tpl.tiled)) ? this.imgKey(mat.map) : null;
+      if (ik && this.cells.has(ik)) {
+        const c = this.cells.get(ik);
         cell = P.raw ? c.color : c.gray;
         color = P.raw ? white : (P.tint ? new THREE.Color(P.tint) : (P.accent || isHead || P.head) ? ctx.accent : ctx.base) || white;
       } else {
@@ -242,20 +298,24 @@ NGN.Models = class Models {
     obj.userData.pivot = new THREE.Vector3(P.x || 0, y + (P.y || 0), P.z || 0); // 머리가 도는 축(조각 바닥 중심)
     return { obj, top: y + (P.y || 0) + t.size.y * s, height: t.size.y * s };
   }
-  // 부품 표에 없는 계열(뽑기로 얻는 20종 — 2026-09-06 gacha.json towerPool. 전용 실루엣은 다음 차례)은 같은 속성의 기본 계열 실루엣을 빌린다.
-  //   같은 속성 + 같은 역할 > 같은 속성 > 같은 공격 타입 > 첫 번째. 등급(NGN.FAMILY_INFO.grade)에 따라 색·크기를 달리해 구별한다(borrowStyle)
+  // 부품 표에 없는 계열이 있으면 같은 속성의 다른 계열 실루엣을 빌린다 — 지금은 30계열 전부 자기 조합을 갖고 있어(K-2-1, 2026-09-07)
+  // 한 번도 쓰이지 않는다(실측: 도감에서 30계열 90장을 다 그려도 호출 0회). 새 계열을 추가하고 부품표에 안 넣었을 때만 도는 안전망이다.
+  //   같은 속성 + 같은 역할 > 같은 속성 > 같은 공격 타입 > 첫 번째. 등급(NGN.FAMILY_INFO.grade)에 따라 색·크기를 달리한다(borrowStyle)
   borrowFamily(family) {
     if (this.parts.towers[family]) return family;
     const I = NGN.FAMILY_INFO || {}; const me = I[family]; if (!me) return null;
     const cands = Object.keys(this.parts.towers).filter((k) => !k.startsWith('_') && I[k]);
     return cands.find((k) => I[k].element === me.element && I[k].role === me.role) || cands.find((k) => I[k].element === me.element) || cands.find((k) => I[k].attackType === me.attackType) || cands[0] || null;
   }
-  // 등급별 변형: 고급 = 색상을 살짝 돌리고 받침을 밝게 · 희귀(수호자) = 받침이 은빛, 꼭대기는 속성 원색 · 전설 = 금빛이 섞인 꼭대기 + 12% 크게
+  // 등급별 변형: 고급 = 받침이 조금 밝다 · 희귀(수호자) = 받침이 은빛 · 전설 = 금빛이 살짝 섞이고 15% 크다.
+  // 🔴 2026-09-07: 30계열이 전부 전용 실루엣을 갖게 되면서(K-2-1) 이 보정의 역할이 "빌린 모양을 구별"에서 "등급을 알아보게"로 바뀌었다.
+  //    옛 값(희귀 돌빛 55%, 전설 금빛 45%)은 계열 고유색을 덮어 수호자 7종이 전부 탁한 회색, 전설 7종이 전부 금갈색으로 보였다(실측 대조표).
+  //    돌빛·금빛을 크게 낮추고, 대신 등급이 오를수록 눈에 띄게 커지게 했다(사장님: "성능도 세게 화려하게 둘다").
   borrowStyle(family) {
     const g = ((NGN.FAMILY_INFO || {})[family] || {}).grade || 'basic';
-    if (g === 'uncommon') return { hue: -0.05, stoneMix: 0.2, stone: 0xCFC7B8, scale: 1 };
-    if (g === 'rare') return { hue: 0, stoneMix: 0.55, stone: 0xDCE3EA, scale: 1.04 };
-    if (g === 'legendary') return { hue: 0, stoneMix: 0.15, stone: 0x6E5A2A, gold: 0.45, scale: 1.12 };
+    if (g === 'uncommon') return { hue: 0, stoneMix: 0.18, stone: 0xCFC7B8, scale: 1.03 };
+    if (g === 'rare') return { hue: 0, stoneMix: 0.26, stone: 0xE8F0F8, scale: 1.08 };
+    if (g === 'legendary') return { hue: 0, stoneMix: 0.13, stone: 0x9A8460, gold: 0.16, scale: 1.16 };
     return { hue: 0, stoneMix: 0.2, stone: 0xB4AEA4, scale: 1 };
   }
   // 타워 조립: 계열·단 → { body, head } 메시가 든 그룹. 같은 계열·단은 지오메트리를 한 번만 만들어 나눠 쓴다(카드 그림·미리보기가 여러 번 불러도 비용 0)
@@ -314,9 +374,12 @@ NGN.Models = class Models {
     if (this.enemyTpl.has(kind)) return this.enemyTpl.get(kind);
     const t = this.templates.get(spec.model); if (!t || !this.atlas) return null;
     const scene = t.scene; scene.updateMatrixWorld(true);
-    const pack = spec.model.split('/')[0];
-    const cellNo = this.cells.has(pack) ? this.cells.get(pack).color : this.whiteCell;
-    const cx = (cellNo % this.atlasN) * this.atlasCell, cy = Math.floor(cellNo / this.atlasN) * this.atlasCell, cs = this.atlasCell;
+    // 칸은 메시마다 제 그림으로 찾는다(K-2-13) — 한 캐릭터가 여러 그림을 쓰거나, 캐릭터마다 그림이 다른 팩(blocky-characters)도 제대로 나온다
+    const cellOf = (mesh) => {
+      const k = mesh.material && mesh.material.map ? this.imgKey(mesh.material.map) : null;
+      return (k && this.cells.has(k)) ? this.cells.get(k).color : this.whiteCell;
+    };
+    const cs = this.atlasCell;
     // 뼈 = 장면의 모든 노드(부위 메시 노드 포함). 순서를 고정해 복제본이 같은 번호를 쓴다
     const bones = []; scene.traverse((o) => { if (o !== scene) bones.push(o); });
     const idx = new Map(bones.map((b, i) => [b, i]));
@@ -333,6 +396,8 @@ NGN.Models = class Models {
       const boneMap = o.isSkinnedMesh ? o.skeleton.bones.map((b) => idx.get(b)) : null;
       const self = idx.get(o);
       const color = tintFor(o.name);
+      const cellNo = cellOf(o);
+      const cx = (cellNo % this.atlasN) * cs, cy = Math.floor(cellNo / this.atlasN) * cs;
       let uvM = null; if (o.material.map) { o.material.map.updateMatrix(); uvM = o.material.map.matrix; }
       const flip = m.determinant() < 0;
       for (let tri = 0; tri < P.count; tri += 3) {

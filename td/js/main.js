@@ -161,20 +161,25 @@ NGN.serverNow = async function serverNow() {
     onDetailClose() { if (preview) preview.detach(); },
     onBuild(slotId, fam) {
       if (game.build(slotId, fam)) {
-        renderer.syncTowers(game); ui.afterBuild(slotId); ui.toast(`${game.slots[slotId].def.name} 지음`); NGN.sound && NGN.sound.play('build');
+        // 🛑 「○○ 지음」 안내를 없앴다(checklist K-2-14) — 타워가 눈앞에 생기는 것이 이미 답이다.
+        //    이미 화면에 보이는 것을 글자로 또 말하지 않는다.
+        renderer.syncTowers(game); ui.afterBuild(slotId); NGN.sound && NGN.sound.play('build');
         // 튜토리얼 3단계: 첫 타워를 지었다 → 멈춰 있던 카운트다운이 흐른다. 너무 짧게 남았으면 8초는 준다(조카가 화면을 읽을 시간)
-        if (tutorialStep === 2) { tutorialStep = 3; if (nextWaveAt !== null && nextWaveAt < 6) nextWaveAt = 6; setTimeout(() => ui.toast('곧 적이 와요 — ▶ 를 누르면 바로 시작(골드 보너스)'), 900); }
+        // 「곧 적이 와요」 안내도 없앴다 — 막대 아래 카운트다운 줄이 남은 초를 계속 보여 준다
+        if (tutorialStep === 2) { tutorialStep = 3; if (nextWaveAt !== null && nextWaveAt < 6) nextWaveAt = 6; }
       }
-      else ui.toast(`골드가 모자라요 (${game.byFamily[fam][0].cost} 필요)`);
+      else ui.toast('골드가 모자라요');
     },
     // 승급. 3단으로 올릴 때는 갈래(화력/광역)를 함께 받는다 — 엔진이 갈래 없는 3단 승급을 거절한다(checklist I-7)
     onUpgrade(inst, branch) {
-      if (game.upgrade(inst, branch || null)) { NGN.sound && NGN.sound.play('upgrade'); const B = game.branchDef(inst.branch); renderer.syncTowers(game); ui.refreshHud(); ui.toast(`${inst.def.name}${B && inst.def.tier >= 3 ? ' · ' + B.name : ''}(으)로 승급!`); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); }
+      // 승급하면 타워가 눈에 띄게 커지고 팝업 숫자도 바뀐다 → 1·2단 승급 안내는 없앴다.
+      // 3단은 「어느 갈래를 골랐나」가 화면만 봐서는 헷갈리므로 그것만 남긴다(checklist K-2-14)
+      if (game.upgrade(inst, branch || null)) { NGN.sound && NGN.sound.play('upgrade'); const B = game.branchDef(inst.branch); renderer.syncTowers(game); ui.refreshHud(); if (B && inst.def.tier >= 3) ui.toast(`${B.name} 갈래`); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); }
       else ui.toast('골드가 모자라요');
     },
-    // 3단부터 지어진 타워(기본기 2칸)의 갈래 고르기 — 무료, 한 번
-    onChooseBranch(inst, branch) { if (game.chooseBranch(inst, branch)) { renderer.syncTowers(game); ui.refreshHud(); ui.toast(`${game.branchDef(branch).name} 갈래를 골랐다`); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); } },
-    onSell(inst) { NGN.sound && NGN.sound.play('sell'); const r = game.sell(inst); renderer.syncTowers(game); ui.clearSelection(); ui.refreshHud(); ui.toast(`팔아서 +${r}골드`); },
+    // 3단부터 지어진 타워(기본기 2칸)의 갈래 고르기 — 무료, 한 번. 팝업이 닫히며 타워가 바뀌므로 안내는 없앴다
+    onChooseBranch(inst, branch) { if (game.chooseBranch(inst, branch)) { renderer.syncTowers(game); ui.refreshHud(); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); } },
+    onSell(inst) { NGN.sound && NGN.sound.play('sell'); const r = game.sell(inst); renderer.syncTowers(game); ui.clearSelection(); ui.refreshHud(); ui.toast(`+${r} 골드`); },
     // 아이템 끼우기/빼기 (checklist I-11). 효과는 엔진 effectiveStats() 한 통로로 들어간다
     onEquip(inst, uid) { if (game.equip(inst, uid)) { ui.refreshHud(); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); } else ui.toast('칸이 다 찼어요'); },
     onUnequip(inst, uid) { if (game.unequip(inst, uid)) { ui.refreshHud(); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); } },
@@ -214,7 +219,7 @@ NGN.serverNow = async function serverNow() {
     ui.onGameStart(game, mode);
     bossKills = 0;
     tutorialStep = meta.state.games === 0 && !ai ? 1 : 0;
-    if (tutorialStep === 1) setTimeout(() => ui.toast('아래 카드에서 타워를 고르세요'), 600); // 말풍선 대신 토스트(화면을 안 가린다)
+    if (tutorialStep === 1) setTimeout(() => ui.toast('아래에서 타워를 고르세요'), 600); // 말풍선 대신 토스트(화면을 안 가린다)
     world.warmup = 0;
     resetBattleFx(); lastLives = game.lives;
     castleUpdate();
@@ -236,7 +241,7 @@ NGN.serverNow = async function serverNow() {
     if (!game || game.wave || ended || paused) return;
     const wv = nextWave(); if (!wv) return;
     const bonus = nextWaveAt !== null ? callBonus(nextWaveAt, wv) : 0;
-    if (bonus > 0) { game.gold += bonus; ui.toast(`미리 불러서 +${bonus} 골드`); NGN.sound && NGN.sound.play('call'); }
+    if (bonus > 0) { game.gold += bonus; ui.toast(`+${bonus} 골드 보너스`); NGN.sound && NGN.sound.play('call'); }
     startWave(); // 안에서 refreshHud → 골드 알약 bump
   }
   function pause() { if (!game || ended || paused) return; paused = true; ui.showPause(true); }

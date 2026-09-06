@@ -56,6 +56,25 @@ const SVG = {
     multishot: '<svg viewBox="0 0 24 24"><path fill="#fff" d="M4 6l7 6-7 6zM10 6l7 6-7 6zM16 6l6 6-6 6z"/></svg>',
     aura: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="#fff"/></svg>',
   },
+  // ---------- 글자 대신 그림 (checklist K-2-5) ----------
+  // 재화·보상·미션·등급을 한글 이름이나 ✓ 글자 대신 그림으로. 창고(assets/kenney-lib-index.json) 49팩은 전부 3D 라 2D 아이콘이 한 장도 없어
+  // 이미 쓰던 인라인 SVG 방식을 넓혔다(밖에서 받은 그림 0장 = 라이선스 표기 의무 0). 색은 부르는 쪽이 넘긴다.
+  heart: '<svg class="i" viewBox="0 0 24 24"><path fill="#E8443A" stroke="#7A1020" stroke-width="1.6" d="M12 21S3 15.4 3 9.8C3 6.6 5.4 4.5 8 4.5c1.8 0 3.2 1 4 2.3.8-1.3 2.2-2.3 4-2.3 2.6 0 5 2.1 5 5.3C21 15.4 12 21 12 21z"/></svg>',
+  gift: '<svg class="i" viewBox="0 0 24 24"><path fill="#C0392B" d="M4 12h16v9H4z"/><path fill="#E85A4F" d="M3 7.5h18V12H3z"/><path fill="#FFC93C" d="M10.3 7.5h3.4V21h-3.4z"/><path fill="#FFC93C" stroke="#B8860B" stroke-width="1.1" d="M12 7.5C9.6 7.5 7.5 6.7 7.5 5.2S9 2.6 12 6c3-3.4 4.5-2.3 4.5-.8S14.4 7.5 12 7.5z"/></svg>',
+  scroll: '<svg class="i" viewBox="0 0 24 24"><path fill="#F3E7CC" stroke="#8E6B3A" stroke-width="1.6" d="M6 3h11v16a2 2 0 0 0 2 2H8a2 2 0 0 1-2-2V3z"/><path stroke="#8E6B3A" stroke-width="1.6" stroke-linecap="round" d="M9 7.5h5M9 11h5M9 14.5h3"/></svg>',
+  check: '<svg class="i" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" d="M4 13l5.5 5.5L20 5.5"/></svg>',
+  arrowUp: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 4l8 13H4z"/></svg>',
+  arrowDown: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 20L4 7h16z"/></svg>',
+  // 도는 화살표 — 「약점 바퀴」 한가운데
+  turn: '<svg class="turn" viewBox="0 0 48 48"><circle cx="24" cy="24" r="15" fill="none" stroke="#8E6B3A" stroke-width="3.4" stroke-dasharray="15 9" stroke-linecap="round"/><path fill="#8E6B3A" d="M20 4l8 5-8 5z"/><path fill="#8E6B3A" d="M28 34l-8 5 8 5z"/></svg>',
+  // 등급 배지: 색만 달랐던 글자 칩을 모양까지 다르게 — 돌 → 육각 → 보석 → 수정 → 왕관
+  grade: {
+    basic: (c) => `<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="${c}" stroke="#222" stroke-width="1.6"/></svg>`,
+    common: (c) => `<svg class="i" viewBox="0 0 24 24"><path fill="${c}" stroke="#222" stroke-width="1.6" d="M12 3.5l7.4 4.3v8.4L12 20.5l-7.4-4.3V7.8z"/></svg>`,
+    uncommon: (c) => `<svg class="i" viewBox="0 0 24 24"><path fill="${c}" stroke="#222" stroke-width="1.6" d="M7 4h10l4 5.5L12 21 3 9.5z"/></svg>`,
+    rare: (c) => `<svg class="i" viewBox="0 0 24 24"><path fill="${c}" stroke="#222" stroke-width="1.6" d="M12 2.5l6 9.5-6 9.5-6-9.5z"/></svg>`,
+    legendary: (c) => `<svg class="i" viewBox="0 0 24 24"><path fill="${c}" stroke="#222" stroke-width="1.6" d="M3 8.5l4.5 4L12 4l4.5 8.5 4.5-4L19 20H5z"/></svg>`,
+  },
 };
 NGN.SVG = SVG;
 
@@ -69,13 +88,24 @@ NGN.UI = class UI {
     this.cdSec = null; this.cdWave = null; this.cdBonus = 0; this.bossPct = null; // 카운트다운 줄·보스 막대의 마지막 표시값(바뀔 때만 DOM 을 만진다)
     // 메뉴
     $('menuPlay').addEventListener('click', () => this.showWorld());
-    $('menuInfinite').addEventListener('click', () => { if (this.meta.infiniteUnlocked()) this.showMapScreen(); else this.toast(`스테이지 ${this.data.stages.infiniteUnlockStage}을 깨면 열립니다`); });
-    $('menuDaily').addEventListener('click', () => cb.onStartDaily());
+    // 로비 좌우 아이콘 열(checklist K-2-9) — 출석·미션은 전용 페이지로, 나머지 넷은 이미 있는 흐름으로 보내는 지름길이다(중복 구현 금지)
+    $('gateMission').addEventListener('click', () => this.showMissions());   // 「일일」 = 출석 + 오늘의 미션 한 페이지
+    $('gateDaily').addEventListener('click', () => cb.onStartDaily());
+    $('gateInfinite').addEventListener('click', () => { if (this.meta.infiniteUnlocked()) this.showMapScreen(); else this.toast(`스테이지 ${this.data.stages.infiniteUnlockStage}을 깨면 열립니다`); });
+    $('gateGacha').addEventListener('click', () => this.showUpgrade());   // 뽑기는 강화 탭 안에 이미 있다
+    $('gateSeason').addEventListener('click', () => this.showRecords());
+    $('missionClose').addEventListener('click', () => this.showMenu());
     $('menuSettings').addEventListener('click', () => this.showSettings());
     // 로비 탭 바(J-11 ②)
     $('lobbyTabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const t = b.dataset.tab; if (t === 'battle') this.showMenu(); else if (t === 'tower') cb.onCodex(); else if (t === 'grow') this.showUpgrade(); else if (t === 'rank') this.showRecords(); });
     $('growGacha').addEventListener('click', (e) => { if (e.target.closest('button')) cb.onGacha(); });
-    $('missionBox').addEventListener('click', (e) => { const b = e.target.closest('[data-claim]'); if (!b) return; const got = this.meta.missionClaim(Number(b.dataset.claim)); if (got) { this.toast(`뽑기 티켓 +${got}장`); NGN.sound && NGN.sound.play('gold'); this.showMenu(); } });
+    $('missionBody').addEventListener('click', (e) => {
+      const g = e.target.closest('[data-go]');                    // 「이동」(checklist K-2-9): 그 미션을 올릴 수 있는 화면으로 데려간다
+      if (g) { this.missionGo(g.dataset.go); return; }
+      const b = e.target.closest('[data-claim]'); if (!b) return;
+      const got = this.meta.missionClaim(Number(b.dataset.claim));
+      if (got) { this.toast(`뽑기 티켓 +${got}장`); NGN.sound && NGN.sound.play('gold'); this.renderMissions(); this.refreshDots(); }
+    });
     $('a2hsClose').addEventListener('click', () => { this.meta.state.settings.a2hsDismissed = true; this.meta.save(); $('a2hs').hidden = true; });
     $('a2hsMore').addEventListener('click', () => this.a2hsHelp());
     // 난이도 고르기(월드맵 점을 누르면)
@@ -105,7 +135,7 @@ NGN.UI = class UI {
     $('endMenu').addEventListener('click', () => { cb.onLeave(); this.showMenu(); });
     $('endRecords').addEventListener('click', () => { cb.onLeave(); this.showRecords('daily'); });
   }
-  hideAll() { for (const id of ['menu', 'worldScreen', 'upgradeScreen', 'mapScreen', 'recordScreen', 'settingScreen', 'codexScreen', 'endScreen', 'game', 'diffModal', 'codeModal']) $(id).hidden = true; }
+  hideAll() { for (const id of ['menu', 'worldScreen', 'upgradeScreen', 'mapScreen', 'recordScreen', 'settingScreen', 'codexScreen', 'missionScreen', 'endScreen', 'game', 'diffModal', 'codeModal']) $(id).hidden = true; }
   // ---------- 로비 탭 바(J-11 ②) ----------
   showTabs(active) {
     document.body.classList.add('has-tabs'); $('lobbyTabs').hidden = false;
@@ -133,21 +163,13 @@ NGN.UI = class UI {
     $('menuTickets').innerHTML = `${SVG.ticket}<span class="num">${m.state.tickets}</span>`;
     // 별은 난이도별로 따로(금·붉은). 상단 알약엔 둘의 합 / 120
     $('menuStars').innerHTML = `${m.diffList().map((d) => NGN.starOf(d)).join('')}<span class="num gold">${m.totalStars()}/${m.maxStars()}</span>`;
-    const b = m.state.best; // 무한 최고 기록은 무한 버튼 밑줄에(상단 알약은 폰 폭을 넘쳐 뺐다)
-    const next = m.nextStage();
-    $('menuPlay').innerHTML = next ? `<span>${SVG.play} 스테이지 ${next.id}</span><span class="sub">${esc(next.name)}</span>` : `<span>${SVG.play} 월드맵</span><span class="sub">모두 클리어</span>`;
-    const inf = m.infiniteUnlocked();
-    $('menuInfinite').classList.toggle('locked', !inf);
-    $('menuInfinite').innerHTML = inf ? `<span>${SVG.infinity} 무한 모드</span><span class="sub">${b ? `최고 웨이브 ${b.wave}` : '끝없이 — 지도별 기록'}</span>` : `<span>${SVG.lock} 무한 모드</span><span class="sub">스테이지 ${this.data.stages.infiniteUnlockStage}을 깨면 열립니다</span>`;
-    // 오늘의 판(I-9): 서버 시각이 있으면 그것, 없으면 폰 시계(작게 표시). 잠그지 않는다
+    // 로비는 「입구」다(checklist K-2-9) — 곁다리(출석·미션·오늘의 판·무한·뽑기·시즌)는 좌우 아이콘 열로 빼고
+    // 가운데는 「다음에 갈 스테이지」가 주인공, 아래는 큰 [전투] 하나.
     const dk = this.cb.dailyClock ? this.cb.dailyClock() : null;
-    const done = dk && m.dailyPlayed(dk.date);
-    $('menuDaily').classList.toggle('locked', !dk);
-    const clockNote = dk && dk.src === 'p' ? ' · <span class="clock">폰 날짜로 판단하는 중</span>' : '';
-    $('menuDaily').innerHTML = dk ? `<span>${SVG.calendar} 오늘의 판 · ${esc(dk.label)}</span><span class="sub">${done ? (m.dailyResult(dk.date).done ? `오늘은 했어요 — 웨이브 ${m.dailyResult(dk.date).wave}` : '오늘 판은 시작했다가 끊겼어요 — 내일 새 판') : '매일 새 지도 · 강화 없이 같은 조건 · 하루 한 번'}${clockNote}</span>` : `<span>${SVG.lock} 오늘의 판</span><span class="sub">준비 중</span>`;
     this.a2hsBanner();
-    this.lobbyDay(dk);
-    this.renderLobbySheet(dk);
+    this.lobbyDay(dk);            // 날짜 정리가 먼저 — 출석 도장·미션이 여기서 갱신된다
+    this.renderLobbyCenter();
+    this.renderGates(dk);
     this.showTabs('battle');
     this.cb.onMenu(true);
   }
@@ -159,22 +181,104 @@ NGN.UI = class UI {
     else if (r.attended) { this.toast(`출석 ${r.attended.streak}일째 — 뽑기 티켓 +${r.attended.reward}장`); NGN.sound && NGN.sound.play('gold'); }
     if (r.attended || r.paidLate || r.seasonRolled) $('menuTickets').innerHTML = `${SVG.ticket}<span class="num">${this.meta.state.tickets}</span>`;
   }
-  // 전투 탭 시트: 출석 도장 한 줄(7칸 사이클, 연속 끊겨도 잃는 것 없음) + 오늘의 미션 셋(진행 막대·[받기])
-  renderLobbySheet(dk) {
-    const m = this.meta, A = m.attendInfo();
-    const stamps = A.cycle.map((rw, i) => { const d = i + 1, done = A.day >= d, today = A.day === d; return `<span class="stamp ${done ? 'done' : ''} ${today ? 'today' : ''}"><b>${d}일</b><span>${done ? '✓' : ''}${SVG.ticket}${rw}</span></span>`; }).join('');
-    $('attendBox').innerHTML = `<div class="attend"><span class="lbl">출석<b>${A.streak}일째</b></span><span class="stamps">${stamps}</span></div>`;
+  // ---------- 로비 가운데: 다음에 갈 스테이지가 주인공 (checklist K-2-9) ----------
+  renderLobbyCenter() {
+    const m = this.meta, next = m.nextStage();
+    if (!next) {                                   // 20개를 다 깼으면 월드맵으로 보낸다
+      $('lobbyStageNo').textContent = '모두 깼어요';
+      $('lobbyStageName').textContent = '월드맵';
+      $('lobbyStageStars').innerHTML = '';
+      $('menuPlay').innerHTML = `<span>${SVG.play} 월드맵</span>`;
+      return;
+    }
+    $('lobbyStageNo').textContent = `스테이지 ${next.id}`;
+    $('lobbyStageName').textContent = next.name;
+    // 별은 난이도별로 따로(보통=금 · 어려움=붉은) — 이 스테이지에서 딴 것만 보여준다
+    $('lobbyStageStars').innerHTML = m.diffList().map((d) => `<span class="srow">${NGN.starsRow(d, m.starsFor(next.id, d))}</span>`).join('');
+    $('menuPlay').innerHTML = `<span>${SVG.play} 전투</span>`;
+  }
+  // ---------- 로비 좌우 아이콘 열 (checklist K-2-9) ----------
+  // 빨간 점 = 지금 받을 게 있다 · 배지 = 상태 한 조각(연속 일수·오늘 진행·최고 기록). 잠긴 것은 회색.
+  renderGates(dk) {
+    const m = this.meta;
+    const put = (id, icon, name, o = {}) => {
+      const el = $(id); if (!el) return;
+      el.classList.toggle('locked', !!o.locked);
+      el.innerHTML = `${icon}<span class="gnm">${esc(name)}</span>`
+        + (o.dot ? '<span class="dot"></span>' : '')
+        + (o.badge ? `<span class="badge">${esc(o.badge)}</span>` : '');
+    };
+    // 「일일」 하나에 출석과 미션이 함께 들어간다 — 둘 다 매일 받는 것이라 한 페이지가 이치에 맞고, 아이콘도 하나로 줄었다
     const M = m.missions();
-    if (!M || !dk) { $('missionBox').innerHTML = '<div class="mission-head">오늘의 미션 <small>날짜를 정하는 중…</small></div>'; return; }
-    const R = m.missionRules();
-    const allDone = M.list.length && M.list.every((x) => x.done), allClaimed = M.list.length && M.list.every((x) => x.claimed);
-    const rows = M.list.map((x, i) => {
-      const pct = Math.min(100, Math.round((x.n || 0) / x.goal * 100));
-      const right = x.claimed ? '<span class="ok">받음</span>' : x.done ? `<button class="btn green tiny" data-claim="${i}">받기 ${SVG.ticket}${x.reward}</button>` : `<span class="rw">${SVG.ticket}${x.reward}</span>`;
-      return `<div class="mission ${x.done ? 'done' : ''}"><span class="nm">${esc(x.name)}<span class="prog"> ${Math.min(x.n || 0, x.goal)}/${x.goal}</span><span class="bar"><span style="width:${pct}%"></span></span></span>${right}</div>`;
+    const doneN = M ? M.list.filter((x) => x.done).length : 0;
+    put('gateMission', SVG.scroll, '일일', { dot: m.missionUnclaimed() > 0, badge: M ? `미션 ${doneN}/${M.list.length}` : null });
+    const played = dk && m.dailyPlayed(dk.date);
+    put('gateDaily', SVG.calendar, '오늘의 판', { locked: !dk, badge: dk ? (played ? '오늘 완료' : dk.label) : '준비 중' });
+    const inf = m.infiniteUnlocked(), b = m.state.best;
+    put('gateInfinite', inf ? SVG.infinity : SVG.lock, '무한', { locked: !inf, badge: inf ? (b ? `최고 ${b.wave}` : '기록 없음') : `${this.data.stages.infiniteUnlockStage} 깨면` });
+    const tk = m.state.tickets, pp = m.state.premiumPulls || 0;
+    put('gateGacha', SVG.ticket, '뽑기', { dot: tk > 0 || pp > 0, badge: tk ? `${tk}장` : null });
+    put('gateSeason', SVG.trophy, '시즌', { dot: !!m.seasonUnseen() });
+  }
+
+  // ---------- 출석 칸 (전용 페이지 「일일」의 아래 절반) ----------
+  // 로비에 끼워 넣던 36px 짜리 작은 칸 일곱을 78px 카드로 키웠다(K-2-9 다섯째).
+  // 처음엔 출석만 따로 페이지를 뒀는데, 미션이 하루 3개뿐이라 미션 쪽 화면 아래 60%가 비었다 →
+  // 둘 다 「매일 받는 것」이라 한 페이지에 합쳤다(2026-09-07).
+  attendHtml() {
+    const A = this.meta.attendInfo();
+    const cells = A.cycle.map((rw, i) => {
+      const d = i + 1, done = A.day >= d, today = A.day === d;
+      return `<div class="astamp ${done ? 'done' : ''} ${today ? 'today' : ''}"><b>${d}일째</b><span class="tk">${SVG.ticket}${rw}장</span>${done ? `<span class="chk">${SVG.check}</span>` : ''}</div>`;
     }).join('');
-    const bonus = R.allClearBonus ? `<div class="mission ${allDone ? 'done' : ''}"><span class="nm">셋 다 하면 보너스</span>${M.bonusClaimed ? '<span class="ok">받음</span>' : allClaimed ? '<span class="ok">받음</span>' : `<span class="rw">${SVG.ticket}${R.allClearBonus}</span>`}</div>` : '';
-    $('missionBox').innerHTML = `<div class="mission-head">오늘의 미션 <small>${esc(dk.label)} · 자정에 새로 · 밀리지 않아요</small></div>${rows}${bonus}`;
+    return `<div class="sec-head">${SVG.check} 출석 <small>지금 ${A.streak}일째 · 이레를 돌면 다시 1일째부터</small></div>
+      <div class="panel cx-wheel"><div class="astamps">${cells}</div></div>
+      <div class="panel cx-note small">로비에 들어오면 그날 도장이 저절로 찍혀요. <b>못 온 날의 벌칙은 없어요</b> — 보너스 칸을 다시 걸어갈 뿐이에요.</div>`;
+  }
+
+  // ---------- 전용 페이지 「일일」 = 오늘의 미션 + 출석 (checklist K-2-9·11) ----------
+  // 참고 그림의 「구조」만 배웠다(그림·색·글꼴은 우리 것): 위에 누적 진행바, 각 줄은
+  // [보상 배지] [제목 + 채워지는 막대] [받기(초록) / 이동(금색)]. 전에는 높이 30px 짜리 글자 줄이었다.
+  showMissions() { this.hideAll(); $('missionScreen').hidden = false; this.renderMissions(); this.showTabs('battle'); this.cb.onMenu(true); }
+  // 「이동」이 데려갈 곳: 뽑기·무한만 따로고 나머지는 전부 판을 해야 오르는 미션이라 로비로 보낸다
+  missionGo(type) {
+    if (type === 'pull') { this.showUpgrade(); const b = document.querySelector('#upgradeScreen .grow-gacha .btn'); if (b && !b.disabled) b.click(); return; }
+    if (type === 'infinite' && this.meta.infiniteUnlocked()) { this.showMapScreen(); return; }
+    this.showMenu();
+  }
+  renderMissions() {
+    const m = this.meta, M = m.missions(), R = m.missionRules();
+    const dk = this.cb.dailyClock ? this.cb.dailyClock() : null;
+    $('missionSub').textContent = dk ? `${dk.label} · 자정에 새로 · 밀리지 않아요` : '날짜를 정하는 중…';
+    if (!M) { $('missionBody').innerHTML = `<div class="panel cx-note">오늘 날짜를 정하는 중이에요.</div>${this.attendHtml()}`; return; }
+    const list = M.list, n = list.length;
+    const doneN = list.filter((x) => x.done).length;
+    const allDone = n > 0 && doneN === n;
+    const allClaimed = n > 0 && list.every((x) => x.claimed);
+    // 누적 진행바: 미션을 깰 때마다 한 칸 차오르고, 마지막 칸에서 보너스 상자가 열린다
+    const stops = list.map((x) => `<span class="stop ${x.done ? 'on' : ''}"><span class="box">${SVG.ticket}</span>${x.reward}장</span>`).join('')
+      + (R.allClearBonus ? `<span class="stop ${allDone ? 'on' : ''}"><span class="box">${SVG.gift}</span>${R.allClearBonus}장</span>` : '');
+    const nStop = n + (R.allClearBonus ? 1 : 0);
+    const pctAll = nStop > 1 ? Math.round(doneN / (nStop - 1) * 100) : 0;
+    const rows = list.map((x, i) => {
+      const got = Math.min(x.n || 0, x.goal);
+      const pct = Math.min(100, Math.round(got / x.goal * 100));
+      const right = x.claimed ? `<span class="mbtn ok">${SVG.check} 받음</span>`
+        : x.done ? `<button class="btn green mbtn" data-claim="${i}">받기</button>`
+                 : `<button class="btn gold mbtn" data-go="${esc(x.type || '')}">이동</button>`;
+      return `<div class="mission ${x.done ? 'done' : ''} ${x.claimed ? 'claimed' : ''}">
+        <span class="mrw">${SVG.ticket}<b>${x.reward}</b></span>
+        <span class="mbody"><b class="nm">${esc(x.name)}</b><span class="bar"><span class="fill" style="width:${pct}%"></span><span class="pct">${got}/${x.goal}</span></span></span>
+        ${right}</div>`;
+    }).join('');
+    const bonusPct = n ? Math.round(doneN / n * 100) : 0;
+    const bonus = R.allClearBonus ? `<div class="mission bonus ${allDone ? 'done' : ''}">
+        <span class="mrw">${SVG.gift}<b>${R.allClearBonus}</b></span>
+        <span class="mbody"><b class="nm">셋 다 하면 보너스</b><span class="bar"><span class="fill" style="width:${bonusPct}%"></span><span class="pct">${doneN}/${n}</span></span></span>
+        <span class="mbtn ok">${M.bonusClaimed || allClaimed ? `${SVG.check} 받음` : '자동'}</span></div>` : '';
+    $('missionBody').innerHTML = `<div class="sec-head">${SVG.scroll} 오늘의 미션 <small>하루 ${n}개 · 셋 다 하면 보너스</small></div>
+      <div class="panel mprog"><span class="track"><span class="fill" style="width:${pctAll}%"></span></span><span class="stops">${stops}</span></div>${rows}${bonus}
+      ${this.attendHtml()}`;
   }
   // 저장 지킴이(I-12): 아이폰 사파리는 7일 안 들어오면 저장을 통째로 지운다. 홈 화면에 추가한 웹앱은 면제(애플 공식). 홈 화면 앱이 아니면 첫 화면에 안내
   isStandalone() { return (navigator.standalone === true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
@@ -593,7 +697,7 @@ NGN.UI = class UI {
     on('.sellNo', () => { this.popSell = false; this.renderPop(); });
     on('.more', () => { this.popDetail = !this.popDetail; this.renderPop(); });
     on('.close', () => this.clearSelection());
-    pop.querySelectorAll('.islot.empty').forEach((b) => b.addEventListener('click', () => { if (!g.inventory.length) { this.toast('가방이 비었다 — 적을 잡으면 떨어진다'); return; } this.popBag = true; this.renderPop(); }));
+    pop.querySelectorAll('.islot.empty').forEach((b) => b.addEventListener('click', () => { if (!g.inventory.length) { this.toast('가방이 비었어요 — 적을 잡으면 떨어져요'); return; } this.popBag = true; this.renderPop(); }));
     pop.querySelectorAll('.islot[data-uid]').forEach((b) => b.addEventListener('click', () => this.cb.onUnequip(inst, Number(b.dataset.uid))));
     pop.querySelectorAll('.islot[data-bag]').forEach((b) => b.addEventListener('click', () => { this.popBag = false; this.cb.onEquip(inst, Number(b.dataset.bag)); }));
     pop.querySelectorAll('.islot[data-bagclose]').forEach((b) => b.addEventListener('click', () => { this.popBag = false; this.renderPop(); }));

@@ -1,7 +1,7 @@
 'use strict';
 // 뽑기 화면과 이펙트(2026-09-06 개편, design.md 12-13 — 주력 상품이 새 타워 계열). 에셋 없이 CSS 로 — 카드 뒤집기·등급 색 빛 번짐·파티클 폭발.
 // 등급이 오를수록 화려하게: 흔함 = 조용히 · 고급 = 파란 폭발 · 희귀 = 보라 폭발 + 짧은 흔들림 · 전설 = 화면 흔들림 + 금빛 플래시 + 광선 + "전설!" 배너 + 그 타워의 3D 모형이 카드 안에서 돈다.
-// 결과 카드에 그 타워가 어떤 것인지(이름·속성·역할·3단 성능·설명)를 같이 보여 준다 — 조카가 "뭐 나왔어?"를 바로 알 수 있게.
+// 결과 카드는 「뭐가 나왔나」만 말한다(이름·속성·역할·새것 여부). 자세한 수치·설명은 도감에 있다 — 같은 말을 두 번 하지 않는다(K-2-14).
 // 규칙(확률·천장·풀)은 data/gacha.json, 굴리기·저장은 meta.js. 여기는 보여주는 것만.
 window.NGN = window.NGN || {};
 
@@ -34,17 +34,20 @@ NGN.GachaUI = class GachaUI {
     $g('pullBtn').disabled = s.tickets < 1 || this.busy;
     $g('pull10Btn').disabled = s.tickets < 10 || this.busy;
     const pb = $g('pullPremiumBtn'); if (pb) { pb.hidden = !(s.premiumPulls > 0); pb.disabled = this.busy; pb.innerHTML = `프리미엄 팩 <span class="num">${s.premiumPulls || 0}</span>회`; }
+    // 천장·확률 (checklist K-2-14): 전에는 두 줄(문장 한 줄 + 확률 칩 넉 줄)이었다.
+    // 확률은 「봐야 할 때만」 보면 되는 정보라 [확률] 을 눌러야 펼쳐지게 접었다(점진적 공개).
     const toLeg = G.pity.pityLegendary - s.sinceLegendary, toRare = G.pity.pityRare - s.sinceRare;
-    $g('pityInfo').innerHTML = `<span class="pity"><b style="color:${GRADE_COLOR.legendary}">전설</b> 확정까지 <b>${toLeg}</b>번 · <b style="color:${GRADE_COLOR.rare}">희귀</b> 확정까지 <b>${toRare}</b>번</span>`
-      + `<span class="rates">${['common', 'uncommon', 'rare', 'legendary'].map((g) => `<span class="gtag" style="background:${GRADE_COLOR[g]}">${GRADE_KO[g]} ${R[g]}%</span>`).join('')}</span>`;
+    $g('pityInfo').innerHTML = `<span class="pity"><b style="color:${GRADE_COLOR.legendary}">전설</b> <b>${toLeg}</b>번 · <b style="color:${GRADE_COLOR.rare}">희귀</b> <b>${toRare}</b>번 안에 확정</span>`
+      + `<details class="rates"><summary>확률</summary><span class="rlist">${['common', 'uncommon', 'rare', 'legendary'].map((g) => `<span class="gtag" style="background:${GRADE_COLOR[g]}">${GRADE_KO[g]} ${R[g]}%</span>`).join('')}</span></details>`;
+    // 아래 요약: 전에는 「타워 6/30계열 · 지금까지 6번 뽑음」 + 「내 강화 · … · … · …」 두 줄이 글자 범벅이었다(사장님 실기기 캡처).
+    // 🛑 강화 목록은 「강화」 탭에 이미 있다 — 같은 말을 두 번 하지 않는다. 여기는 숫자 두 칸만 남긴다.
     const owned = this.meta.unlockedFamilies().length, all = this.data.families.length;
-    const sum = this.meta.summary(NGN.FAMILY_NAMES);
-    $g('perkSummary').innerHTML = `<b>타워 ${owned}/${all}계열</b> · 지금까지 ${s.pulls}번 뽑음` + (sum.length ? `<br><b>내 강화</b> · ${sum.map(escG).join(' · ')}` : '<br><span class="dim">아직 강화 없음 — 뽑으면 여기에 쌓인다</span>');
+    $g('perkSummary').innerHTML = `<span class="pchip">타워 <b>${owned}</b>/${all}</span><span class="pchip">뽑은 횟수 <b>${s.pulls}</b></span>`;
   }
   resetCard() {
     const card = $g('gachaCard');
     card.className = 'card3d';
-    for (const k of ['grade', 'name', 'tags', 'badge', 'tiers', 'desc']) card.querySelector('.front .' + k).innerHTML = '';
+    for (const k of ['grade', 'name', 'tags', 'badge']) card.querySelector('.front .' + k).innerHTML = '';
     card.querySelector('.front .art').innerHTML = '';
     card.style.removeProperty('--grade');
     $g('gachaBurst').innerHTML = '';
@@ -62,7 +65,6 @@ NGN.GachaUI = class GachaUI {
       if (!it) break;
       items.push(it);
       await this.reveal(it, n > 1 ? (it.grade === 'legendary' ? 1600 : 700) : (it.grade === 'legendary' ? 2400 : 1300));
-      this.log(it);
       this.refresh(); // 티켓 수·천장까지 남은 횟수를 카드마다 갱신
       if (i < n - 1) await this.sleep(n > 1 ? 220 : 400);
     }
@@ -71,10 +73,43 @@ NGN.GachaUI = class GachaUI {
       await this.sleep(200);
       await this.reveal(best, 1400, true);
     }
+    this.renderResults(items);
     this.busy = false; this.refresh(); this.onChange();
   }
 
-  // 카드 앞면 채우기: 타워면 그림(3단) + 이름 + 속성·역할 칩 + 새 타워/레벨 + 3단 성능 + 설명, 숫자 상품이면 이름만
+  // 이번에 뽑은 것 목록 (checklist K-2-14) — 한 줄에 한 상품, 같은 것은 묶어서 「×2」.
+  // 🛑 전에는 뽑을 때마다 한 줄씩 쌓아 「모든 타워 사거리 +1%」가 두 줄로 따로 나왔고,
+  //    새 타워는 카드 배지 + "새 타워: 이름" + 초록 "새 타워" 로 같은 말을 세 번 했다(사장님 실기기 캡처).
+  //    이제 이름은 한 번만 적고, 새것은 초록 「새」 배지 하나로만 알린다.
+  renderResults(items) {
+    const host = $g('gachaLog');
+    host.innerHTML = '';
+    if (!items || !items.length) return;
+    const map = new Map();
+    for (const it of items) {
+      const key = it.kind + '|' + it.grade + '|' + (it.family || it.name);
+      const cur = map.get(key);
+      if (cur) { cur.n++; if (it.isNew) cur.isNew = true; } else map.set(key, { it, n: 1, isNew: !!it.isNew });
+    }
+    // 좋은 것부터 위로 — 뭘 건졌는지 한눈에
+    const rows = [...map.values()].sort((a, b) => GRADE_RANK[b.it.grade] - GRADE_RANK[a.it.grade] || (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+    for (const r of rows) {
+      const it = r.it;
+      const name = it.kind === 'tower' ? (NGN.FAMILY_NAMES && NGN.FAMILY_NAMES[it.family]) || it.name : it.name;
+      const li = document.createElement('div');
+      li.className = 'glog g-' + it.grade + (r.isNew ? ' isnew' : '');
+      li.innerHTML = `<span class="gtag" style="background:${GRADE_COLOR[it.grade]}">${GRADE_KO[it.grade]}</span>`
+        + `<span class="gnm">${escG(name)}</span>`
+        + (r.n > 1 ? `<span class="gx">×${r.n}</span>` : '')
+        // 🛑 새것 표시에 별을 쓰지 않는다 — 별은 이미 「스테이지 별」이라 뜻이 겹친다.
+        //    우리가 새로 만든 그림은 조카가 처음 보는 것이라 통하지 않는다(아이콘 조사 결론) → 짧은 글자 배지로 남긴다.
+        + (r.isNew ? '<span class="gnew">새</span>' : '');
+      host.appendChild(li);
+    }
+  }
+
+  // 카드 앞면 채우기: 타워면 그림(3단) + 이름 + 속성·역할 칩 + 새 타워/레벨. 숫자 상품이면 이름만.
+  // 3단 성능표와 설명은 뺐다(K-2-14) — 도감에 이미 있고, 실기기에서 카드 밖으로 넘쳐 버튼에 가렸다
   fillFront(item) {
     const card = $g('gachaCard'), F = (k) => card.querySelector('.front .' + k);
     const color = GRADE_COLOR[item.grade];
@@ -87,9 +122,8 @@ NGN.GachaUI = class GachaUI {
       const elColor = '#' + (NGN.ELEMENT_COLOR[t1.element] || 0x888888).toString(16).padStart(6, '0');
       F('name').textContent = t1.familyName;
       F('tags').innerHTML = `<span class="spc" style="background:${elColor}">${escG(t1.elementKo)}</span><span class="spc" style="background:#5C666D">${escG(this.data.roleKo[t1.role] || t1.role)}${t1.attackType ? ' · ' + escG(NGN.ATTACK_KO[t1.attackType]) : ''}</span>`;
+      // 「새것」은 카드에서 한 번만 말한다 — 아래 목록에서는 작은 「새」 배지로만 알린다(K-2-14: 같은 말을 두 번 하지 않는다)
       F('badge').innerHTML = item.isNew ? `<span class="new">새 타워!</span>` : `<span class="lvup">Lv.${item.level} · 피해 +${Math.round(item.level * (this.data.gacha.towerPool.dupLevelDmg || 0) * 100)}%</span>`;
-      F('tiers').innerHTML = tiers.map((t) => `<span><b>${t.tier}단</b> ${t.attackType ? `초당 ${Math.round(t.dps)}` : `주변 +${Math.round(t.aura.damageBonus * 100)}%`}</span>`).join('');
-      F('desc').textContent = t1.desc || '';
       // 그림: 전설은 돌아가는 3D 모형(3단), 나머지는 3단 카드 그림
       const host = F('art');
       let live = false;
@@ -98,7 +132,7 @@ NGN.GachaUI = class GachaUI {
     } else {
       F('name').textContent = item.name;
       F('tags').innerHTML = `<span class="spc" style="background:#5C666D">강화</span>`;
-      F('badge').innerHTML = ''; F('tiers').innerHTML = ''; F('desc').textContent = '모든 판에 늘 적용된다';
+      F('badge').innerHTML = '';
       F('art').innerHTML = NGN.SVG ? `<span class="ro">${NGN.SVG.tree.attack}</span>` : '';
     }
   }

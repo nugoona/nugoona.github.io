@@ -280,10 +280,11 @@ NGN.Meta = class Meta {
   dailySettle(date, result, src = 's') {
     const D = this.stages.daily; const lines = [];
     this.state.games++;
-    // 오늘의 판 = 티켓 D.tickets(데이터 담당이 3 으로 맞춤, 2026-09-06), 깨면 +2(2차 밸런스 설계 — 강화가 안 통하는 유일한 판 = 뒤처진 아이의 무대. 클리어 보너스는 stages.json 에 칸이 없어 상수)
+    // 오늘의 판 = 티켓 D.tickets(데이터 담당이 3 으로 맞춤, 2026-09-06), 깨면 +2(2차 밸런스 설계 — 강화가 안 통하는 유일한 판 = 뒤처진 아이의 무대. 클리어 보너스도 stages.json daily.clearBonus 에서 읽는다 — 2026-09-07 상수에서 데이터로 옮김)
     const base = D.tickets || 0;
     if (base > 0) { this.state.tickets += base; lines.push({ n: base, why: '오늘의 판' }); }
-    if (result.cleared) { this.state.tickets += NGN.DAILY_CLEAR_BONUS; lines.push({ n: NGN.DAILY_CLEAR_BONUS, why: '오늘의 판 클리어' }); }
+    const bonus = D.clearBonus === undefined ? NGN.DAILY_CLEAR_BONUS : D.clearBonus;
+    if (result.cleared && bonus > 0) { this.state.tickets += bonus; lines.push({ n: bonus, why: '오늘의 판 클리어' }); }
     this.state.daily[date] = { done: true, wave: result.wave, lives: result.lives, spent: Math.round(result.spent), cleared: result.cleared ? 1 : 0, src };
     this.seasonAdd('daily', result.wave, result.cleared); this.missionProgress('daily', 1);
     const rec = this.addRecord({ m: 'd', k: date, d: null, w: result.wave, l: result.cleared ? result.lives : 0, g: result.cleared ? Math.round(result.spent) : null, c: result.cleared ? 1 : 0, cs: src });
@@ -567,4 +568,4 @@ NGN.Meta = class Meta {
   codexMarkSeen() { const s = new Set(this.state.codexSeen || []); let changed = false; for (const f of this.unlockedFamilies()) if (!s.has(f)) { s.add(f); changed = true; } if (changed) { this.state.codexSeen = [...s]; this.save(); } }
 };
 NGN.GRADES = ['common', 'uncommon', 'rare', 'legendary'];
-NGN.DAILY_CLEAR_BONUS = 2; // 오늘의 판 클리어 보너스 — stages.json daily 에 칸이 생기면 그것을 읽게
+NGN.DAILY_CLEAR_BONUS = 2; // 옛 데이터에 clearBonus 칸이 없을 때만 쓰는 대비값. 정본은 stages.json daily.clearBonus (2026-09-07)

@@ -12,13 +12,31 @@ const isNode = typeof module !== 'undefined' && module.exports;
 // 안 그러면 20판이 전부 "기본·기본·기본·빠른·보스·떼거리·단단한·공중" 으로 시작해 같은 판이 된다(실측).
 // 같은 스테이지는 언제나 같은 순서다(번호가 곧 씨앗) — 그래야 다시 해도 같은 판이고 기록 비교가 된다.
 // 지키는 규칙 셋: (1)첫 3웨이브는 기본(튜토리얼) (2)보스는 5의 배수 그대로(리듬) (3)종류마다 최소 한 번은 나온다
+// 보스가 나오는 웨이브 목록. 기본은 bossEvery(5)의 배수인데, **마지막 웨이브는 언제나 보스**다.
+//   왜: 판 길이가 8·12·16 이라 5의 배수만 쓰면 보스가 5·10·15 에서 끝나고 뒤에 잡몹 웨이브가 1~3개 더 남는다.
+//   그러면 보스를 잡고도 판이 안 끝나 김이 샌다(사장님 지적 2026-09-07: "왜 보스가 마지막에 안 나와?").
+//   실측(고치기 전): 스테이지 20개 중 14개가 그랬다 — 8웨이브 4판·12웨이브 5판·16웨이브 5판.
+//   🔴 마지막 보스와 붙으면(간격 2 미만) 앞의 것을 뺀다 — 16웨이브에서 15·16 연속 보스가 되는 것을 막는다.
+function bossWavesFor(waveCount, T) {
+  const every = T.bossEvery, out = [];
+  for (let w = every; w <= waveCount; w += every) out.push(w);
+  if (out[out.length - 1] !== waveCount) {
+    while (out.length && waveCount - out[out.length - 1] < 2) out.pop();
+    out.push(waveCount);
+  }
+  return out;
+}
+// 이 웨이브가 보스인가. bossWaves 가 있으면 그 목록, 없으면 옛 규칙(5의 배수 — 무한 모드는 끝이 없어 목록을 못 만든다)
+function isBossWave(w, T) { return T.bossWaves ? T.bossWaves.indexOf(w) >= 0 : w % T.bossEvery === 0; }
+
 function kindsForStage(stageId, waveCount, balance) {
   const T = balance.waveTemplate;
   const kinds = Object.keys(T.kinds).filter((k) => k.charAt(0) !== '_'); // _설명 같은 주석 키는 뺀다
   const out = {}; for (const k of kinds) out[k] = [];
 
   const slots = [];
-  for (let w = T.defenseCycle.tutorial.length + 1; w <= waveCount; w++) if (w % T.bossEvery !== 0) slots.push(w);
+  const bosses = bossWavesFor(waveCount, T);
+  for (let w = T.defenseCycle.tutorial.length + 1; w <= waveCount; w++) if (bosses.indexOf(w) < 0) slots.push(w);
 
   const quota = kinds.map((k) => Math.max(1, Math.round(T.kinds[k].length / balance.waveCount * waveCount)));
   let sum = quota.reduce((a, b) => a + b, 0);
@@ -40,8 +58,9 @@ function balanceForStage(stageId, waveCount, balance) {
   // 처음 세 판은 섞지 않는다 — 배우는 구간이라 순서가 정해져 있어야 한다.
   // (섞으면 첫 판 4웨이브에 공중이 나와 대공 타워를 모르는 조카가 그냥 막힌다)
   const b = Object.assign({}, balance, { _stageId: stageId }); // 번호는 성질(special)을 정할 때도 쓴다
-  if (stageId <= 3) return b;
-  b.waveTemplate = Object.assign({}, balance.waveTemplate, { kinds: kindsForStage(stageId, waveCount, balance) });
+  const bossWaves = bossWavesFor(waveCount, balance.waveTemplate); // 마지막 웨이브를 보스로 — 스테이지 1~3 도 마찬가지다
+  if (stageId <= 3) { b.waveTemplate = Object.assign({}, balance.waveTemplate, { bossWaves }); return b; }
+  b.waveTemplate = Object.assign({}, balance.waveTemplate, { bossWaves, kinds: kindsForStage(stageId, waveCount, balance) });
   return b;
 }
 
@@ -65,7 +84,7 @@ function chanceAt(table, progress) {
 function specialForWave(seed, w, kind, specials, balance, progress) {
   if (!specials || !seed || progress === null || progress === undefined) return null;
   const T = balance.waveTemplate;
-  if (w <= T.defenseCycle.tutorial.length || w % T.bossEvery === 0) return null;
+  if (w <= T.defenseCycle.tutorial.length || isBossWave(w, T)) return null;
   const chance = chanceAt(specials.chanceByProgress || {}, progress);
   let s = (Math.imul(seed, 2246822519) ^ Math.imul(w, 3266489917) ^ 0x9e3779b9) >>> 0;
   const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
@@ -110,7 +129,7 @@ function waveFor(w, balance, enemiesDef) {
 
   // 1) 이 웨이브의 주인공 적 종류. 표에 적힌 번호 뒤(31~)는 표의 마지막 주기(5웨이브 단위)를 반복한다.
   let kind = 'basic';
-  if (w % T.bossEvery === 0) kind = 'boss';
+  if (isBossWave(w, T)) kind = 'boss';
   else {
     for (const k of Object.keys(T.kinds)) if (T.kinds[k].includes(w)) kind = k;
     if (kind === 'basic' && w > balance.waveCount) {

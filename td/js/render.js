@@ -149,6 +149,10 @@ NGN.Renderer = class Renderer {
     this.outlineMat = (c) => this.cachedMat('outline', c, () => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).lerp(new THREE.Color(0xFFFFFF), 0.18), side: THREE.BackSide, depthWrite: false }));
     this.glowTex = null;
     this.foeMat = { basic: lam(0x7B3FB5), fast: lam(0xE8A23A), tank: lam(0x3F5566), swarm: lam(0x5FA85A), flyer: lam(0xE6E1D3), boss: lam(0x8B1E2B) };
+    // 맞는 순간 적을 흰색으로 번쩍이게 하는 재질(K-2-15). 적들은 재질 하나를 나눠 쓰므로 색을 직접 못 바꾼다 —
+    // 맞은 적의 메시만 잠깐 이 재질로 바꿨다가 되돌린다. skinning 을 켜야 뼈 셰이더가 붙는다(r128)
+    this.foeHitMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, skinning: true });
+    this.hitStop = 0; this.hitStopAt = -9;
     this.defMat = {};
     for (const k of Object.keys(NGN.DEFENSE_COLOR)) this.defMat[k] = glow(NGN.DEFENSE_COLOR[k], { emissiveIntensity: 0.35 });
     this.rangeRing = null; this.time = 0;
@@ -279,6 +283,8 @@ NGN.Renderer = class Renderer {
     if (level >= 1 || branch) { const b = this.levelBadge(level + 1, branch); b.position.y = u.height + 0.9; g.add(b); u.badge = b; }
   }
   syncTowers(game) {
+    // 로비 모드(K-2-8): 판이 없을 때는 지도를 통째로 숨기고 표지만 보인다. 메뉴에서 넘어오는 가짜 판은 { towersBuilt: [], enemies: [], events: [] } 뿐이라 slots 가 없다(main.js 프레임 루프)
+    if (this.world.setLobbyMode) this.world.setLobbyMode(!game.slots);
     const seen = new Set();
     for (const inst of game.towersBuilt) {
       seen.add(inst.id);
@@ -344,17 +350,32 @@ NGN.Renderer = class Renderer {
     const ringColor = NGN.DEFENSE_COLOR[e.defense] || 0xFFFFFF;
     const spColor = e.special && this.specialColor[e.special] !== undefined ? this.specialColor[e.special] : null;
     if (kBody && (e.kind === 'swarm' || e.kind === 'fast' || e.kind === 'flyer')) kBody.userData.mesh.castShadow = false; // 작은 적 그림자 없음 — 떼거리 40마리가 그림자 패스를 40회 더 먹는다
-    // 적 성질(checklist I-8): 몸에 소품(갑옷=둥근 방패 · 중갑=네모 방패 · 부활=깃발). 파티클은 syncEnemies 가 성질별로
-    if (e.special && kBody && this.models && this.data.kenneyParts.specialProps && this.data.kenneyParts.specialProps[e.special]) {
-      const P = this.data.kenneyParts.specialProps[e.special]; const prop = this.models.enemyProp(P);
-      // 소품은 몸 크기에 맞춰 옆구리(방패)·등 뒤(깃발)에. 뼈에 매달지 않고 몸통 그룹에 고정 — 종류마다 뼈 위치가 달라 뼈 기준으로는 코끼리 몸속에 파묻혔다(실측)
-      if (prop) { const T = this.models.enemyTemplate(e.kind), sz = T.size, ph = this.models.size(P.p); const k = (sz.y * (P.h || 0.6)) / Math.max(1e-3, ph.y); prop.scale.setScalar(k); prop.position.set(sz.x * (P.x === undefined ? 0.6 : P.x), sz.y * (P.y === undefined ? 0.5 : P.y), sz.z * (P.z || 0)); if (P.ry) prop.rotation.y = P.ry; kBody.userData.inner.add(prop); }
+    // 몸에 소품 매달기 — ⑴ 종류 고유(kenney_parts.enemies[kind].props: 보스 왕관·등 깃발, 오크 몽둥이) ⑵ 성질(specialProps: 갑옷=둥근 방패 · 중갑=네모 방패 · 부활=깃발).
+    // 둘 다 같은 칸(p·h·x·y·z·ry)을 쓴다 — 형식을 하나로 둔다. 파티클은 syncEnemies 가 성질별로.
+    if (kBody && this.models) {
+      const list = [];
+      if (Array.isArray(spec.props)) list.push(...spec.props);
+      const SP = this.data.kenneyParts && this.data.kenneyParts.specialProps;
+      if (e.special && SP && SP[e.special]) list.push(SP[e.special]);
+      for (const P of list) this.attachEnemyProp(kBody, e.kind, P);
     }
     // 보스 발밑 붉은 빛은 오버레이 인스턴스(syncEnemies)
-    g.userData = { barW: e.boss ? 2.4 : 1.2, barY: height + 0.45, rs, ringColor, spColor, bob: (e.id * 1.7) % 6.28, kind: e.kind, hitFlash: 0, fresh: true, mesh: kBody, body: kBody, height, motion: spec.motion || 'none', mixer: kBody ? kBody.userData.mixer : null, action: kBody ? kBody.userData.action : null, bones: kBody ? kBody.userData.bones : {}, fxAt: 0 };
+    // hitT·baseScale·baseMat·kb = 「맞는 순간 0.05초」에 쓰는 것들(K-2-15). baseScale 을 기억해 두어야 움찔이 매 프레임 제자리에서 다시 계산된다
+    g.userData = { barW: e.boss ? 2.4 : 1.2, barY: height + 0.45, rs, ringColor, spColor, bob: (e.id * 1.7) % 6.28, kind: e.kind, hitT: 0, baseScale: scale, baseMat: kBody ? kBody.userData.mesh.material : null, kb: null, fwd: null, fresh: true, mesh: kBody ? kBody.userData.mesh : null, body: kBody, height, motion: spec.motion || 'none', mixer: kBody ? kBody.userData.mixer : null, action: kBody ? kBody.userData.action : null, bones: kBody ? kBody.userData.bones : {}, fxAt: 0 };
     g.scale.setScalar(scale);
     if (e.boss && this.world.shake) this.world.shake(0.8); // 보스 등장: 땅이 울린다
     return g;
+  }
+  // 소품 하나를 적 몸에 고정. 크기는 몸 높이의 h 배(기본 0.6), 위치는 몸 크기 대비 비율(x·y·z).
+  // 🔴 뼈에 매달지 않고 몸통 그룹에 고정한다 — 종류마다 뼈 위치가 달라 뼈 기준으로는 코끼리 몸속에 파묻혔다(실측 2026-09-06)
+  attachEnemyProp(kBody, kind, P) {
+    const prop = this.models.enemyProp(P); if (!prop) return;
+    const T = this.models.enemyTemplate(kind); if (!T) return;
+    const sz = T.size, ph = this.models.size(P.p); if (!ph) return;
+    prop.scale.setScalar((sz.y * (P.h || 0.6)) / Math.max(1e-3, ph.y));
+    prop.position.set(sz.x * (P.x === undefined ? 0.6 : P.x), sz.y * (P.y === undefined ? 0.5 : P.y), sz.z * (P.z || 0));
+    if (P.ry) prop.rotation.y = P.ry;
+    kBody.userData.inner.add(prop);
   }
   // alpha = 다음 엔진 틱까지 얼마나 왔나(0~1). 직전 틱(px,py)과 현재 틱(x,y) 사이를 이어 그린다 — 엔진은 10Hz 지만 화면은 매 프레임 움직인다
   syncEnemies(game, now, alpha = 1, dt = 0) {
@@ -387,7 +408,10 @@ NGN.Renderer = class Renderer {
       // 회전: 진행 방향을 목표로 부드럽게(사원수 보간) + 동작 기울기
       const ahead = NGN.map.positionAt(e.path, e.s + 60);
       const q = this.world.toWorld(ahead[0], ahead[1], p.y);
-      if (q.distanceToSquared(p) > 1e-4) { this._tmpObj.position.copy(p); this._tmpObj.lookAt(q); g.quaternion.slerp(this._tmpObj.quaternion, u.fresh ? 1 : 0.18); u.fresh = false; }
+      if (q.distanceToSquared(p) > 1e-4) {
+        this._tmpObj.position.copy(p); this._tmpObj.lookAt(q); g.quaternion.slerp(this._tmpObj.quaternion, u.fresh ? 1 : 0.18); u.fresh = false;
+        (u.fwd = u.fwd || new THREE.Vector3()).copy(q).sub(p).setY(0).normalize(); // 넉백을 「뒤로」 밀 때 쓴다
+      }
       if (u.body) { u.body.rotation.z = roll; u.body.rotation.x = tilt; }
       const ratio = Math.max(0, e.hp / e.maxHp);
       // 오버레이: 발밑 방어 고리(+성질 고리) · 머리 위 체력 막대(초록→노랑→빨강)
@@ -409,8 +433,21 @@ NGN.Renderer = class Renderer {
         if (e.special === 'slippery') P.emit(p.clone().setY(p.y + u.height * 0.4), 1, 0x7FE0FF, { cell: c('dot'), size: 0.4, sizeEnd: 0.1, ttl: 0.5, speed: 0.8, up: 0.3, grav: 6, spread: 0.5 });
         if (e.boss) P.emit(p.clone().setY(p.y + 0.4), 2, 0xFF5030, { cell: c('fire'), size: 1.2, sizeEnd: 0.3, ttl: 0.6, speed: 1.2, up: 2.2, grav: -1, spread: 1.6 });
       }
-      // 맞으면 잠깐 움찔(작아졌다 돌아옴)
-      if (u.hitFlash > 0) { u.hitFlash -= 1 / 60; const s = g.scale.x; g.scale.setScalar(s * (1 - u.hitFlash * 0.25)); u.hitFlash = Math.max(0, u.hitFlash); g.scale.setScalar(s); }
+      // ── 맞는 순간 0.05초(K-2-15) ─────────────────────────────────────────
+      // 🔴 옛 코드는 크기를 줄인 **바로 다음 줄에서 원래대로 되돌려** 화면에 아무 변화도 안 나왔다(같은 프레임 안이라 보이지 않는다).
+      //    이제 기준 크기(baseScale)를 두고 매 프레임 거기서 다시 계산한다.
+      if (u.hitT > 0) {
+        u.hitT = Math.max(0, u.hitT - dt);
+        const k = u.hitT / 0.12;                       // 1 → 0
+        g.scale.setScalar(u.baseScale * (1 - k * 0.22)); // ⑴ 움찔: 22% 눌렸다 돌아온다
+        // ⑵ 넉백: 진행 방향 반대로 아주 살짝. 🛑 엔진의 적 위치(e.s)는 안 건드린다 — 보이는 메시만 민다
+        if (u.kb) g.position.addScaledVector(u.kb, k * 0.28); // 0.28 세계단위 ≈ 0.09칸
+        // ⑶ 흰 번쩍: 맞은 적만 흰 재질로 잠깐 바꾼다(적끼리 재질을 공유해서 색을 직접 못 바꾼다)
+        if (u.mesh) u.mesh.material = (k > 0.45 && this.foeHitMat) ? this.foeHitMat : (u.baseMat || u.mesh.material);
+      } else if (u.hitT === 0 && u.baseScale && g.scale.x !== u.baseScale) {
+        g.scale.setScalar(u.baseScale);
+        if (u.mesh && u.baseMat) u.mesh.material = u.baseMat;
+      }
       u.lastPos = p;
       if (e.s > e.path.length * 0.82) danger = true; // 성 가까이 온 적 — 화면 가장자리 경고
     }
@@ -467,16 +504,28 @@ NGN.Renderer = class Renderer {
         this.bolt(from, to);
         this.particles.emit(to, 5, 0xBFE8FF, { speed: 2, up: 2, ttl: 0.4, grav: 4 });
       } else if (ev.type === 'hit') {
-        const g = this.enemyMeshes.get(ev.enemy.id); if (g) g.userData.hitFlash = 1;
         const big = ev.dmg >= ev.enemy.maxHp * 0.12;
+        const g = this.enemyMeshes.get(ev.enemy.id);
+        if (g) {
+          const u = g.userData;
+          u.hitT = 0.12;                                                  // 움찔·흰 번쩍·넉백이 도는 시간
+          if (u.fwd) (u.kb = u.kb || new THREE.Vector3()).copy(u.fwd).negate(); // 넉백은 진행 방향 반대(= 맞아서 뒤로 밀린다)
+        }
+        // 히트스톱은 **큰 타격에만** 아주 짧게. 🛑 잡몹 한 대마다 걸면 게임이 끊긴다 —
+        // 보스 피격이거나 최대 체력의 30% 를 한 방에 깎을 때만, 그리고 0.5초에 한 번을 넘지 않는다(동시 발동 상한)
+        if ((ev.enemy.boss || ev.dmg >= ev.enemy.maxHp * 0.30) && this.time - this.hitStopAt > 0.5) {
+          this.hitStopAt = this.time; this.hitStop = ev.enemy.boss ? 0.055 : 0.04;
+        }
         if ((big || this.floatBudget > 0) && ev.dmg >= 1 && this.floatQueue.length < 12) { this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: ev.enemy.flying ? 3.6 : 1.6, dmg: ev.dmg, big }); this.floatBudget--; }
       } else if (ev.type === 'kill') {
         const at = this.world.toWorld(ev.enemy.x, ev.enemy.y, ev.enemy.flying ? 3.2 : 0.9);
         this.particles.emit(at, ev.enemy.boss ? 60 : 16, ev.enemy.boss ? 0xFF6060 : 0xFFE9A8, { speed: ev.enemy.boss ? 6 : 3.5, up: 4, ttl: 0.8 });
+        // 처치 순간 아주 약한 화면 흔들림(K-2-15). 🛑 세게 하면 멀미가 난다 — 0.18 이고, 0.25초에 한 번을 넘지 않는다(떼거리가 한꺼번에 죽어도 안 흔들리게)
+        if (!ev.enemy.boss && this.world.shake && this.time - (this.killShakeAt || -9) > 0.25) { this.killShakeAt = this.time; this.world.shake(0.18); }
         // 골드가 튀어나온다(표준 TD): 금화 알갱이가 위로 튀고 "+N" 금색 글자. 새끼(분열)는 보상 0 이라 안 뜬다
         if (NGN.sound) { NGN.sound.play('kill'); if (ev.enemy.reward > 0) NGN.sound.play('gold', { delay: 0.06 }); }
         if (ev.enemy.reward > 0) { this.particles.emit(at, ev.enemy.boss ? 18 : 5, 0xFFD34D, { cell: this.cell('dot'), size: 0.55, sizeEnd: 0.25, speed: 2.2, up: 4.5, ttl: 0.7, grav: 12, spread: 0.3 }); if (this.floatQueue.length < 14) this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: ev.enemy.flying ? 4.2 : 2.4, text: '+' + Math.round(ev.enemy.reward), gold: true }); }
-        if (ev.enemy.boss) { if (NGN.sound) NGN.sound.play('bossKill'); this.bossExplosion(at); this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: 3.4, kill: true, text: '보스 처치!' }); if (this.onBossKill) this.onBossKill(ev.enemy); }
+        if (ev.enemy.boss) { if (NGN.sound) NGN.sound.play('bossKill'); this.bossExplosion(at); this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: 3.4, kill: true, text: '보스 처치!' }); if (this.onBossKill) this.onBossKill(ev.enemy); this.hitStopAt = this.time; this.hitStop = 0.09; } // 보스를 잡는 순간은 조금 더 길게 멎는다
       } else if (ev.type === 'leak') { // 적이 성에 닿았다: 성문에 폭발·불꽃·잔해, 성이 움찔, 화면 흔들림, 생명 알약(main.js onLeak)
         const g = this.enemyMeshes.get(ev.enemy.id); if (g) g.userData.leaked = true;
         this.castleHitFx(ev.enemy); if (NGN.sound) NGN.sound.play('castle');
@@ -600,6 +649,11 @@ NGN.Renderer = class Renderer {
     else P.emit(at, 6, hit, { speed: 2.5, up: 2, ttl: 0.35 });
   }
   update(dt, game, alpha = 1) {
+    // 히트스톱(K-2-15): 큰 타격 순간 화면이 아주 짧게 멎는다 — 「맞았다」가 손에 잡히는 핵심이다.
+    // 🛑 엔진은 안 멈춘다(main.js 가 따로 돌린다) — 여기서는 **보이는 것만** 멈춘다: 연출 시간(dt)을 0 으로,
+    //    적 위치 보간(alpha)을 직전 값으로 고정한다. 결정론(시뮬·기록 겨루기)에는 아무 영향이 없다.
+    if (this.hitStop > 0) { this.hitStop = Math.max(0, this.hitStop - dt); dt = 0; alpha = this._lastAlpha === undefined ? alpha : this._lastAlpha; }
+    else this._lastAlpha = alpha;
     this.time += dt;
     this.floatBudget = 2;
     // 투사체

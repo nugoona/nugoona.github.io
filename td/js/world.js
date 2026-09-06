@@ -19,7 +19,8 @@ NGN.SCALE = 1 / 100;
 // 전에는 길과 잔디의 명도가 거의 같았다(풀밭 흙길 0xA8814D vs 잔디 0x6BA34A · 눈은 둘 다 흰색). 테마마다 세 층의 밝기 차가 확실히 나게 골랐다
 NGN.C = {
   sky: 0x4A6B3F, fog: 0xB4D3DF,
-  grass: 0x7FA76A, grassAlt: 0x789F63, outer: 0x4A6B3F, outerAlt: 0x45643B, cliff: 0x8A7452,
+  // 잔디는 채도 있는 초록으로(2026-09-07) — 옛 색(0x7FA76A)은 회끼가 돌아 화면이 흐릿했다(사장님 "잔디 디테일이 떨어진다")
+  grass: 0x74B84A, grassAlt: 0x86C755, outer: 0x4A6B3F, outerAlt: 0x45643B, cliff: 0x8A7452,
   road: 0xF2EAD6, roadEdge: 0x4E3A22,
   stone: 0x8F8A80, stoneDark: 0x6B6760, slot: 0xFFFFFF, slotEdge: 0xE8C34A, slotHover: 0xFFE27A,
   wood: 0x7A5A3A, leaf: 0x437A2E, leafAlt: 0x356524, trunk: 0x6B4E33,
@@ -31,6 +32,30 @@ NGN.THEMES = {
   snow: { sky: 0x6C8293, fog: 0xD6E4EE, grass: 0xC4D2DB, grassAlt: 0xBECDD7, outer: 0x6C8293, outerAlt: 0x667C8D, cliff: 0x8FA3B4, road: 0xF7F9FB, roadEdge: 0x4E6274, leaf: 0x4F7A62, leafAlt: 0x3E6650, trunk: 0x5A4634, air: 0xFFFFFF, water: 0x8FC4E8 },
   desert: { sky: 0x8E6B3F, fog: 0xF0DCC0, grass: 0xD6B978, grassAlt: 0xD0B372, outer: 0x8E6B3F, outerAlt: 0x88663B, cliff: 0xA0562F, road: 0xFBF1D8, roadEdge: 0x6B4426, leaf: 0x7FA34A, leafAlt: 0x6B8E3C, trunk: 0x7A5A3A, air: 0xFFF3E0, water: 0x5FA8D8 },
   lava: { sky: 0x2A1F26, fog: 0x4A3038, grass: 0x6E5866, grassAlt: 0x695361, outer: 0x2A1F26, outerAlt: 0x271C23, cliff: 0x1E1418, road: 0xF6A860, roadEdge: 0x6E2208, leaf: 0x6A3A2A, leafAlt: 0x502A20, trunk: 0x3A2420, air: 0xFFB070, water: 0xFF7A30 },
+  // 2026-09-07 K-2-3: 큰 테마 넷 아래에 변종 다섯을 폈다 — 지도 20개가 지금보다 서로 달라 보이게.
+  meadow: { sky: 0x5A7F42, fog: 0xD8E8C8, grass: 0x8FBE5E, grassAlt: 0x86B657, outer: 0x5A7F42, outerAlt: 0x54783C, cliff: 0x9A8460, road: 0xF6EFD4, roadEdge: 0x6B5228, leaf: 0x5AA83E, leafAlt: 0x479130, trunk: 0x7A5A3A, air: 0xEAF6D8, water: 0x6FB8E0 },
+  swamp: { sky: 0x2E3F2A, fog: 0x74896A, grass: 0x5F7550, grassAlt: 0x586E4A, outer: 0x2E3F2A, outerAlt: 0x293A26, cliff: 0x5E5A48, road: 0xBEB48E, roadEdge: 0x3A3222, leaf: 0x3E6A38, leafAlt: 0x2E5A2C, trunk: 0x4A3A2A, air: 0xA8C2A0, water: 0x4A6A48 },
+  glacier: { sky: 0x486078, fog: 0xC0DCEE, grass: 0xAFCEE0, grassAlt: 0xA8C8DC, outer: 0x486078, outerAlt: 0x435A70, cliff: 0x7FA0BC, road: 0xEAF6FC, roadEdge: 0x3E5A72, leaf: 0x4A7A78, leafAlt: 0x3A6664, trunk: 0x50606E, air: 0xFFFFFF, water: 0x6FC0EE },
+  shore: { sky: 0x3F7E8E, fog: 0xE4E0C4, grass: 0xE0CE96, grassAlt: 0xD9C68E, outer: 0x3F7E8E, outerAlt: 0x3A7686, cliff: 0xB09468, road: 0xFAF2DC, roadEdge: 0x8A7048, leaf: 0x5FA05A, leafAlt: 0x4C8A48, trunk: 0x8A6A44, air: 0xEAF8FC, water: 0x35A8C8 },
+  ruins: { sky: 0x3E3C42, fog: 0xACA8A2, grass: 0x86846F, grassAlt: 0x7E7C69, outer: 0x3E3C42, outerAlt: 0x39373D, cliff: 0x6E6A62, road: 0xC8C2AE, roadEdge: 0x4A463E, leaf: 0x5A7248, leafAlt: 0x486038, trunk: 0x585044, air: 0xC8C8C4, water: 0x5A7A80 },
+};
+// 지도가 정하는 큰 테마(grass·snow·desert·lava) 아래의 변종. 씨앗으로 고르므로 같은 지도는 늘 같은 모습이다.
+// 🛑 지도 생성기(sim/mapgen.js)는 이 담당의 경계 밖이라 큰 테마 넷은 그대로 두고 화면에서만 편다 — 길·자리·판정은 하나도 안 바뀐다(색과 장식뿐).
+NGN.THEME_VARIANTS = { grass: ['grass', 'meadow', 'swamp'], snow: ['snow', 'glacier'], desert: ['desert', 'shore'], lava: ['lava', 'ruins'] };
+NGN.pickTheme = function pickTheme(map) {
+  const base = NGN.THEMES[map.theme] ? map.theme : 'grass';
+  const vs = NGN.THEME_VARIANTS[base];
+  if (!vs || vs.length < 2) return base;
+  // 🛑 손으로 만든 지도(id 가 gen<숫자> 가 아닌 것)는 변종을 안 건다 — 이름·성격이 정해져 있어서다("첫 숲길"·"뱀길").
+  //    스테이지 1~3 이 바로 이 지도들이라, 조카가 처음 보는 화면이 "첫 숲길"인데 늪으로 나오던 것도 이걸로 막힌다
+  //    (코디네이터 지적 2026-09-07. 튜토리얼 보호는 적 배치에서도 쓰는 원칙 — build-waves.js 가 스테이지 1~3 을 안 섞는다).
+  const g = /^gen(\d+)$/.exec(String(map.id || ''));
+  if (!g) return base;
+  // 씨앗을 제대로 섞는다. 🔴 생성 지도 씨앗이 3·7·11… 4씩 느는 등차라, 나머지를 그냥 쓰거나 한 번만 곱하면
+  //    주기가 생겨 변종이 한쪽으로 몰린다(실측: 곱셈만 썼더니 눈 계열 셋이 전부 빙하, 사막 셋이 전부 해변으로 갔다)
+  let h = Number(g[1]) >>> 0;
+  h ^= h >>> 16; h = Math.imul(h, 0x7feb352d); h ^= h >>> 15; h = Math.imul(h, 0x846ca68b); h ^= h >>> 16;
+  return vs[(h >>> 0) % vs.length];
 };
 NGN.ELEMENT_COLOR = { nature: 0x4FA36B, fire: 0xE0612F, ice: 0x6FC3E8, darkness: 0x6B3FA0, iron: 0x8E9AA5, astral: 0xE8C34A, storm: 0x3D6FD6 };
 NGN.ELEMENT_KO = { nature: '자연', fire: '불', ice: '얼음', darkness: '어둠', iron: '강철', astral: '천체', storm: '폭풍' };
@@ -49,6 +74,12 @@ function instanced(geo, mat, items, root) {
     const s = it.s === undefined ? 1 : it.s; o.scale.set(it.sx || s, it.sy || s, it.sz || s);
     o.updateMatrix(); m.setMatrixAt(i, o.matrix);
   });
+  // it.k = 이 인스턴스만의 밝기(1 = 그대로). 잔디 칸마다 아주 조금씩 달리해 균일한 판을 자연스럽게 만든다 — 그리기 횟수는 그대로다
+  if (items.some((it) => it.k !== undefined) && m.setColorAt) {
+    const c = new THREE.Color();
+    items.forEach((it, i) => { const k = it.k === undefined ? 1 : it.k; c.setRGB(k, k, k); m.setColorAt(i, c); });
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  }
   m.castShadow = items.some((it) => it.cast); m.receiveShadow = true; m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; // 하나라도 그림자를 원하면 켠다(종류 하나 = 그림자 패스 1회)
   root.add(m);
   return m;
@@ -83,6 +114,12 @@ function mergeStatic(list) {
 // 방향 (dx,dz) → y 회전: 물체의 로컬 +x 축이 그 방향을 보게 한다(길 상자·화살표·성·동굴이 전부 이 규칙)
 function headingRy(dx, dz) { return Math.atan2(-dz, dx); }
 const hexOf = (c) => '#' + new THREE.Color(c).getHexString();
+// 색을 k 배 밝게(0xRRGGBB → '#rrggbb'). 🔴 THREE.Color.multiplyScalar 로 하면 안 된다 —
+// 이 버전은 색을 선형 공간에 담고 getHexString 이 한 번 더 변환해서, #becdd7 을 1.35 배 했더니 #011522(거의 검정)이 나왔다(실측 2026-09-07).
+const brighten = (hex, k) => {
+  const c = [16, 8, 0].map((s) => Math.min(255, Math.round(((hex >> s) & 255) * k)));
+  return '#' + ((c[0] << 16) | (c[1] << 8) | c[2]).toString(16).padStart(6, '0');
+};
 const DEG = Math.PI / 180;
 
 NGN.World = class World {
@@ -148,8 +185,10 @@ NGN.World = class World {
   setMap(map) {
     NGN.map = map;
     while (this.root.children.length) this.root.remove(this.root.children[0]);
-    const C = Object.assign({}, NGN.C, NGN.THEMES[map.theme] || {});
-    this.C = C; this.theme = NGN.THEMES[map.theme] ? map.theme : 'grass';
+    this.stageMark = null; this.lobbyMode = null; // 로비 표지도 지운 것들 중 하나 — buildStageMark 가 다시 만들고, 다음 프레임에 setLobbyMode 가 다시 정한다
+    this.theme = NGN.pickTheme(map); // 큰 테마 아래 변종까지(NGN.THEME_VARIANTS) — 지도 씨앗으로 고른다
+    const C = Object.assign({}, NGN.C, NGN.THEMES[this.theme] || {});
+    this.C = C;
     this.scene.background = new THREE.Color(C.sky);
     if (this.scene.fog) this.scene.fog.color = new THREE.Color(C.fog);
     const mat = (color, opts) => new THREE.MeshLambertMaterial(Object.assign({ color }, opts || {}));
@@ -192,7 +231,12 @@ NGN.World = class World {
     if (!this.models) return null;
     const pack = P.p.split('/')[0];
     const Q = { p: P.p, raw: P.raw, tint: P.tint };
-    if (pack === 'nature' || pack === 'space') { const base = (this.parts.scenery && this.parts.scenery.natureColors && this.parts.scenery.natureColors[this.theme]) || {}; Q.recolor = Object.assign({}, base, P.recolor || {}); }
+    const SC = this.parts.scenery || {};
+    // 텍스처를 못 쓰는 팩은 재질 이름별 색을 깔아 준다: nature·space 는 원래 텍스처가 없고,
+    // retro-fantasy 처럼 UV 를 반복하는 팩은 아틀라스로 못 옮겨서 같은 길을 탄다(K-2-13, models.js tiled)
+    const tpl = this.models.templates && this.models.templates.get(P.p);
+    if (pack === 'nature' || pack === 'space') { const base = (SC.natureColors && SC.natureColors[this.theme]) || {}; Q.recolor = Object.assign({}, base, P.recolor || {}); }
+    else if (tpl && tpl.tiled) { const base = (SC.matColors && SC.matColors[pack]) || {}; Q.recolor = Object.assign({}, base, P.recolor || {}); }
     else if (P.recolor) Q.recolor = P.recolor;
     const g = this.models.pieceGeometry(Q);
     if (!g) { if (!this.missing.has(P.p)) { this.missing.add(P.p); console.warn('장식 조각 없음', P.p); } return null; }
@@ -242,16 +286,59 @@ NGN.World = class World {
     // 판 테두리(어두운 띠 0.35칸) → 그 위에 판. 판 윗면 y=0 이 길·자리·타워의 바닥
     const rim = new THREE.Mesh(new THREE.BoxGeometry(BW + 0.7, 0.32, BD + 0.7), this.M.roadEdge);
     rim.position.y = -0.18; rim.receiveShadow = true; this.root.add(rim);
-    const board = new THREE.Mesh(new THREE.BoxGeometry(BW, 0.3, BD), this.M.grass);
+    // 🔴 2026-09-07 (K-2-12 2판, 사장님 "누가 격자선을 만들라고 했어"): 1판은 칸 사이를 크게 벌리고 바닥을 확 어둡게 해서
+    //    **선**이 그어진 것처럼 보였다. 격자선은 목표가 아니었다 — 사장님 말씀은 "깔끔하게"였다.
+    //    지금은 ⑴칸 사이를 거의 붙이고 ⑵바닥 대비를 은은하게 낮춰 **면**으로 읽히게 하고,
+    //    ⑶대신 창고 지형 타일(둔덕·바위·나무)을 길·자리에서 떨어진 곳에 가끔 놓아 땅에 변화를 준다.
+    // 값은 네 가지 안을 화면에 나란히 놓고 눈으로 골랐다(2026-09-07 대조표):
+    //   1판(틈 0.44·바닥 0.40) = 선이 그어진 듯 지저분 · A(틈 0) = 깔끔하나 밋밋 · C(틈 0.18) = 아직 선이 읽힘
+    //   → **B: 틈 0.06 + 은은한 대비 + 채도 올린 잔디** — 선이 안 보이면서 완전 단색보다 미세한 결이 남는다
+    const T = NGN.GROUND_TUNE || {};
+    const GAP = T.gap === undefined ? 0.06 : T.gap;          // 칸 사이 틈(선으로 안 보일 만큼만)
+    const BOARD_MUL = T.board === undefined ? 0.88 : T.board; // 바닥 어둡기(1 = 잔디와 같음)
+    const TINT_MUL = T.tint === undefined ? 1.16 : T.tint;    // 칸 밝기(회색조 칸이라 1 을 넘겨야 바닥 위로 뜬다)
+    const FEATURE = T.feature === undefined ? 0.34 : T.feature; // 지형 타일을 놓을 칸의 비율
+    const boardMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(this.C.grass).multiplyScalar(BOARD_MUL) });
+    const board = new THREE.Mesh(new THREE.BoxGeometry(BW, 0.3, BD), boardMat);
     board.position.y = -0.15; board.receiveShadow = true; this.root.add(board);
-    const TILE = 3, tiles = [], outerTiles = [];
-    for (let x = -W / 2 + TILE / 2; x < W / 2; x += TILE) for (let z = -D / 2 + TILE / 2; z < D / 2; z += TILE) {
-      if ((Math.round(x / TILE) + Math.round(z / TILE)) % 2) continue;
-      const inside = Math.abs(x) < BW / 2 - TILE * 0.6 && Math.abs(z) < BD / 2 - TILE * 0.6;
-      (inside ? tiles : outerTiles).push({ x, y: inside ? 0.02 : -0.47, z });
+    const TILE = 3, TS = TILE - GAP, tiles = [], outerTiles = [], feats = [];
+    // 지형 타일을 놓아도 되는 곳인가 — 길·자리·성·동굴에서 떨어져 있어야 한다(가리면 못 쓴다)
+    const blocked = [];
+    for (const s of (NGN.map.SLOTS || [])) blocked.push({ p: this.toWorld(s.x, s.y), r: 2.6 });
+    const gp = NGN.map.GROUND_PATH || [];
+    for (let i = 0; i < gp.length - 1; i++) {
+      const a = this.toWorld(gp[i][0], gp[i][1]), b = this.toWorld(gp[i + 1][0], gp[i + 1][1]);
+      const steps = Math.max(1, Math.ceil(a.distanceTo(b) / 2));
+      for (let k = 0; k <= steps; k++) blocked.push({ p: a.clone().lerp(b, k / steps), r: 2.4 });
     }
-    instanced(new THREE.BoxGeometry(TILE, 0.06, TILE), this.M.grassAlt, tiles, this.root);
+    const free = (x, z) => blocked.every((b) => (b.p.x - x) * (b.p.x - x) + (b.p.z - z) * (b.p.z - z) > b.r * b.r);
+    let seed = 1;
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    for (let x = -W / 2 + TILE / 2; x < W / 2; x += TILE) for (let z = -D / 2 + TILE / 2; z < D / 2; z += TILE) {
+      const inside = Math.abs(x) < BW / 2 - TILE * 0.6 && Math.abs(z) < BD / 2 - TILE * 0.6;
+      if (!inside) { if ((Math.round(x / TILE) + Math.round(z / TILE)) % 2 === 0) outerTiles.push({ x, y: -0.47, z }); continue; }
+      // 창고 타일은 두께 0.2 · 바닥이 y=0 → 윗면이 0.02 에 오게 내린다(길은 0.075~0.12 라 그 위에 얹힌다)
+      tiles.push({ x, y: -0.18, z, sx: TS, sy: 1, sz: TS, k: 0.93 + rnd() * 0.14 }); // 칸마다 밝기를 아주 조금씩 — 균일한 판보다 자연스럽다
+      if (FEATURE > 0 && rnd() < FEATURE && free(x, z)) feats.push({ x, z, k: Math.floor(rnd() * 4), ry: Math.floor(rnd() * 4) * Math.PI / 2 });
+    }
+    // 🔴 타일은 테마와 무관하게 `tile` 하나만 쓰고 색만 입힌다 — `snow-tile` 을 눈 테마에 썼더니 그 조각의 원본이 어두워
+    //    판이 짙은 청록으로 나왔다(실측 2026-09-07). 회색조 칸에 색을 곱하는 구조라 tint 를 밝게 넣어야 칸이 바닥 위로 뜬다.
+    const tileTint = brighten(this.C.grassAlt, TINT_MUL);
+    const tileP = this.piece({ p: 'tower-defense/tile', tint: tileTint });
+    if (tileP) instanced(tileP.g.geometry, tileP.g.material, tiles, this.root);
+    else instanced(new THREE.BoxGeometry(TS, 0.06, TS), this.M.grassAlt, tiles.map((t) => ({ x: t.x, y: 0.02, z: t.z })), this.root); // 조각을 못 읽었을 때
     instanced(new THREE.BoxGeometry(TILE, 0.06, TILE), this.M.outerAlt, outerTiles, this.root);
+    // 지형 타일 — 자연스러운 땅은 균일하지 않다. 종류가 넷이어도 정점을 하나로 구워 그리기 1~2회
+    if (feats.length && this.models) {
+      const kinds = ['tower-defense/tile-bump', 'tower-defense/tile-rock', 'tower-defense/tile-tree', 'tower-defense/tile-tree-double'];
+      const col = this.collector(this.root);
+      for (const f of feats) {
+        col.add({ p: kinds[f.k] || kinds[0], tint: tileTint }, { x: f.x, y: -0.18, z: f.z, ry: f.ry, sx: TS, sy: 1, sz: TS, cast: f.k >= 1 });
+      }
+      if (this.models.sceneryMat) col.flush(this.models.sceneryMat, true);
+      else feats.length = 0;
+    } else feats.length = 0;
+    this.groundFeatures = feats.length;
     const hillsA = [], hillsB = [], blocks = []; this.hillSpots = [];
     for (let i = 0; i < 60; i++) {
       const ang = i / 60 * Math.PI * 2;
@@ -263,7 +350,9 @@ NGN.World = class World {
       this.hillSpots.push({ x, y: h, z });
     }
     // 창고 절벽 블록(풀 뚜껑 + 흙 옆면)을 테마 색으로 — 눈 테마는 돌 블록
-    const C = this.C, cliffP = this.theme === 'snow' ? { p: 'nature/cliff_block_stone', recolor: { grass: hexOf(C.outerAlt), stone: hexOf(C.cliff) } } : { p: 'nature/cliff_block_rock', recolor: { grass: hexOf(C.outerAlt), dirt: hexOf(C.cliff) } };
+    // 돌 절벽(윗면이 돌) 쪽이 어울리는 테마: 눈·빙하·폐허. 나머지는 흙 절벽
+    const stoneCliff = this.theme === 'snow' || this.theme === 'glacier' || this.theme === 'ruins';
+    const C = this.C, cliffP = stoneCliff ? { p: 'nature/cliff_block_stone', recolor: { grass: hexOf(C.outerAlt), stone: hexOf(C.cliff) } } : { p: 'nature/cliff_block_rock', recolor: { grass: hexOf(C.outerAlt), dirt: hexOf(C.cliff) } };
     const cliff = this.piece(cliffP);
     if (cliff) instanced(cliff.g.geometry, cliff.g.material, blocks, this.root);
     else { const hill = new THREE.BoxGeometry(TILE, 1, TILE); instanced(hill, this.M.cliff, hillsA, this.root); instanced(hill, this.M.outerAlt, hillsB, this.root); }
@@ -358,8 +447,9 @@ NGN.World = class World {
     put('base', base.g, sb, 0.01, null, true);
     if (hole) put('hole', hole.g, fit(hole.g, D * 0.46), hb + 0.012, null, false);
     // 링은 조명을 안 받는 재질(늘 밝게) — 아틀라스 × 인스턴스 색
-    // 🛑 vertexColors 를 켜지 마라(2026-09-06 실측): Basic 재질 + 정점색 + 인스턴스 색이 겹치면 크롬(ANGLE/D3D)이 매 프레임
-    //    GL_INVALID_OPERATION(Vertex buffer is not big enough) 을 뱉는다. 끄면 사라지고 인스턴스 색은 그대로 먹는다(빨강 시험으로 확인)
+    // vertexColors 는 안 켠다 — 링 조각은 흰색(#FFFFFF)으로 구워져 정점색을 곱해도 그대로라 켜나 안 켜나 화면이 같다.
+    // ⚠️ 2026-09-06 정정: 여기 있던 "vertexColors 가 WebGL 경고의 원인" 이라는 기록은 틀렸다(밸런스 담당 오진).
+    //    진짜 원인은 적 오버레이의 길이 0 색 버퍼였다(J-11 ⑥). 적이 있는 상태에서 이 칸을 다시 켜 봐도 경고는 안 난다(실측).
     if (ring) { this.slotRingMat = this.slotRingMat || new THREE.MeshBasicMaterial({ map: this.models.atlas, transparent: true, opacity: 0.98, depthWrite: false }); put('ring', ring.g, fit(ring.g, D * 1.26), 0.03, this.slotRingMat, false); layers.ring.m.renderOrder = 1; }
     this.slotLayers = layers;
     return true;
@@ -434,6 +524,55 @@ NGN.World = class World {
     if (!this.models || !L || !L.castle || !L.castle.length) { this.flag(start, NGN.C.flagIn); this.flag(end, NGN.C.flagOut); return; }
     this.buildCastle(L, end, dirOut);
     this.buildPortal(L, start, dirIn);
+    this.buildStageMark(L);
+  }
+  // 로비 표지(K-2-8, 2026-09-07): 다음에 갈 스테이지의 작은 3D 모형을 판 한가운데 공중에 띄운다 — "다음은 여기다"가 한눈에 보이게.
+  // 테마마다 다른 모형이라 눈밭인지 늪인지 해변인지가 들어가기 전에 보인다. 전투가 시작되면 render.js 가 숨긴다(syncTowers).
+  // 조립표는 landmarks.stageMark(테마별 조각 목록). 조각을 정점 하나로 구워 메시 1개 = 그리기 1회.
+  buildStageMark(L) {
+    const spec = L && L.stageMark; if (!spec || !this.models) return;
+    const set = (spec.theme || {})[this.theme] || spec.theme.grass || [];
+    if (!set.length || !this.models.sceneryMat) return;
+    const S = spec.scale || 2.0;
+    const g = new THREE.Group();
+    // 🔴 cx·cz 는 지도 좌표다(세계 좌표가 아니다) — 판 한가운데의 세계 좌표는 원점(0,0). 처음에 cx 를 그대로 써서 표지가 화면 밖 1725 에 놓였다(실측)
+    this.stageMarkY = (spec.y === undefined ? 8 : spec.y);
+    g.position.set(0, this.stageMarkY, 0);
+    this.root.add(g);
+    const col = this.collector(g);
+    for (const E of set) {
+      const s = S * (E.s === undefined ? 1 : E.s);
+      col.add({ p: E.p, raw: E.raw, recolor: E.recolor, tint: E.tint },
+        { x: (E.x || 0) * S, y: (E.y || 0) * S, z: (E.z || 0) * S, ry: (E.ry || 0) * DEG, s, cast: true }); // 그림자를 켠다 — 없으면 조각이 바닥판에 납작하게 붙어 보인다
+    }
+    col.flush(this.models.sceneryMat, true);
+    this.stageMark = g;
+  }
+  // 로비 모드(render.js 가 매 프레임 부른다). 로비에서는 판(길·자리·성·동굴·장식)을 통째로 숨기고 표지만 남긴다 —
+  // 판 위에 표지를 겹쳐 두었더니 둘이 뒤섞여 모형이 뭐인지 안 보였다(2026-09-07 실측, 사장님 "배경하고 너무 산만해").
+  // 🛑 보이고 안 보이고만 바꾼다 — 지도 생성·길·자리 좌표는 그대로다. 판을 안 그리는 만큼 로비 그리기 횟수도 준다.
+  setLobbyMode(on) {
+    on = !!on;
+    if (this.lobbyMode === on) return;
+    this.lobbyMode = on;
+    for (const c of this.root.children) c.visible = (c === this.stageMark) ? on : !on;
+    // 로비 배경은 그 테마 하늘을 반쯤 어둡게 — 풀밭 하늘이 초록이라 초록 모형이 그대로 묻혔다(실측). 판에 들어가면 원래 하늘로 되돌린다
+    this.scene.background = new THREE.Color(on ? brighten(this.C.sky, 0.55) : this.C.sky);
+    this.placeCamera();
+  }
+  // 로비 카메라: 판이 아니라 모형에 맞춘다. 판을 내려다보는 각(62°)으로는 모형이 납작하게 눌려 나무인지 바위인지 안 보였다(실측) —
+  // 각을 40° 로 낮춰 옆모습이 보이게 하고, 거리는 모형 지름에 맞춘다
+  placeLobbyCamera() {
+    const spec = (this.parts && this.parts.landmarks && this.parts.landmarks.stageMark) || {};
+    const size = spec.scale || 22, pitch = 40 * Math.PI / 180;
+    // 거리는 세로·가로 시야 중 좁은 쪽에 맞춘다 — 세로 화면은 가로가 훨씬 좁아, 세로 시야로만 재면 모형이 화면을 뚫고 나온다(실측)
+    const halfV = Math.tan(this.camera.fov * Math.PI / 360);
+    const dist = (size * 0.82) / Math.max(0.06, Math.min(halfV, halfV * this.camera.aspect));
+    const look = new THREE.Vector3(0, (this.stageMarkY || 0) + size * 0.22, 0); // 바라보는 점을 모형 위로 올리면 모형이 화면 아래로 내려가 제목·별과 안 겹친다
+    this.camera.position.set(look.x + Math.sin(this.camAngle) * Math.cos(pitch) * dist, look.y + Math.sin(pitch) * dist, look.z + Math.cos(this.camAngle) * Math.cos(pitch) * dist);
+    this.camera.lookAt(look);
+    this.camBase.copy(this.camera.position);
+    this.dist = dist;
   }
   // 성: 조립표(landmarks.castle)를 성 단위 × castleScale 로 놓는다. 같은 조각은 InstancedMesh 로 묶고(벽 9개 = 그리기 1회), 성문 문짝·깃발만 개별 메시(움직여야 해서).
   // 재질은 장식 아틀라스 재질을 복제한 성 전용 하나 — 그을음(setCastleDamage)이 성만 어둡게 하려고. 테마: castleTheme[테마].tint(성벽) · flag(깃발)
@@ -715,6 +854,7 @@ NGN.World = class World {
     return Math.max(distV, distH);
   }
   placeCamera() {
+    if (this.lobbyMode) return this.placeLobbyCamera(); // 로비에서는 판이 아니라 모형에 맞춘다
     const aspect = this.camera.aspect;
     const portrait = aspect < 1;
     const pitch = (portrait ? 62 : 56) * Math.PI / 180;
@@ -765,6 +905,10 @@ NGN.World = class World {
       for (const f of this.flagMeshes) f.rotation.z = Math.sin(now * 0.04) * 0.22 * k;
     }
     this.breatheSlots(now); // 빈 자리 금테가 숨 쉰다(인스턴스 색만 갱신 — 그리기 횟수 0 증가)
+    if (this.stageMark && this.stageMark.visible) { // 로비 표지: 천천히 돌고 살짝 오르내린다
+      this.stageMark.rotation.y += dt * 0.35;
+      this.stageMark.position.y = this.stageMarkY + Math.sin(now * 0.0011) * 0.5;
+    }
     this.renderer.render(this.scene, this.camera);
   }
 };
