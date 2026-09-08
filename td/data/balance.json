@@ -111,21 +111,21 @@
     "power": {
       "name": "화력",
       "dmgMul": 1.25,
-      "rangeMul": 0.85,
+      "rangeMul": 0.9,
       "color": "#E85A4F",
-      "설명": "피해 +25% / 사거리 −15%"
+      "설명": "피해 +25% / 사거리 −10%"
     },
     "area": {
       "name": "광역",
       "dmgMul": 0.9,
-      "rangeMul": 1.1,
+      "rangeMul": 1.05,
       "splash": {
         "radius": 250,
         "ratio": 0.2
       },
       "splashRadiusMulIfHas": 1.25,
       "color": "#3AA0F0",
-      "설명": "사거리 +10% · 광역 공격(이미 광역이면 반경 +25%) / 피해 −10%"
+      "설명": "사거리 +5% · 광역 공격(이미 광역이면 반경 +25%) / 피해 −10%"
     }
   },
   "combat": {

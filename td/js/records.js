@@ -12,7 +12,7 @@ const $r = (id) => document.getElementById(id);
 const escR = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 NGN.CROWN = '<svg class="i crown" viewBox="0 0 24 24"><path fill="#FFC93C" stroke="#7A4E00" stroke-width="1.4" d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>';
-NGN.DIFF_COLOR = { normal: '#FFC93C', hard: '#E85A4F' }; // 쉬움(은별 #C9D1D9)은 2026-09-06 폐지
+NGN.DIFF_COLOR = { normal: '#FFC93C', hard: '#EE2747' }; // 쉬움(은별 #C9D1D9)은 2026-09-06 폐지
 NGN.DIFF_EDGE = { normal: '#7A4E00', hard: '#7A1E14' };
 // 별 아이콘: 난이도 색(은·금·붉은). 안 딴 것은 회색
 NGN.starOf = (diff, on = true, size = '') => `<svg class="i ${size}" viewBox="0 0 24 24"><path d="M12 2l3 6.6 7 .8-5.2 4.8 1.5 7L12 17.7 5.7 21.2l1.5-7L2 9.4l7-.8z" fill="${on ? NGN.DIFF_COLOR[diff] : '#4A4F55'}" stroke="${on ? NGN.DIFF_EDGE[diff] : '#2E3237'}" stroke-width="1.5"/></svg>`;
@@ -88,10 +88,10 @@ NGN.RecordsUI = class RecordsUI {
     const lastHtml = last ? `<div class="last"><b>지난 ${Number(last.key.split('-')[1])}월</b> — ${last.score}점${last.people > 1 ? ` · ${last.people}명 중 ${last.rank}등` : ' · 혼자'}${last.prize ? ` · <b style="color:#B8860B">프리미엄 팩 ${last.prize}회 받음</b>(강화 탭 → 뽑기)` : last.rank === 1 && last.people >= (m.seasonRules().minPeople || 3) ? ' · <b>1등! 상품은 사장님이</b>' : ''}</div>` : '';
     if (m.seasonUnseen()) m.seasonMarkSeen();
     box.innerHTML = `<div class="panel season">
-      <div class="shead">${NGN.CROWN} ${mo}월 시즌<small>${daysLeft !== null ? `${daysLeft}일 남음 · ` : ''}1일에 점수만 0</small></div>
+      <div class="shead">${NGN.CROWN} ${mo}월 시즌<small>${daysLeft !== null ? `${daysLeft}일 남음` : ''}</small></div>
       <div class="score">${score}점</div>
       <div class="bd">${bd.map((b) => `<span>${escR(b.name)} <b>${b.n}${escR(b.unit)}</b> → ${b.pts}점</span>`).join('')}</div>
-      <div class="rhead">이번 달 순위 <small>친구 코드에 이번 달 점수가 실려요</small></div>${rows}${rank.rows.length === 1 ? '<div class="rk dim">친구 코드를 넣으면 나란히 서요</div>' : ''}
+      <div class="rhead">이번 달 순위 <button class="hlp" data-help="season">?</button></div>${rows}${rank.rows.length === 1 ? '<div class="rk dim">친구 코드를 넣어 보세요</div>' : ''}
       <div class="prize"><b>상품</b> · 1등은 사장님이 게임 밖에서 · 2등 프리미엄 팩 ${packs['2등'] || 0}회 · 3등 ${packs['3등'] || 0}회(고급 ${this.data.gacha.premiumPack ? this.data.gacha.premiumPack.rates.uncommon : 0}·희귀 ${this.data.gacha.premiumPack ? this.data.gacha.premiumPack.rates.rare : 0}·전설 ${this.data.gacha.premiumPack ? this.data.gacha.premiumPack.rates.legendary : 0}%). 나까지 ${m.seasonRules().minPeople || 3}명 이상일 때 매겨요. 별·타워·강화는 초기화되지 않아요.</div>
       ${lastHtml}</div>`;
   }
@@ -143,7 +143,7 @@ NGN.RecordsUI = class RecordsUI {
     const m = this.meta, diffs = m.diffList();
     const sum = `<div class="panel sumbox">${diffs.map((d) => `<span class="sumcell">${NGN.starOf(d)}<b>${m.totalStars(d)}</b><small>/${m.maxStars(d)} ${escR(m.diff(d).star)}</small></span>`).join('')}<span class="sumcell tot"><b>${m.totalStars()}</b><small>/${m.maxStars()}</small></span></div>`;
     const rk = m.starRanking();
-    const starRank = `<div class="panel list rankbox"><div class="rhead">별 총합 순위 <small>캠페인 기록만으로도 여기 올라요</small></div>${rk.map((r, i) => `<div class="rk ${r.me ? 'me' : ''}"><span class="pos">${i + 1}</span><span class="nm">${r.me ? '나' : escR(r.n)}</span><span class="v">${NGN.starOf('normal')}<b>${r.t}</b></span><span class="cr">${i === 0 && rk.length > 1 ? `<span class="ctag">${NGN.CROWN}별</span>` : ''}</span></div>`).join('')}${rk.length === 1 ? '<div class="rk dim">친구 코드를 넣으면 나란히 서요</div>' : ''}</div>`;
+    const starRank = `<div class="panel list rankbox"><div class="rhead">별 총합 순위</div>${rk.map((r, i) => `<div class="rk ${r.me ? 'me' : ''}"><span class="pos">${i + 1}</span><span class="nm">${r.me ? '나' : escR(r.n)}</span><span class="v">${NGN.starOf('normal')}<b>${r.t}</b></span><span class="cr">${i === 0 && rk.length > 1 ? `<span class="ctag">${NGN.CROWN}별</span>` : ''}</span></div>`).join('')}${rk.length === 1 ? '' : ''}</div>`;
     const stages = m.stageList().map((s) => {
       const key = 's' + s.id; const isOpen = this.open.has(key);
       const friendN = new Set(m.state.friends.filter((f) => f.m === 's' && f.k === s.id).map((f) => f.n)).size;
@@ -152,7 +152,7 @@ NGN.RecordsUI = class RecordsUI {
       if (isOpen) detail = diffs.map((d) => `<div class="dsec"><div class="dhead">${NGN.starOf(d)} ${escR(m.diff(d).name)} <small>×${m.diff(d).hpMul}</small>${this.codeBtn(m.myRecord('s', s.id, NGN.DIFF_SHORT[d]))}</div>${this.rankingHtml('s', s.id, NGN.DIFF_SHORT[d], [this.colStars.bind(this), this.colLives.bind(this), this.colGold.bind(this)], m.isDiffOpen(s.id, d) ? '아직 기록이 없어요' : '보통으로 깨면 열려요')}</div>`).join('');
       return `<div class="srow ${isOpen ? 'open' : ''} ${m.clearedAny(s.id) ? '' : 'locked'}"><div class="shead" data-open="${key}"><span class="no">${s.id}</span><span class="nm">${escR(s.name)}</span>${stars}${friendN ? `<span class="fb">친구 ${friendN}</span>` : ''}</div>${detail}</div>`;
     }).join('');
-    return sum + starRank + `<div class="panel list stlist"><div class="rhead">스테이지별 <small>누르면 난이도별 순위가 펼쳐져요</small></div>${stages}</div>`;
+    return sum + starRank + `<div class="panel list stlist"><div class="rhead">스테이지별 </div>${stages}</div>`;
   }
 
   // ---------- 무한 탭 ----------

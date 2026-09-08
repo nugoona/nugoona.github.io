@@ -15,6 +15,41 @@ window.NGN = window.NGN || {};
 
 NGN.SCALE = 1 / 100;
 
+// ---------- 툰 셰이딩(2026-09-08, 사장님 「음악빼고 다해」) ----------
+// 무엇: 빛이 물체를 비출 때 밝기가 **매끄럽게** 변하던 것을 **몇 단으로 뚝뚝 끊어** 만화처럼 보이게 한다.
+//   지금까지 재질은 MeshBasicMaterial 29곳(빛을 아예 안 받음) + MeshLambertMaterial 14곳(가장 단순한 음영)뿐이었다.
+//   Lambert 를 MeshToonMaterial 로 바꾸면 같은 조명·같은 모델로 **칸이 진 그림자**가 생긴다.
+// 어떻게: 「밝기 → 실제로 칠할 밝기」 표를 그림 한 장(gradientMap)으로 준다. 3픽셀짜리 가로 그림이면 3단이다.
+//   🛑 NearestFilter 여야 한다 — 기본값(Linear)이면 세 칸을 부드럽게 섞어 버려 Lambert 와 똑같아진다.
+// 🔴 **켜 보고 껐다**(2026-09-08). 같은 판을 세 조합으로 찍어 픽셀로 쟀다(scratchpad/toon_*.png):
+//   판 영역(y400~2100) 평균 밝기 / 대비(표준편차)
+//     Lambert(끔)              198.1 / **31.0**
+//     툰 [0x55,0xB4,0xFF]      207.7 / 27.3   ← 밝아지고 **대비가 3.7 떨어진다**
+//     툰 + 하늘빛0.28·햇빛1.35 208.3 / 29.9   ← 조명을 다시 맞춰도 Lambert 보다 낮다
+//   왜: 툰은 빛이 **비스듬히** 닿는 면에서 칸이 갈리는데, 이 게임은 위에서 내려다보는 **평평한 판**이라
+//   땅 법선이 거의 전부 위를 향한다 → dotNL 이 0.94 근처로 몰려 **맨 위 칸 하나만** 쓰인다.
+//   게다가 HemisphereLight 는 툰의 칸을 **거치지 않고** 그대로 더해져 남은 칸마저 뭉갠다.
+//   결과: 효과는 없고 그림자만 들려 허옇게 뜬다. **켜지 않는다** — '안 해봤다'가 아니라 **재보고 고른 결과**다.
+//   다시 시험하려면 on: true 한 글자만 바꾸면 된다(litMat 이 두 재질을 같은 입구로 만든다).
+NGN.TOON = NGN.TOON || { on: false, steps: [0x55, 0xB4, 0xFF] };
+NGN.toonGradient = function toonGradient() {
+  if (NGN.__toonTex !== undefined) return NGN.__toonTex;
+  if (!NGN.TOON.on || typeof THREE === 'undefined' || !THREE.MeshToonMaterial) return (NGN.__toonTex = null);
+  const st = NGN.TOON.steps, d = new Uint8Array(st.length);
+  for (let i = 0; i < st.length; i++) d[i] = st[i];
+  const t = new THREE.DataTexture(d, st.length, 1, THREE.LuminanceFormat);
+  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter;
+  t.generateMipmaps = false; t.needsUpdate = true;
+  return (NGN.__toonTex = t);
+};
+// 빛을 받는 재질을 만드는 유일한 입구. 툰이 꺼져 있거나 못 쓰면 예전 Lambert 로 그대로 돌아간다.
+// 🛑 Lambert 전용 옵션은 없다(map·vertexColors·emissive·skinning·transparent 는 둘 다 받는다).
+NGN.litMat = function litMat(params) {
+  const g = NGN.toonGradient();
+  if (!g) return new THREE.MeshLambertMaterial(params);
+  return new THREE.MeshToonMaterial(Object.assign({ gradientMap: g }, params));
+};
+
 // 명도 세 층(2026-09-06 화면 설계 2판 — 사장님 "뿌옇고 길이 또렷하게 안 보여"): 길(road) = 가장 밝게 + 어두운 테두리(roadEdge) · 판 안 잔디(grass) = 중간 · 판 밖(outer) = 어둡게.
 // 전에는 길과 잔디의 명도가 거의 같았다(풀밭 흙길 0xA8814D vs 잔디 0x6BA34A · 눈은 둘 다 흰색). 테마마다 세 층의 밝기 차가 확실히 나게 골랐다
 NGN.C = {
@@ -121,12 +156,15 @@ const brighten = (hex, k) => {
   return '#' + ((c[0] << 16) | (c[1] << 8) | c[2]).toString(16).padStart(6, '0');
 };
 const DEG = Math.PI / 180;
+const UP = new THREE.Vector3(0, 1, 0); // 잔존물(그을음)을 땅 위에서 돌릴 때 쓰는 축
 
 NGN.World = class World {
   constructor(stage) {
     this.stage = stage;
     this.isMobile = ('ontouchstart' in window) || innerWidth < 700;
-    this.quality = 3; // 3 최고 … 0 최저
+    // 🔑 **3 에서 시작한다** — 빛번짐(4)은 기본 꺼짐이고, 여유가 10초 이어져야 자동으로 켜진다.
+    //    1판에서는 4 에서 시작해 무거운 기기가 곧장 떨어졌고, 떨어지는 길에 그림자까지 잃었다.
+    this.quality = 3; // 0~4. 단계별 내용은 setQuality 참고
     this.scene = new THREE.Scene();
     // 🔴 안개를 끈다(2026-09-06 화면 설계 2판). 카메라가 판에서 229 떨어져 있는데 안개가 263 부터 껴서 판 뒤쪽이 하늘색 안개에 잠겼다(배포본 실측 234~407).
     //    땅이 화면 끝까지 채우므로 안개 없이도 지평선이 안 보인다. 판이 안개에 잠기면 안 된다
@@ -136,20 +174,41 @@ NGN.World = class World {
     // 아래쪽 줄은 옆이 보여 크게 나왔다(사장님 지적 2026-09-06 "앞쪽 타워는 왜 작게 나와"). 좁히면 판 전체가 같은 각도로 보인다
     this.camera = new THREE.PerspectiveCamera(22, 1, 1, 800);
     this.renderer = new THREE.WebGLRenderer({ antialias: !this.isMobile, powerPreference: 'high-performance' });
-    this.maxPixelRatio = this.isMobile ? 1.5 : 2; // 폰은 3배로 그리면 픽셀이 9배 — 상한을 둔다
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.maxPixelRatio));
+    // 🔴 2026-09-08 (사장님 "그래픽이 너무 구려"). 폰 상한이 **1.5** 였다.
+    //    사장님 폰은 3배 화면(360×780·DPR3)이라 **540×1170 으로 그려 1080×2340 에 2배 확대**하고 있었다 —
+    //    실제 픽셀의 1/4 로 그린 것이다. 같은 장면을 1.5배·3배로 찍어 대 보니(scratchpad/px15.png·px30.png)
+    //    성의 면들이 뭉개져 하나로 붙고 타워 나무결이 사라졌다. 수치로도 또렷한 가장자리 비율 0.69% → 1.55% (2.2배).
+    //    🛑 이게 화면이 「싸구려로」 보이던 가장 큰 원인이다. 모델이나 조명 문제가 아니었다.
+    this.maxPixelRatio = this.isMobile ? 2.5 : 2;
+    this.renderer.setPixelRatio(this.pixelFor(3));   // 시작 단계(3)의 배율
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.shadowStatic = false; // 그림자를 매 프레임 굽는 중인가(setShadowStatic 참고)
     this.renderer.outputEncoding = THREE.sRGBEncoding;
-    // 🔴 톤매핑을 끈다(2026-09-06 화면 설계 2판). ACES 는 실사 영화용 — 색을 부드럽게 뭉개서 카툰풍엔 정반대였고 노출 0.86 으로 전체가 어두웠다.
-    //    끄면 꼭짓점 색(속성색)이 그대로 나온다. "노출 1.0~1.1" 은 톤매핑이 없으면 적용이 안 되니 조명 세기를 그만큼 올린다(0.46→0.55 · 0.92→1.0)
-    this.renderer.toneMapping = THREE.NoToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    // 톤매핑(M-4-2, 2026-09-07) — **비교해 보고 끄는 것으로 결론냈다.**
+    // 계약은 "ACES 는 카툰 색을 뭉갠다고 껐는데 판단은 옳았고 선택지가 틀렸다, r128 의 Cineon·Reinhard 를 비교해 골라라" 였다.
+    // 같은 장면을 여섯 조합으로 찍어 나란히 놓고 봤다(scratchpad/m4_grid.png):
+    //   Cineon(노출 1.15) · Reinhard(1.35) **둘 다 ACES 와 같은 병을 앓는다** — 잔디 초록이 회끼 돌게 바래고 길이 회색이 된다.
+    //   톤매핑이란 밝은 쪽을 눌러 담는 장치라, **원래 색이 선명한 카툰 화면에서는 누를 것이 색채뿐**이다.
+    // 그래서 셋 다 쓰지 않는다. 이건 "안 해봤다" 가 아니라 **해보고 고른 결과**다.
+    NGN.TONE = NGN.TONE || {};
+    this.renderer.toneMapping = THREE[NGN.TONE.map || 'NoToneMapping'];
+    this.renderer.toneMappingExposure = NGN.TONE.exposure === undefined ? 1.0 : NGN.TONE.exposure;
     stage.appendChild(this.renderer.domElement);
 
     this.scene.add(new THREE.HemisphereLight(0xE4F0F8, 0x46552F, 0.55));
     const sun = new THREE.DirectionalLight(0xFFF0D2, 1.0);
-    sun.position.set(20, 30, 14);
+    // 🔴 2026-09-07 밤 (사장님 "그림자 거리가 너무 길어서 떠 다녀"):
+    //    옛 자리 (20, 30, 14) 는 수평에서 **50.9도** — 그림자가 물체 높이의 **0.81배**만큼 옆으로 진다.
+    //    적 높이가 1.5칸이면 그림자가 1.2칸 옆에 떨어져서 **길 위 적들이 공중에 뜬 것처럼** 보였다.
+    //    물리적으로는 맞지만 **보기에 틀렸다** — 사람 눈은 물체와 그림자가 붙어 있어야 바닥에 놓인 것으로 읽는다.
+    //    그래서 카툰풍 게임은 그림자를 물체 바로 밑에 짧게 둔다.
+    //    네 각(50.9 / 65 / 72 / 80도)을 적이 길 위를 걸을 때·타워가 서 있을 때로 나란히 찍어 골랐다
+    //    (scratchpad/sun_angles.png · sun_enemy.png):
+    //      50.9 = 그림자가 몸에서 완전히 떨어진다 · 65 = 아직 옆으로 나간다
+    //      **72 = 적은 발밑에 붙고 타워·나무는 그림자로 입체감이 남는다** ✅ · 80 = 그림자가 너무 작아 입체감을 잃는다
+    //    방위(해가 오는 쪽)와 거리(38.7)는 그대로 두고 **고도만** 50.9° → 72° 로 올렸다. 그림자 길이 0.81배 → **0.32배**
+    sun.position.set(9.79, 36.79, 6.85);
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.isMobile ? 1024 : 2048, this.isMobile ? 1024 : 2048);
     sun.shadow.camera.near = 1; sun.shadow.camera.far = 120;
@@ -161,17 +220,31 @@ NGN.World = class World {
     rim.position.set(-12, 7, -14);
     this.scene.add(rim);
 
+    // 검증용 손잡이: 브라우저에서 조명·재질을 실제로 재고 비교하려면 장면에 닿을 수 있어야 한다.
+    // 게임 동작에는 쓰지 않는다(읽기 전용으로만 쓸 것).
+    NGN.world = this;
     this.root = new THREE.Group();
     this.scene.add(this.root);
     this.camAngle = 0;
     this.zoom = 1;
     this.frameTimes = []; this.lastDrop = 0;
+    // 자동 품질의 기억(watchFrame·setQuality 가 쓴다)
+    this.qualityCap = 4;      // 이 기기에서 **올라갈 수 있는** 최고 단계. 높은 자리에서 두 판 떨어지면 한 칸 내려 굳는다
+    this.qualityBase = 3;     // 판을 **시작할 때**의 단계. 빛번짐(4)은 여기서 시작하지 않는다 —
+                              // 여유가 10초 이어진 것이 확인돼야 watchFrame 이 올려 준다(그래야 느린 기기가 헛되이 떨어지지 않는다)
+    this.dropsAtCap = 0;      // 그 "두 번"을 세는 곳
+    this.cappedThisRound = false; // 이 판에서 이미 한 번 셌나(연속 낙하를 겹쳐 세지 않게)
+    this.goodSince = 0;       // 여유로운 상태가 시작된 시각(10초 이어져야 올린다)
+    this.raisedOnce = false;  // 이 판에서 한 번이라도 올렸나
+    this.qualityLocked = false; // 올렸다 도로 떨어졌다 → 이 판에서는 더 안 올린다
+    this.lastWatch = 0;       // 마지막으로 프레임을 잰 시각(웨이브 사이 공백을 알아채는 용도)
     // 창고 모델(attachModels 로 들어온다) · 카메라 흔들림 · 성 피격 · 불 자리(렌더러가 읽는다)
     this.models = null; this.parts = null;
-    this.camBase = new THREE.Vector3(); this.shakeT = 0; this.shakeS = 0; this.hitT = 0;
+    this.camBase = new THREE.Vector3(); this.trauma = 0; this.shakeScale = 1; this.hitT = 0; // trauma = 화면 흔들림 세기(0~1). shakeScale 은 설정(끄기·절반·기본)
     this.fireSpots = []; this.castleFireSpots = []; this.flagMeshes = []; this.castleFires = [[], [], []]; this.damageStage = 0;
     addEventListener('resize', () => this.resize());
     this.setMap(NGN.map);
+    this.buildPost(); // 빛번짐 준비(지도를 다 지은 뒤 — 화면 크기를 알아야 한다)
   }
 
   // 모델 로딩이 끝난 뒤 main.js 가 부른다. 그때부터 창고 장식·성·동굴로 다시 짓는다(못 읽었으면 코드 도형 그대로)
@@ -191,15 +264,15 @@ NGN.World = class World {
     this.C = C;
     this.scene.background = new THREE.Color(C.sky);
     if (this.scene.fog) this.scene.fog.color = new THREE.Color(C.fog);
-    const mat = (color, opts) => new THREE.MeshLambertMaterial(Object.assign({ color }, opts || {}));
+    const mat = (color, opts) => NGN.litMat(Object.assign({ color }, opts || {}));
     this.M = {
       grass: mat(C.grass), grassAlt: mat(C.grassAlt), outer: mat(C.outer), outerAlt: mat(C.outerAlt), cliff: mat(C.cliff), road: mat(C.road), roadEdge: mat(C.roadEdge),
       stone: mat(C.stone), stoneDark: mat(C.stoneDark), slot: mat(C.slot), wood: mat(C.wood),
       leaf: mat(C.leaf), leafAlt: mat(C.leafAlt), trunk: mat(C.trunk),
       air: new THREE.MeshBasicMaterial({ color: C.air, transparent: true, opacity: 0.55 }),
       shot: new THREE.MeshBasicMaterial({ color: C.shot }), spark: new THREE.MeshBasicMaterial({ color: C.spark }),
-      water: new THREE.MeshLambertMaterial({ color: C.water, transparent: true, opacity: 0.85 }),
-      pip: new THREE.MeshLambertMaterial({ color: 0xE8C34A, emissive: 0xE8C34A, emissiveIntensity: 0.35 }),
+      water: NGN.litMat({ color: C.water, transparent: true, opacity: 0.85 }),
+      pip: NGN.litMat({ color: 0xE8C34A, emissive: 0xE8C34A, emissiveIntensity: 0.35 }),
     };
     const B = map.BOUNDS;
     this.cx = (B.minX + B.maxX) / 2; this.cz = (B.minY + B.maxY) / 2;
@@ -220,6 +293,10 @@ NGN.World = class World {
     this.baseAngle = this.camDist(0) <= this.camDist(Math.PI / 2) ? 0 : Math.PI / 2;
     this.camAngle = this.baseAngle;
     this.buildScenery();
+    this.buildDecals(); // 잔존물(그을음) 판 — root 를 비웠으니 다시 만든다
+    this.markShadowDirty(); // 판이 통째로 바뀌었다 — 고정 그림자면 여기서 한 번 다시 굽는다
+    // 🛑 지도를 다 지은 뒤에 부른다 — 되돌리면 카메라를 다시 앉히는데, 그 전에 부르면 옛 지도 기준으로 앉는다
+    this.resetQualityWatch();
     this.resize();
   }
   toWorld(x, y, h = 0) { return new THREE.Vector3((x - this.cx) * NGN.SCALE, h, (y - this.cz) * NGN.SCALE); }
@@ -290,15 +367,20 @@ NGN.World = class World {
     //    **선**이 그어진 것처럼 보였다. 격자선은 목표가 아니었다 — 사장님 말씀은 "깔끔하게"였다.
     //    지금은 ⑴칸 사이를 거의 붙이고 ⑵바닥 대비를 은은하게 낮춰 **면**으로 읽히게 하고,
     //    ⑶대신 창고 지형 타일(둔덕·바위·나무)을 길·자리에서 떨어진 곳에 가끔 놓아 땅에 변화를 준다.
-    // 값은 네 가지 안을 화면에 나란히 놓고 눈으로 골랐다(2026-09-07 대조표):
-    //   1판(틈 0.44·바닥 0.40) = 선이 그어진 듯 지저분 · A(틈 0) = 깔끔하나 밋밋 · C(틈 0.18) = 아직 선이 읽힘
-    //   → **B: 틈 0.06 + 은은한 대비 + 채도 올린 잔디** — 선이 안 보이면서 완전 단색보다 미세한 결이 남는다
+    // 🔴 3판(2026-09-07 저녁, 사장님 "맵디자인은 개선되었어?" · 주 세션 실측):
+    //    2판(틈 0.06 · 칸밝기 1.16)은 **390×844 에서는 멀쩡해 보였지만 360×780·픽셀비율 3 에서 보니 둘 다 틀렸다.**
+    //    ⑴ **틈 0.06 이 여전히 선으로 읽혔다** — 틈 사이로 어두운 바닥이 비친다. 화면이 촘촘할수록 가는 선이 더 잘 보인다.
+    //       0.02 로 줄여도 읽혔다(대조표 F). **0 이어야 한다.** 칸의 존재감은 아래 칸마다 밝기(0.93~1.07)만으로 낸다 = 면으로 읽히는 땅.
+    //    ⑵ **칸 밝기 1.16 이 판 안쪽을 허옇게 띄웠다** — 판 밖은 진한 초록인데 판 안만 하얘서 따로 놀았다.
+    //       "무대처럼 떠 보이게" 하려던 것인데, 그건 **테두리 띠와 그림자**가 이미 하고 있다. 색으로까지 하니 과했다.
+    //    여섯 안(밝기 1.16·1.05·0.96·0.88 × 틈 0.06·0.02·0)을 한 화면에 놓고 골랐다 → scratchpad/ground_grid.png
+    // 🛑 **앞으로 땅 확인은 반드시 360×780·픽셀비율 3 으로 한다.** 390 으로 보면 이 문제가 안 보인다(두 번 속았다).
     const T = NGN.GROUND_TUNE || {};
-    const GAP = T.gap === undefined ? 0.06 : T.gap;          // 칸 사이 틈(선으로 안 보일 만큼만)
+    const GAP = T.gap === undefined ? 0 : T.gap;             // 칸 사이 틈 — **0**. 조금이라도 벌리면 선이 된다
     const BOARD_MUL = T.board === undefined ? 0.88 : T.board; // 바닥 어둡기(1 = 잔디와 같음)
-    const TINT_MUL = T.tint === undefined ? 1.16 : T.tint;    // 칸 밝기(회색조 칸이라 1 을 넘겨야 바닥 위로 뜬다)
+    const TINT_MUL = T.tint === undefined ? 0.88 : T.tint;    // 칸 밝기 — 바닥과 같은 값. grassAlt 가 grass 보다 조금 밝아 층은 남는다
     const FEATURE = T.feature === undefined ? 0.34 : T.feature; // 지형 타일을 놓을 칸의 비율
-    const boardMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(this.C.grass).multiplyScalar(BOARD_MUL) });
+    const boardMat = NGN.litMat({ color: new THREE.Color(this.C.grass).multiplyScalar(BOARD_MUL) });
     const board = new THREE.Mesh(new THREE.BoxGeometry(BW, 0.3, BD), boardMat);
     board.position.y = -0.15; board.receiveShadow = true; this.root.add(board);
     const TILE = 3, TS = TILE - GAP, tiles = [], outerTiles = [], feats = [];
@@ -403,7 +485,7 @@ NGN.World = class World {
   flag(pos, color) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.4, 5), this.M.wood);
     pole.position.copy(pos); pole.position.y = 1.2; pole.castShadow = true;
-    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.55), new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.55), NGN.litMat({ color, side: THREE.DoubleSide }));
     cloth.position.set(pos.x + 0.45, 2.05, pos.z);
     this.root.add(pole, cloth);
   }
@@ -555,6 +637,10 @@ NGN.World = class World {
     on = !!on;
     if (this.lobbyMode === on) return;
     this.lobbyMode = on;
+    // 로비 → 전투 = 새 판이 시작됐다. 여기서 품질을 이 기기 상한까지 되돌리고 처음부터 다시 잰다.
+    // 🛑 setMap 만으로는 모자란다 — main.js 는 지도가 실제로 바뀔 때만 setMap 을 부르므로(showMap),
+    //    같은 판을 다시 도전하면 지난 판에서 내려간 그림자가 그대로 꺼져 있었다
+    if (!on) this.resetQualityWatch();
     for (const c of this.root.children) c.visible = (c === this.stageMark) ? on : !on;
     // 로비 배경은 그 테마 하늘을 반쯤 어둡게 — 풀밭 하늘이 초록이라 초록 모형이 그대로 묻혔다(실측). 판에 들어가면 원래 하늘로 되돌린다
     this.scene.background = new THREE.Color(on ? brighten(this.C.sky, 0.55) : this.C.sky);
@@ -648,7 +734,17 @@ NGN.World = class World {
     if (this.gateMesh) { this.gateMesh.rotation.z = stage >= 2 ? -0.42 : 0; this.gateMesh.rotation.x = stage >= 2 ? 0.18 : 0; }
   }
   // 카메라 흔들림(0.6~1.0). 보스 등장·성 피격 때 렌더러가 부른다. render() 가 감쇠시키며 camBase 에 난수 오프셋을 더한다
-  shake(strength) { this.shakeT = 0.55; this.shakeS = Math.max(this.shakeS, strength || 0.8); }
+  // ---------- 화면 흔들림(M-4-4, 2026-09-07 전면 교체) ----------
+  // 옛 방식: 매 프레임 `Math.random()` 으로 **카메라 위치**를 튕겼다. 두 가지가 잘못됐다 —
+  //   ⑴ 난수는 앞뒤 프레임이 서로 무관해 화면이 **지직거린다**(흔들리는 게 아니라 떨린다).
+  //   ⑵ 3D 에서 위치를 흔들면 원근이 바뀌어 물체가 미끄러지고, 심하면 카메라가 땅을 파고든다.
+  // 새 방식(GDC 2016 Squirrel Eiserloh, "Math for Game Programmers: Juicing Your Cameras"):
+  //   · 이어진 잡음(SimplexNoise)을 쓴다 — 강연 원문 "Smoothed fractal noise is WAY better than random for screen shake"
+  //   · **위치 말고 회전만** 흔든다(pitch·yaw·roll 세 축을 각각 다른 잡음 줄에서 뽑는다)
+  //   · 세기는 `trauma` 라는 0~1 값 하나로 모으고, 화면에는 **trauma 의 제곱**을 쓴다 —
+  //     작은 충격은 거의 안 흔들리고 큰 충격만 확 흔들려서, 세기 차이가 저절로 생긴다.
+  // 흔들림이 어지러운 사람을 위해 `shakeScale`(0 끄기 / 0.5 절반 / 1 기본)을 곱한다 — main.js 가 설정에서 넣어 준다.
+  shake(strength) { this.trauma = Math.min(1, (this.trauma || 0) + (strength || 0.8) * 0.55); }
 
   // ---------- 장식 ----------
   // 풍경: 연못 둘(용암 테마면 용암 못) + 테마 장식 세트(창고 모델, 인스턴스) — 모델이 없으면 옛 코드 도형. 같은 시드(NGN.map.seed)면 같은 배치
@@ -705,18 +801,47 @@ NGN.World = class World {
     // 종류 풀
     const pools = { edge: [], far: [], road: [], water: [], pond: [], hill: [] };
     for (const it of set) for (const z of (it.zone === 'any' ? ['edge', 'far'] : [it.zone || 'edge'])) if (pools[z]) pools[z].push(it);
-    const counts = new Map();
-    const pick = (pool) => {
-      let tot = 0; const c = [];
-      for (const it of pool) { if (it.max && (counts.get(it) || 0) >= it.max) continue; c.push(it); tot += it.n || 1; }
-      if (!c.length) return null;
-      let r = rnd() * tot; for (const it of c) { r -= it.n || 1; if (r <= 0) return it; }
-      return c[c.length - 1];
+    // 🔴 2026-09-07 저녁 (사장님 "배경 너무 산만하지 않아? 조형물이 덕지덕지"):
+    //    장식이 572개였다. 땅이 약 7,900칸이니 **14칸마다 하나씩** — 판 위아래가 빈틈없이 덮였다.
+    //    🔑 개수는 예전부터 그대로였는데 이제야 걸린 이유: **판이 깨끗해지니 배경이 상대적으로 도드라졌다.**
+    //    🛑 "창고를 다 쓰라"와 충돌하지 않는다 — 그건 **종류를 다양하게** 쓰라는 뜻이지 빽빽하게 채우라는 뜻이 아니다.
+    //       종류는 그대로 두고 **개수만** 줄인다.
+    //    네 가지를 함께 손봤다(값은 아래 대조표에서 눈으로 골랐다):
+    //      ⑴개수 ⑵판 둘레 여백(판이 무대처럼 도드라지게 — 색으로 하려다 실패했던 그 효과를 여백으로)
+    //      ⑶밀도를 고르게 뿌리지 않는다(잡음으로 뭉치는 곳과 비는 곳을 만든다 — 균일하면 "벽지"가 된다)
+    //      ⑷큰 것 위주(작은 것 열 개보다 큰 나무 세 그루가 덜 산만하고 더 그럴듯하다)
+    const ST = NGN.SCENERY_TUNE || {};
+    //    여섯 안(572 / 307 / 306 / 306 / 208 / 145)을 한 화면에 놓고, 다시 셋(310 / 258 / 209)을 크게 봤다 —
+    //    310 은 숲 띠가 아직 촘촘하고, 209 는 배경이 허전해 "빈 들판에 나무 몇 그루"가 된다.
+    //    **258 개**에서 뭉친 곳과 빈 곳이 생기고 판 둘레 여백이 살아난다(scratchpad/scenery_grid.png · scenery_pick.png)
+    const N_EDGE = ST.edge === undefined ? 95 : ST.edge;      // 판 둘레 개수(옛 230)
+    const N_FAR = ST.far === undefined ? 120 : ST.far;        // 먼 땅 개수(옛 300)
+    const MARGIN = ST.margin === undefined ? 2.9 : ST.margin; // 판 테두리에서 띄울 여백(칸, 옛 0.4)
+    const CLUMP = ST.clump === undefined ? 0.88 : ST.clump;   // 뭉침 정도(0 = 예전처럼 고르게)
+    const BIG = ST.big === undefined ? 1.1 : ST.big;          // 큰 것 선호(0 = 예전처럼 크기 무시)
+    const nz = (CLUMP > 0 && THREE.SimplexNoise) ? new THREE.SimplexNoise() : null;
+    // 밀도 잡음 — 같은 자리는 늘 같은 값이라 씨앗이 같으면 배치도 같다(결정론 유지)
+    const denseOk = (x, z) => {
+      if (!nz) return true;
+      const v = (nz.noise(x * 0.028, z * 0.028) + 1) / 2;      // 0~1, 부드럽게 이어진다
+      return rnd() < (1 - CLUMP) + CLUMP * (v * v * 1.9);      // 제곱해서 빈 곳은 더 비고 뭉친 곳은 더 뭉친다
     };
+    const counts = new Map();
+    const fpCache = new Map();
     const footprint = (it) => {
       if (it.r) return it.r;
+      if (fpCache.has(it)) return fpCache.get(it);
       const p = it.p || (it.parts && it.parts[0] && it.parts[0].p); const sz = p && this.models.size(p);
-      return sz ? Math.max(sz.x, sz.z) / 2 : 0.4;
+      const v = sz ? Math.max(sz.x, sz.z) / 2 : 0.4;
+      fpCache.set(it, v); return v;
+    };
+    const weight = (it) => (it.n || 1) * (BIG ? Math.pow(Math.max(0.25, footprint(it)), BIG) : 1);
+    const pick = (pool) => {
+      let tot = 0; const c = [];
+      for (const it of pool) { if (it.max && (counts.get(it) || 0) >= it.max) continue; c.push(it); tot += weight(it); }
+      if (!c.length) return null;
+      let r = rnd() * tot; for (const it of c) { r -= weight(it); if (r <= 0) return it; }
+      return c[c.length - 1];
     };
     let placed = 0;
     // 항목 하나를 자리에 놓는다(묶음이면 조각들을 회전시켜 함께). fire 항목은 불 자리로
@@ -746,10 +871,11 @@ NGN.World = class World {
     // 🔴 판 안에는 장식을 하나도 놓지 않는다(2026-09-06). 판 둘레(edge)는 판 테두리 바깥 0.4~6.5칸 띠, 먼 땅(far)은 그 밖.
     //    길 옆(road) 장식은 전부 판 안이라 뺐다 — 울타리·가로등·수레가 타워 자리와 뒤섞여 어디가 자리인지 헷갈리게 했다. 개수(230+300)는 그대로라 안 산만해진다
     const EDGE_W = 6.5;
-    const genEdge = () => { const x = -hw - EDGE_W + rnd() * (2 * hw + 2 * EDGE_W), z = -hd - EDGE_W + rnd() * (2 * hd + 2 * EDGE_W); if (this.insideBoard(x, z, 0.4)) return null; return freeAt(x, z, 0.5) ? { x, z, zone: 'edge' } : null; };
+    const genEdge = () => { const x = -hw - EDGE_W + rnd() * (2 * hw + 2 * EDGE_W), z = -hd - EDGE_W + rnd() * (2 * hd + 2 * EDGE_W); if (this.insideBoard(x, z, MARGIN)) return null; if (!denseOk(x, z)) return null; return freeAt(x, z, 0.5) ? { x, z, zone: 'edge' } : null; };
     const genFar = () => {
       const x = -(hw + 18) + rnd() * (2 * hw + 36), z = -(hd + 33) + rnd() * (2 * hd + 66);
       if (Math.abs(x) < hw + EDGE_W && Math.abs(z) < hd + EDGE_W) return null; // 판 둘레는 edge 몫
+      if (!denseOk(x, z)) return null;
       return freeAt(x, z, 0.5) ? { x, z, zone: 'far' } : null;
     };
     const roadSpots = [];
@@ -765,9 +891,9 @@ NGN.World = class World {
     const withFace = (it, sp) => { if (!sp) return sp; if (it.face && sp.faceRy !== undefined) return { x: sp.bridgeX, z: sp.bridgeZ, ry: sp.faceRy, noOverlap: true, zone: 'water' }; return sp; };
     // ① 최소 개수가 있는 것(풍차·물레방아·밭·다리·잔해)부터 — 자리가 남아 있을 때
     for (const it of set) for (let k = 0; k < (it.min || 0); k++) for (let tries = 0; tries < 60; tries++) { const zone = it.zone === 'any' ? (rnd() < 0.5 ? 'edge' : 'far') : it.zone; const sp = withFace(it, spotOf(zone)); if (sp && put(it, sp)) break; }
-    // ② 판 둘레 230 · 먼 땅 300
-    for (let i = 0, n = 0; i < 5000 && n < 230; i++) { const sp = genEdge(); if (!sp) continue; const it = pick(pools.edge); if (!it) break; if (put(it, sp)) n++; }
-    for (let i = 0, n = 0; i < 6000 && n < 300; i++) { const sp = genFar(); if (!sp) continue; const it = pick(pools.far); if (!it) break; if (put(it, sp)) n++; }
+    // ② 판 둘레 · 먼 땅 (개수는 위 조절값)
+    for (let i = 0, n = 0; i < 9000 && n < N_EDGE; i++) { const sp = genEdge(); if (!sp) continue; const it = pick(pools.edge); if (!it) break; if (put(it, sp)) n++; }
+    for (let i = 0, n = 0; i < 11000 && n < N_FAR; i++) { const sp = genFar(); if (!sp) continue; const it = pick(pools.far); if (!it) break; if (put(it, sp)) n++; }
     // ③ 길 옆(후보의 65%) · 물가 · 연못 위 · 언덕 위
     while (roadSpots.length) { const sp = roadSpots.pop(); if (rnd() > 0.65) continue; const it = pick(pools.road); if (!it) break; put(it, sp); }
     while (waterSpots.length) { const sp = waterSpots.pop(); const it = pick(pools.water); if (!it) break; put(it, withFace(it, sp)); }
@@ -805,13 +931,13 @@ NGN.World = class World {
     instanced(new THREE.CylinderGeometry(0.13, 0.19, 1.0, 6), this.M.trunk, trunks, this.root);
     instanced(new THREE.ConeGeometry(0.72, 1.15, 7), this.M.leaf, cones1, this.root);
     instanced(new THREE.ConeGeometry(0.52, 0.95, 7), this.M.leafAlt, cones2, this.root);
-    const autumn = new THREE.MeshLambertMaterial({ color: 0xC9803A }), autumn2 = new THREE.MeshLambertMaterial({ color: 0xA8A03A });
+    const autumn = NGN.litMat({ color: 0xC9803A }), autumn2 = NGN.litMat({ color: 0xA8A03A });
     instanced(new THREE.SphereGeometry(0.75, 9, 7), autumn, rounds1, this.root);
     instanced(new THREE.SphereGeometry(0.75, 9, 7), autumn2, rounds2, this.root);
     const rockGeo = new THREE.DodecahedronGeometry(0.42, 0);
     instanced(rockGeo, this.M.stone, rocks1, this.root); instanced(rockGeo, this.M.stoneDark, rocks2, this.root);
     const flowerGeo = new THREE.SphereGeometry(0.14, 6, 5);
-    [0xE86A8A, 0xF2D25A, 0xF2F2F2, 0x9B6FE0].forEach((c, i) => instanced(flowerGeo, new THREE.MeshLambertMaterial({ color: c }), flowers[i], this.root));
+    [0xE86A8A, 0xF2D25A, 0xF2F2F2, 0x9B6FE0].forEach((c, i) => instanced(flowerGeo, NGN.litMat({ color: c }), flowers[i], this.root));
     this.sceneryCount = placed;
   }
 
@@ -819,9 +945,108 @@ NGN.World = class World {
   resize() {
     const w = this.stage.clientWidth, h = this.stage.clientHeight;
     this.renderer.setSize(w, h, false);
+    if (this.post) { this.post.setPixelRatio(this.renderer.getPixelRatio()); this.post.setSize(w, h); }
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.placeCamera();
+  }
+
+  // ---------- 잔존물(M-4-5) ----------
+  // 적이 죽은 자리·성이 맞은 자리에 **그을음이 땅에 남는다.** 타워 디펜스는 같은 길을 계속 보므로,
+  // 싸운 흔적이 남으면 "여기서 한참 버텼다"가 눈에 보인다(전투가 지나가도 화면이 리셋되지 않는다).
+  // 🛑 자국이 쌓여도 **그리기는 1회**여야 한다 → 납작한 사각형 하나를 InstancedMesh 로 64장 돌려 쓴다(링 버퍼).
+  //    three.js 의 인스턴스 색은 색만 바꿀 수 있고 투명도는 못 바꾸므로, 사라질 때는 **크기를 줄여서** 없앤다.
+  buildDecals() {
+    this.decals = null;
+    const tex = this.models && this.models.fxTexture;
+    if (!tex || !THREE.InstancedMesh) return;
+    const N = 64;
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2); // 땅에 눕힌다
+    // 파티클 아틀라스(4×4)의 '연기' 칸으로 UV 를 옮긴다 — 그을음처럼 가장자리가 부드러운 그림이다
+    const CELL = (NGN.CELL && NGN.CELL.smoke) || 1, col = CELL % 4, row = Math.floor(CELL / 4);
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (col + uv.getX(i)) * 0.25, (row + uv.getY(i)) * 0.25);
+    uv.needsUpdate = true;
+    // 🛑 불투명도·크기·높이 셋 다 실측하며 올렸다. 처음 값(0.42 · 1.5 · y 0.045)으로는 **화면에서 아예 안 보였다** —
+    //    연기 그림이 가장자리가 매우 옅어 실효 크기가 작고, 땅 타일에 높낮이가 있어 낮게 깔면 묻힌다
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.7, depthWrite: false, color: 0xFFFFFF });
+    const m = new THREE.InstancedMesh(geo, mat, N);
+    m.frustumCulled = false; m.renderOrder = 2;
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < N; i++) m.setMatrixAt(i, zero);
+    this.root.add(m);
+    this.decals = m; this.decalN = N; this.decalAt = 0;
+    this.decalAge = new Float32Array(N).fill(1e9); // 큰 값 = 이미 사라진 자리
+    this.decalLife = new Float32Array(N);
+    this.decalSize = new Float32Array(N);
+    this.decalPos = new Float32Array(N * 3);
+    this.decalRot = new Float32Array(N);
+    this._dm = new THREE.Matrix4(); this._dq = new THREE.Quaternion(); this._dv = new THREE.Vector3(); this._ds = new THREE.Vector3();
+  }
+  // 자국 하나 남기기. at = 세계 좌표(THREE.Vector3), size = 지름, color = 색, life = 몇 초 남을지
+  addDecal(at, size, color, life) {
+    const m = this.decals; if (!m) return;
+    const i = this.decalAt; this.decalAt = (i + 1) % this.decalN;
+    this.decalPos[i * 3] = at.x; this.decalPos[i * 3 + 1] = 0.13; this.decalPos[i * 3 + 2] = at.z; // 땅 타일의 높낮이(tile-bump 등)보다 위 — 더 낮게 두면 묻힌다
+    this.decalRot[i] = Math.random() * Math.PI * 2; // 같은 그림이 반복돼 보이지 않게 돌려 놓는다
+    this.decalSize[i] = size || 2.6;
+    this.decalLife[i] = life || 11;
+    this.decalAge[i] = 0;
+    if (m.setColorAt) { m.setColorAt(i, (this._dc || (this._dc = new THREE.Color())).set(color === undefined ? 0x2A2118 : color)); if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+  }
+  // 매 프레임: 나이를 먹이고, 마지막 25% 구간에서 오그라들며 사라진다
+  updateDecals(dt) {
+    const m = this.decals; if (!m) return;
+    let dirty = false;
+    for (let i = 0; i < this.decalN; i++) {
+      const life = this.decalLife[i];
+      if (this.decalAge[i] > life) continue;
+      this.decalAge[i] += dt;
+      const age = this.decalAge[i], left = life - age;
+      let s = this.decalSize[i];
+      // 🛑 나타나고 사라지는 시간은 **절대 시간**이어야 한다. 처음엔 수명 대비 비율(6%·25%)로 했다가,
+      //    수명이 긴 자국(보스 20초)은 나타나는 데만 1.2초가 걸려 **화면에서 안 보였다**(실측하다 발견).
+      if (age < 0.18) s *= age / 0.18;                     // 0.18초에 걸쳐 커지며 나타난다
+      else if (left < 1.6) s *= Math.max(0, left / 1.6);   // 마지막 1.6초 동안 오그라들며 사라진다
+      this._dv.set(this.decalPos[i * 3], this.decalPos[i * 3 + 1], this.decalPos[i * 3 + 2]);
+      this._dq.setFromAxisAngle(UP, this.decalRot[i]);
+      this._ds.set(s, 1, s);
+      m.setMatrixAt(i, this._dm.compose(this._dv, this._dq, this._ds));
+      dirty = true;
+    }
+    if (dirty) m.instanceMatrix.needsUpdate = true;
+  }
+
+  // ---------- 빛번짐(M-4-1) ----------
+  // 밝은 곳이 화면으로 번져 나오는 효과. 눈으로 보면 "빛난다"고 느끼는 것의 정체다.
+  // 화면에 바로 그리지 않고 그림을 한 장 떠서 손본 뒤 내보내는 방식(후처리)이라, **맨 끝에 감마 보정을 반드시 넣어야 한다** —
+  // 안 넣으면 지금 색 설정(sRGB 출력)이 중간 그림에는 적용되지 않아 화면이 통째로 어두워진다.
+  // 🛑 폰에서 제일 비싼 것이 이것이다. 그래서 자동 품질의 **가장 먼저 빠지는 단계**(4)로 두었다.
+  buildPost() {
+    if (this.post || !THREE.EffectComposer || !THREE.UnrealBloomPass) return;
+    const w = this.stage.clientWidth || 1, h = this.stage.clientHeight || 1;
+    const T = NGN.BLOOM || {};
+    const c = new THREE.EffectComposer(this.renderer);
+    c.addPass(new THREE.RenderPass(this.scene, this.camera));
+    // 세기 · 번지는 반경 · 문턱(이 밝기를 넘는 곳만 번진다).
+    // 🔑 **문턱이 이 게임의 전부다.** 우리 화면은 밝은 배경(연두 잔디·흰 길·하늘)이라,
+    //    흔히 쓰는 문턱 0.8 대를 쓰면 **길과 잔디가 통째로 번져 안개 낀 화면**이 된다(실측: scratchpad/m4_thresh.png 의 B).
+    //    문턱을 1.3 까지 올리면 조명을 받아 정말 밝은 것(흰 타워·얼음·섬광·번개)만 빛나고 길은 그대로 있다.
+    //    네 값(번짐 없음 / 0.82 / 1.00 / 1.30)을 같은 장면에서 찍어 나란히 놓고 문턱을 골랐고(scratchpad/m4_thresh.png),
+//    세기는 문턱을 고정한 채 0.62·0.95·1.35 를 다시 비교해 골랐다(scratchpad/m4_strength.png) —
+//    0.62 는 눈으로 차이를 못 느끼고, 1.35 는 흰 길까지 번진다. 0.95 가 "빛나는 것은 빛나되 길은 길로 남는" 지점이다.
+    const b = new THREE.UnrealBloomPass(new THREE.Vector2(w, h),
+      T.strength === undefined ? 0.95 : T.strength,
+      T.radius === undefined ? 0.40 : T.radius,
+      T.threshold === undefined ? 1.25 : T.threshold);
+    c.addPass(b);
+    c.addPass(new THREE.ShaderPass(THREE.GammaCorrectionShader)); // 🛑 반드시 맨 끝
+    c.setPixelRatio(this.renderer.getPixelRatio());
+    c.setSize(w, h);
+    this.post = c; this.bloom = b;
+    this.postOn = this.quality >= 4;
   }
   // 판 전체가 화면에 들어오는 가장 가까운 거리를 계산한다. 세로 폰에서는 거의 언제나 가로폭이 한계라(폭 35 단위 ≈ 390px) 그 거리가 된다.
   // 기울기 62°(세로) — 72° 는 너무 수직이라 타워가 원판처럼 보였다. 62° 면 옆면이 보여 "탑"으로 읽힌다.
@@ -866,6 +1091,7 @@ NGN.World = class World {
     this.camera.position.set(look.x + Math.sin(this.camAngle) * cr, cy, look.z + Math.cos(this.camAngle) * cr);
     this.camera.lookAt(look);
     this.camBase.copy(this.camera.position); // 흔들림(shake)의 기준 위치
+    this.camQuat = (this.camQuat || new THREE.Quaternion()).copy(this.camera.quaternion); // 흔들림은 이 방향에서 회전만 얹는다
     this.dist = dist;
     // 안개는 껐다(2026-09-06). 남겨 두면(fog 가 있으면) 판 너머(카메라 거리의 1.15배)부터만
     if (this.scene.fog) { this.scene.fog.near = dist * (this.quality <= 0 ? 1.05 : 1.15); this.scene.fog.far = dist * (this.quality <= 0 ? 1.5 : 2.0); }
@@ -873,42 +1099,134 @@ NGN.World = class World {
     this.camera.updateProjectionMatrix();
   }
 
-  // ---------- 자동 품질: 프레임 시간이 20ms 를 30프레임 연속 넘으면 한 단계 낮춘다(5초에 한 번) ----------
+  // ---------- 자동 품질(3 최고 … 0 최저) ----------
+  // 🔴 2026-09-07: 옛 코드에는 **내리는 길만 있고 올리는 길이 없었다.** 한 판에서 잠깐 버벅이면 그 뒤로 계속
+  //    그림자 없는 납작한 화면을 봐야 했다(페이지를 새로 열기 전에는 안 돌아온다).
+  // 🔴 게다가 내리는 기준(17ms)이 **60Hz 화면의 정상 프레임(16.7ms)과 거의 붙어 있어** 멀쩡한 기기도 쉽게 떨어졌다.
+  //    이제 목표는 60fps — 22ms(45fps)보다 느릴 때만 내리고, 17.5ms(57fps)보다 빠른 상태가 오래 이어지면 올린다.
+  //    깜빡임(오르내리기 반복)은 넷으로 막는다: ⑴올리는 기준을 내리는 기준과 4.5ms 떨어뜨리고
+  //    ⑵좋은 상태가 10초 이어져야 올리며 ⑶한 번 올렸다 다시 떨어지면 **그 판에서는 다시 안 올리고**
+  //    ⑷가장 높은 자리에서 두 판 떨어지면 그 단계를 이 기기의 상한으로 굳힌다.
   watchFrame(dtMs, now) {
+    // 🛑 이 함수는 **웨이브가 도는 동안에만** 불린다(main.js: game.wave && !paused).
+    //    웨이브 사이의 빈 시간을 "여유로웠던 시간"으로 착각하면 안 되므로, 1초 넘게 끊겼으면 세던 것을 버린다
+    if (this.lastWatch && now - this.lastWatch > 1000) { this.frameTimes.length = 0; this.goodSince = 0; }
+    this.lastWatch = now;
     if (!this.warmup) this.warmup = now + 4000; // 시작 직후 로딩 스파이크는 재지 않는다
     if (now < this.warmup) return;
     this.frameTimes.push(dtMs); if (this.frameTimes.length > 30) this.frameTimes.shift();
-    if (this.frameTimes.length < 30 || now - this.lastDrop < 5000 || this.quality <= 0) return;
-    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / 30;
-    if (avg > 17) { this.lowerQuality(); this.lastDrop = now; this.frameTimes.length = 0; }
+    if (this.frameTimes.length < 30) return;
+    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+    if (avg > 22) { // 느리다 → 한 단계 내린다
+      this.goodSince = 0;
+      if (this.quality > 0 && now - this.lastDrop > 5000) {
+        if (this.raisedOnce) this.qualityLocked = true; // 올렸다가 도로 떨어졌다 = 이 판에서는 다시 안 올린다
+        // 가장 높은 자리에서 떨어진 것이 두 판째면 이 기기의 상한을 한 칸 내려 굳힌다(판마다 켰다 끄기를 반복하지 않게).
+        // 🛑 한 판에 한 번만 센다 — 안 그러면 3→2→1→0 연속 낙하가 전부 세어져 한 번 무거웠다는 이유로 상한이 바닥에 굳는다
+        if (this.quality === this.qualityCap && !this.cappedThisRound) {
+          this.cappedThisRound = true;
+          if (++this.dropsAtCap >= 2) { this.qualityCap = this.quality - 1; this.dropsAtCap = 0; }
+        }
+        this.setQuality(this.quality - 1, '낮춤');
+        this.lastDrop = now; this.frameTimes.length = 0;
+      }
+      return;
+    }
+    if (avg > 17.5) { this.goodSince = 0; return; } // 어중간하면 아무것도 안 한다
+    if (this.quality >= this.qualityCap || this.qualityLocked) return;
+    if (!this.goodSince) { this.goodSince = now; return; }
+    if (now - this.goodSince > 10000 && now - this.lastDrop > 8000) { // 여유가 10초 이어졌다 → 한 단계 올린다
+      this.setQuality(this.quality + 1, '올림'); this.raisedOnce = true; this.goodSince = 0; this.frameTimes.length = 0;
+      // 🛑 올린 직후 1.5초는 재지 않는다. 빛번짐을 처음 켜는 순간 **셰이더를 컴파일하느라 한 프레임이 크게 튀는데**,
+      //    그걸 "이 기기는 못 버틴다"로 오해해서 1.4초 만에 도로 꺼 버렸다(실측하다 발견)
+      this.warmup = now + 1500;
+    }
   }
-  lowerQuality() {
-    this.quality--;
-    if (this.quality === 2) this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.0));
-    else if (this.quality === 1) { this.renderer.shadowMap.enabled = false; this.sun.castShadow = false; this.root.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
-    else if (this.quality <= 0) { this.renderer.setPixelRatio(Math.min(devicePixelRatio, 0.75)); this.placeCamera(); }
-    console.log('품질 낮춤 →', this.quality, '픽셀비율', this.renderer.getPixelRatio(), '그림자', this.renderer.shadowMap.enabled);
+  // 단계별 설정을 한곳에 모은다(내릴 때와 올릴 때가 어긋나지 않게).
+  // 🔴 2026-09-07 2판 — **순서를 다시 짰다.** 1판에서는 무거워지면 그림자가 꺼졌는데,
+  //    화면이 납작해 보이는 가장 큰 원인이 바로 그림자다. 빛번짐을 얻고 그림자를 잃으면 **손해다**(실측 확인).
+  // 🔑 그래서 "그림자를 끄는 칸"을 **없앴다.** 대신 그림자를 싸게 만든다 —
+  //    우리 해는 움직이지 않고 나무·바위·타워도 안 움직인다. 그런데 three.js 는 그림자를 **매 프레임 다시 굽고 있었다.**
+  //    한 번 굽고 고정하면 값이 1/3 이 된다(실측 0.13ms → 0.04ms). 대가는 **움직이는 적의 그림자 하나뿐**이다.
+  //   4 = 픽셀 상한  · 그림자 매프레임 · 빛번짐 O   ← 여유가 확인된 기기만 여기까지 올라온다
+  //   3 = 픽셀 상한  · 그림자 매프레임 · 빛번짐 X   ← **여기서 시작한다**(빛번짐은 기본 꺼짐)
+  //   2 = 픽셀 1.0   · 그림자 매프레임 · 빛번짐 X
+  //   1 = 픽셀 1.0   · 그림자 **고정**  · 빛번짐 X   ← 적 그림자만 포기, 배경·타워 그림자는 그대로
+  //   0 = 픽셀 0.75  · 그림자 고정      · 빛번짐 X   ← 가장 낮은 칸에서도 그림자는 살아 있다
+  //   🛑 그림자를 아예 끄는 것은 **설정에서 사장님이 직접 끌 때뿐**이다(자동으로는 절대 안 끈다).
+  // 단계별 픽셀 배율. 예전엔 「3단 이상=상한 · 1~2단=1.0 · 0단=0.75」 세 칸뿐이라
+  // 좋은 폰이든 느린 폰이든 거의 같은 흐릿한 화면을 봤다(폰 상한이 1.5 였으므로).
+  // 이제 칸마다 다르게 준다 — 폰 2.5 / 2.0 / 1.5 / 1.25 / 1.0 (0단은 그래도 1.0 을 지킨다).
+  // 🛑 느린 폰은 watchFrame 이 알아서 칸을 내린다. 여기서 겁먹고 낮게 시작할 이유가 없다.
+  pixelFor(q) {
+    const cap = this.maxPixelRatio;
+    const f = q >= 4 ? 1.0 : q >= 3 ? 0.8 : q >= 2 ? 0.6 : q >= 1 ? 0.5 : 0.4;
+    return Math.min(devicePixelRatio, Math.max(1.0, cap * f));
+  }
+  setQuality(q, why) {
+    q = Math.max(0, Math.min(4, q));
+    if (q === this.quality) return;
+    this.quality = q;
+    this.renderer.setPixelRatio(this.pixelFor(q));
+    this.setShadowStatic(q <= 1);
+    this.postOn = (q >= 4) && !!this.post;
+    this.placeCamera();
+    console.log('품질 ' + (why || '바꿈') + ' →', q, '픽셀비율', this.renderer.getPixelRatio(),
+      '그림자', this.renderer.shadowMap.enabled ? (this.shadowStatic ? '고정' : '매프레임') : '꺼짐', '빛번짐', this.postOn);
+  }
+  // 그림자를 "한 번 굽고 고정" 으로 바꾼다. 고정 동안에는 움직이는 적이 그림자를 지지 않게 한다 —
+  // 안 그러면 적이 지나간 자리에 그림자가 **얼룩처럼 남는다**(그림자 그림이 갱신되지 않으므로)
+  setShadowStatic(on) {
+    on = !!on;
+    if (this.shadowStatic === on) return;
+    this.shadowStatic = on;
+    this.renderer.shadowMap.autoUpdate = !on;
+    if (this.onShadowStatic) this.onShadowStatic(on); // 렌더러가 적 메시의 그림자를 켜고 끈다
+    this.markShadowDirty();
+  }
+  // 판이 바뀌거나 타워를 짓는 등 **그림자에 나올 것이 달라졌을 때** 부른다. 고정 모드에서 딱 한 프레임만 다시 굽는다
+  markShadowDirty() { if (this.renderer.shadowMap.enabled) this.renderer.shadowMap.needsUpdate = true; }
+  lowerQuality() { this.setQuality(this.quality - 1, '낮춤'); }
+  // 새 판이 시작될 때: 품질을 이 기기의 상한까지 되돌리고 측정을 처음부터 다시 한다.
+  // 지난 판이 유난히 무거웠을 뿐일 수 있으니 새 판에서 한 번 더 시험해 본다(두 판 연속 실패하면 watchFrame 이 상한을 내린다)
+  resetQualityWatch() {
+    this.raisedOnce = false; this.qualityLocked = false; this.goodSince = 0; this.cappedThisRound = false;
+    this.frameTimes.length = 0; this.warmup = 0; this.lastDrop = 0; this.lastWatch = 0;
+    const start = Math.min(this.qualityCap, this.qualityBase);
+    if (this.quality < start) this.setQuality(start, '판 시작·되돌림');
   }
   // 매 프레임: 카메라 흔들림 감쇠(camBase + 난수 오프셋) · 성 피격 움찔(성문·깃발) · 그리기
   render() {
     const now = performance.now(), dt = Math.min(0.1, (now - (this.lastT || now)) / 1000); this.lastT = now;
-    if (this.shakeT > 0) {
-      this.shakeT = Math.max(0, this.shakeT - dt);
-      const k = this.shakeS * (this.shakeT / 0.55) * 0.5;
-      this.camera.position.set(this.camBase.x + (Math.random() - 0.5) * k, this.camBase.y + (Math.random() - 0.5) * k * 0.6, this.camBase.z + (Math.random() - 0.5) * k);
+    // 흔들림: trauma 를 시간으로 깎고, 화면에는 그 제곱을 쓴다. 위치는 건드리지 않고 방향만 돌린다
+    if (this.trauma > 0) {
+      this.trauma = Math.max(0, this.trauma - dt * 1.6); // 약 0.6초면 잦아든다
+      const amp = this.trauma * this.trauma * (this.shakeScale === undefined ? 1 : this.shakeScale);
+      if (amp > 0.0005 && this.camQuat) {
+        if (!this.noise && THREE.SimplexNoise) this.noise = new THREE.SimplexNoise();
+        const t = now * 0.021; // 잡음을 훑는 속도 — 높이면 잘고 빠르게, 낮추면 크고 느리게 흔들린다
+        const n = this.noise ? (r) => this.noise.noise(t, r) : () => 0;
+        const MAX = 0.026; // 라디안(약 1.5°). 화각이 22° 로 좁아 이보다 크면 화면이 휙휙 돈다
+        this.camera.quaternion.copy(this.camQuat);
+        this.camera.rotateZ(n(11.3) * amp * MAX * 1.35); // roll(화면이 갸우뚱) 이 가장 잘 보인다
+        this.camera.rotateX(n(31.7) * amp * MAX);        // pitch
+        this.camera.rotateY(n(57.1) * amp * MAX);        // yaw
+      }
       this.shaking = true;
-    } else if (this.shaking) { this.camera.position.copy(this.camBase); this.shaking = false; this.shakeS = 0; }
+    } else if (this.shaking) { if (this.camQuat) this.camera.quaternion.copy(this.camQuat); this.shaking = false; }
     if (this.hitT > 0) {
       this.hitT = Math.max(0, this.hitT - dt);
       const k = this.hitT / 0.3;
       if (this.gateMesh) this.gateMesh.rotation.y = Math.sin(now * 0.05) * 0.14 * k;
       for (const f of this.flagMeshes) f.rotation.z = Math.sin(now * 0.04) * 0.22 * k;
     }
+    this.updateDecals(dt); // 잔존물(그을음)이 나이를 먹고 서서히 사라진다
     this.breatheSlots(now); // 빈 자리 금테가 숨 쉰다(인스턴스 색만 갱신 — 그리기 횟수 0 증가)
     if (this.stageMark && this.stageMark.visible) { // 로비 표지: 천천히 돌고 살짝 오르내린다
       this.stageMark.rotation.y += dt * 0.35;
       this.stageMark.position.y = this.stageMarkY + Math.sin(now * 0.0011) * 0.5;
     }
-    this.renderer.render(this.scene, this.camera);
+    if (this.postOn && this.post) this.post.render(dt);
+    else this.renderer.render(this.scene, this.camera);
   }
 };

@@ -170,7 +170,7 @@ NGN.Models = class Models {
       const placed = this.place(Q, 0); if (!placed) return null;
       const g = new THREE.Group(); g.add(placed.obj);
       const merged = this.mergeGroup(g, { outline: false, accent: new THREE.Color(P.tint || 0xffffff), base: new THREE.Color(P.tint || 0xffffff) });
-      this.sceneryMat = this.sceneryMat || new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true });
+      this.sceneryMat = this.sceneryMat || NGN.litMat({ map: this.atlas, vertexColors: true });
       this.pieceGeo.set(key, merged.body ? { geometry: merged.body, material: this.sceneryMat, height: placed.height, size: this.templates.get(P.p).size.clone() } : null);
     }
     return this.pieceGeo.get(key);
@@ -282,7 +282,7 @@ NGN.Models = class Models {
     const key = family + ':' + (element || '');
     if (!this.towerMats.has(key)) {
       const glowHex = (NGN.ELEMENT_COLOR && element && NGN.ELEMENT_COLOR[element]) || 0xFFFFFF;
-      this.towerMats.set(key, new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true, emissive: glowHex, emissiveIntensity: 0.1 })); // 0.07 → 0.1(2026-09-06 진하게). 0.2 를 넘기면 명암이 날아간다(실측)
+      this.towerMats.set(key, NGN.litMat({ map: this.atlas, vertexColors: true, emissive: glowHex, emissiveIntensity: 0.1 })); // 0.07 → 0.1(2026-09-06 진하게). 0.2 를 넘기면 명암이 날아간다(실측)
     }
     return this.towerMats.get(key);
   }
@@ -436,7 +436,7 @@ NGN.Models = class Models {
   buildEnemy(kind) {
     const T = this.enemyTemplate(kind); if (!T) return null;
     const spec = T.spec;
-    this.enemyMat = this.enemyMat || new THREE.MeshLambertMaterial({ map: this.atlas, vertexColors: true, skinning: true }); // r128 은 skinning 플래그가 있어야 뼈 셰이더가 붙는다
+    this.enemyMat = this.enemyMat || NGN.litMat({ map: this.atlas, vertexColors: true, skinning: true }); // r128 은 skinning 플래그가 있어야 뼈 셰이더가 붙는다
     const inner = new THREE.Group(); inner.position.set(-T.center.x, -T.min.y, -T.center.z);
     const bones = T.tree.map((e) => { const b = new THREE.Bone(); b.name = e.name; b.position.copy(e.p); b.quaternion.copy(e.q); b.scale.copy(e.s); return b; });
     T.tree.forEach((e, i) => { if (e.parent < 0) inner.add(bones[i]); else bones[e.parent].add(bones[i]); });

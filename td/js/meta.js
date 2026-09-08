@@ -142,7 +142,7 @@ NGN.Meta = class Meta {
     const firstClear = cleared && !this.clearedAny(stage.id);
     const prevRec = this.myRecord('s', stage.id, NGN.DIFF_SHORT[diff]);
     const held = cleared ? stage.waves : Math.max(0, Math.min(stage.waves, Math.floor(wavesHeld) || 0));
-    if (!cleared) give(Math.floor(held / 3) + 1, held > 0 ? `웨이브 ${held}까지 막았다 (${held}÷3+1)` : '한 판 했다');
+    if (!cleared) give(Math.floor(held / 3) + 1, held > 0 ? `웨이브 ${held}까지` : '한 판 했다');
     else {
       give(T.perGame, '한 판 했다');
       if (gained > 0) { this.state.starsBy[diff][stage.id] = stars; this.seasonAdd('star', gained); this.missionProgress('star', gained); }

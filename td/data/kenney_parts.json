@@ -3,8 +3,8 @@
   "_출처": "https://github.com/shorepine/kenney (Kenney.nl 공식 미러) — Creative Commons Zero. 매핑은 우리가 정한 것. 2026-09-06 계열마다 몸통·무기를 다른 팩에서 골라 실루엣을 갈랐다(checklist J-1).",
   "_규칙": "타워 = stack 을 아래에서 위로 쌓는다. 조각은 문자열('팩/이름') 또는 객체. 객체 칸: p=팩/이름 · s=배율(TD 킷 1칸 폭 기준) · y/x/z=위치 보정 · r=이 조각이 다음 조각을 얼마나 밀어올리나(0~1, 기본 1. 머리·장식은 0) · head=적을 향해 도는 머리(별도 메시) · headNode=머리로 돌릴 노드 이름(나머지는 몸통) · anim=aim|bob|spin · raw=텍스처 원색 유지(회색조+속성색 안 함) · accent=속성 원색으로(기본은 돌빛과 섞음) · tint=이 조각만 다른 색 · recolor={재질이름: 색|'tint'} (텍스처 없는 팩 — space 는 metalRed 만 바꾸면 파랑·흰 SF 색이 그대로 난다) · fx=상시 효과(flame|spark|mist).",
 
-  "towerScale": 3.1,
-  "enemyScale": 2.0,
+  "towerScale": 3.7,
+  "enemyScale": 2.5,
 
   "towers": {
     "shrub": { "tint": "#5FC24A", "recolor": { "grass": "tint", "leafsGreen": "tint", "leafsDark": "#3E9C3A" }, "stack": {

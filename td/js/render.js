@@ -6,8 +6,8 @@
 // 파티클은 THREE.Points 하나(최대 600개)로 그려 그리기 1회.
 window.NGN = window.NGN || {};
 
-const lam = (color, opts) => new THREE.MeshLambertMaterial(Object.assign({ color }, opts || {}));
-const glow = (color, opts) => new THREE.MeshLambertMaterial(Object.assign({ color, emissive: color, emissiveIntensity: 0.55 }, opts || {}));
+const lam = (color, opts) => NGN.litMat(Object.assign({ color }, opts || {}));
+const glow = (color, opts) => NGN.litMat(Object.assign({ color, emissive: color, emissiveIntensity: 0.55 }, opts || {}));
 // 공격 타입별 색·투사체 모양(계열 표에 없는 계열의 기본값)
 const SHOT = {
   physical: { color: 0xF2E6C8, kind: 'arrow', speed: 46 },
@@ -183,6 +183,8 @@ NGN.Renderer = class Renderer {
     this.showRange(null); this.floatQueue.length = 0;
     // 지도가 바뀌면 파티클도 새 root 에
     this.makeFx();
+    // 그림자 고정 모드가 켜지고 꺼질 때 world 가 알려 주면, 화면에 있는 적들의 그림자를 함께 맞춘다
+    this.world.onShadowStatic = () => this.onShadowStaticChanged();
   }
   // 파티클: 입자 그림(Kenney)이 있으면 스프라이트 시스템(fx.js), 없으면 옛 점 파티클. 번개도 여기서
   makeFx() {
@@ -225,7 +227,7 @@ NGN.Renderer = class Renderer {
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     this._flagGeo.set(colorHex, geo); return geo;
   }
-  flagMat() { return this._flagMat = this._flagMat || new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xFFFFFF, emissiveIntensity: 0.12 }); }
+  flagMat() { return this._flagMat = this._flagMat || NGN.litMat({ vertexColors: true, emissive: 0xFFFFFF, emissiveIntensity: 0.12 }); }
   cachedMat(kind, color, make) { const k = kind + ':' + color; if (!this._matCache.has(k)) this._matCache.set(k, make()); return this._matCache.get(k); }
   // 발밑 빛: 가운데가 밝고 가장자리로 사라지는 원(캔버스 한 장을 모두가 나눠 쓴다)
   glowSprite(color, size) {
@@ -282,9 +284,23 @@ NGN.Renderer = class Renderer {
     if (u.badge) { g.remove(u.badge); u.badge = null; }
     if (level >= 1 || branch) { const b = this.levelBadge(level + 1, branch); b.position.y = u.height + 0.9; g.add(b); u.badge = b; }
   }
+  // 적 하나의 그림자를 지금 모드에 맞춘다. 그림자 고정 모드(품질 1 이하)에서는 **적이 그림자를 지지 않는다** —
+  // 그림자 그림이 갱신되지 않으므로, 켜 두면 적이 지나간 자리에 그림자가 얼룩처럼 눌어붙는다.
+  // 배경(나무·바위)과 타워 그림자는 그대로 남으므로 화면의 입체감은 지켜진다
+  applyEnemyShadow(g) {
+    const off = !!(this.world && this.world.shadowStatic);
+    g.traverse((o) => { if (o.isMesh || o.isSkinnedMesh) { if (off) { if (o.castShadow) o.userData._hadShadow = true; o.castShadow = false; } else if (o.userData._hadShadow) o.castShadow = true; } });
+  }
+  // 그림자 고정 모드가 켜지고 꺼질 때 world 가 불러 준다 — 이미 화면에 있는 적들도 함께 맞춘다
+  onShadowStaticChanged() { for (const g of this.enemyMeshes.values()) this.applyEnemyShadow(g); }
+
   syncTowers(game) {
     // 로비 모드(K-2-8): 판이 없을 때는 지도를 통째로 숨기고 표지만 보인다. 메뉴에서 넘어오는 가짜 판은 { towersBuilt: [], enemies: [], events: [] } 뿐이라 slots 가 없다(main.js 프레임 루프)
     if (this.world.setLobbyMode) this.world.setLobbyMode(!game.slots);
+    // 그림자 고정 모드(품질 1 이하)에서는 그림자 그림이 갱신되지 않는다 —
+    // 타워를 짓거나 팔거나 승급하면 **그때 한 프레임만** 다시 구워야 새 타워에 그림자가 생긴다
+    const towerSig = game.towersBuilt.length;
+    if (towerSig !== this._towerSig) { this._towerSig = towerSig; if (this.world.markShadowDirty) this.world.markShadowDirty(); }
     const seen = new Set();
     for (const inst of game.towersBuilt) {
       seen.add(inst.id);
@@ -388,7 +404,7 @@ NGN.Renderer = class Renderer {
     for (const e of game.enemies) {
       seen.add(e.id);
       let g = this.enemyMeshes.get(e.id);
-      if (!g) { g = this.enemyMesh(e); this.world.root.add(g); this.enemyMeshes.set(e.id, g); }
+      if (!g) { g = this.enemyMesh(e); this.applyEnemyShadow(g); this.world.root.add(g); this.enemyMeshes.set(e.id, g); }
       const u = g.userData;
       const slowed = e.slowUntil > waveTime && e.slowRatio > 0;
       const ix = (e.px === undefined ? e.x : e.px) + (e.x - (e.px === undefined ? e.x : e.px)) * a;
@@ -516,10 +532,23 @@ NGN.Renderer = class Renderer {
         if ((ev.enemy.boss || ev.dmg >= ev.enemy.maxHp * 0.30) && this.time - this.hitStopAt > 0.5) {
           this.hitStopAt = this.time; this.hitStop = ev.enemy.boss ? 0.055 : 0.04;
         }
+        // 🔑 "쫀득함"의 정체(M-4, 셀레스트 출시 코드 실측): **정지를 단독으로 쓴 곳이 한 곳도 없다** —
+        //    번쩍 + 정지 + 흔들림 + 소리 + 파티클이 **같은 프레임에 겹쳐야** 손맛이 난다.
+        //    위에서 움찔·흰 번쩍·넉백·정지가 이미 걸렸으니, 여기서 흔들림과 소리를 같은 자리에 얹는다.
+        // 🛑 한 대마다 세게 흔들면 멀미가 난다. 큰 타격만, 0.12초에 한 번, 아주 약하게(0.05~0.1).
+        if (big && this.world.shake && this.time - (this.hitShakeAt || -9) > 0.12) {
+          this.hitShakeAt = this.time;
+          this.world.shake(ev.dmg >= ev.enemy.maxHp * 0.30 ? 0.10 : 0.05);
+        }
+        // 적 피격음 — 프리셋(fx.js 'hit')은 만들어 두고 **한 번도 부르지 않고 있었다**(조사에서 발견).
+        // gap 60ms 가 프리셋에 이미 걸려 있어 떼거리를 때려도 소리가 겹쳐 터지지 않는다
+        if (NGN.sound) NGN.sound.play('hit');
         if ((big || this.floatBudget > 0) && ev.dmg >= 1 && this.floatQueue.length < 12) { this.floatQueue.push({ x: ev.enemy.x, y: ev.enemy.y, h: ev.enemy.flying ? 3.6 : 1.6, dmg: ev.dmg, big }); this.floatBudget--; }
       } else if (ev.type === 'kill') {
         const at = this.world.toWorld(ev.enemy.x, ev.enemy.y, ev.enemy.flying ? 3.2 : 0.9);
         this.particles.emit(at, ev.enemy.boss ? 60 : 16, ev.enemy.boss ? 0xFF6060 : 0xFFE9A8, { speed: ev.enemy.boss ? 6 : 3.5, up: 4, ttl: 0.8 });
+        // 잔존물(M-4-5): 죽은 자리에 그을음이 남는다. 공중 적은 땅에 안 닿으니 자국도 안 남긴다
+        if (!ev.enemy.flying && this.world.addDecal) this.world.addDecal(at, ev.enemy.boss ? 8.5 : 2.4 + Math.random() * 0.8, ev.enemy.boss ? 0x3A1410 : 0x241C14, ev.enemy.boss ? 20 : 11);
         // 처치 순간 아주 약한 화면 흔들림(K-2-15). 🛑 세게 하면 멀미가 난다 — 0.18 이고, 0.25초에 한 번을 넘지 않는다(떼거리가 한꺼번에 죽어도 안 흔들리게)
         if (!ev.enemy.boss && this.world.shake && this.time - (this.killShakeAt || -9) > 0.25) { this.killShakeAt = this.time; this.world.shake(0.18); }
         // 골드가 튀어나온다(표준 TD): 금화 알갱이가 위로 튀고 "+N" 금색 글자. 새끼(분열)는 보상 0 이라 안 뜬다

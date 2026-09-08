@@ -22,8 +22,8 @@ const SVG = {
   coin: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#F5B301"/><circle cx="12" cy="12" r="7" fill="#FFD84D"/></svg>',
   ticket: '<svg class="i" viewBox="0 0 24 24"><path fill="#B15BE8" d="M3 7h18v4a2 2 0 0 0 0 4v4H3v-4a2 2 0 0 0 0-4V7z"/><path d="M9 7v12" stroke="#fff" stroke-width="1.5" stroke-dasharray="2 2"/></svg>',
   shield: (c) => `<svg class="i" viewBox="0 0 24 24"><path fill="${c}" stroke="#222" stroke-width="1.5" d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3z"/></svg>`,
-  up: '<svg class="i" viewBox="0 0 24 24"><path fill="#fff" d="M12 4 4 12h5v8h6v-8h5z"/></svg>',
-  sell: '<svg class="i" viewBox="0 0 24 24"><path fill="#fff" d="M12 3 8 7h8l-4-4zM6 9h12l1 12H5L6 9z"/><path d="M12 12v6M10 14h3a1 1 0 0 1 0 2h-2" stroke="#B8860B" stroke-width="1.6" fill="none"/></svg>',
+  up: '<svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4 4 12h5v8h6v-8h5z"/></svg>',
+  sell: '<svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 8 7h8l-4-4zM6 9h12l1 12H5L6 9z"/><path d="M12 12v6M10 14h3a1 1 0 0 1 0 2h-2" stroke="#B8860B" stroke-width="1.6" fill="none"/></svg>',
   info: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff"/><path fill="#555" d="M11 10h2v7h-2zM11 7h2v2h-2z"/></svg>',
   lock: '<svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M17 9V7A5 5 0 0 0 7 7v2H5v13h14V9h-2zM9 7a3 3 0 0 1 6 0v2H9V7z"/></svg>',
   trophy: '<svg class="i" viewBox="0 0 24 24"><path fill="#F5B301" d="M6 3h12v3h3v3a5 5 0 0 1-4.2 4.9A6 6 0 0 1 13 17.9V20h4v2H7v-2h4v-2.1A6 6 0 0 1 7.2 13.9 5 5 0 0 1 3 9V6h3V3zm-1 5v1a3 3 0 0 0 2 2.8V8H5zm14 0h-2v3.8A3 3 0 0 0 19 9V8z"/></svg>',
@@ -34,7 +34,7 @@ const SVG = {
   calendar: '<svg class="i" viewBox="0 0 24 24"><path fill="currentColor" d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2zm-1 8v10h12V10H6zm2 2h3v3H8v-3z"/></svg>',
   tree: {
     attack: '<svg class="i" viewBox="0 0 24 24"><path fill="#C0392B" d="M4 20l1.5-1.5L4 17l-1 1zM6.5 16.5 17 6l1 1L7.5 17.5zM14 3l7 7-2 2-7-7z"/><path fill="#8E6B3A" d="M4 17l3 3 2-2-3-3z"/></svg>',
-    range: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#1D5FA0" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="#3AA0F0"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="#1D5FA0" stroke-width="2"/></svg>',
+    range: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#146587" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="#1C9FD7"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="#146587" stroke-width="2"/></svg>',
     gold: '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#F5B301"/><circle cx="12" cy="12" r="7" fill="#FFD84D"/><path d="M12 7v10M9.5 9.5h4a1.75 1.75 0 0 1 0 3.5h-3a1.75 1.75 0 0 0 0 3.5h4" stroke="#B8860B" stroke-width="1.8" fill="none"/></svg>',
     life: '<svg class="i" viewBox="0 0 24 24"><path fill="#E8443A" d="M12 21s-7.5-4.6-9.5-9.3C1 8 3.4 4.5 7 4.5c2 0 3.6 1.1 5 2.8 1.4-1.7 3-2.8 5-2.8 3.6 0 6 3.5 4.5 7.2C19.5 16.4 12 21 12 21z"/></svg>',
     // 기본기: 망치와 벽돌(타워가 처음부터 높이 지어진다)
@@ -50,17 +50,17 @@ const SVG = {
     boss: '<svg viewBox="0 0 24 24"><circle cx="12" cy="14" r="8" fill="#B02A3A" stroke="#222" stroke-width="1.5"/><path d="M6 8 4 2l5 4zM18 8l2-6-5 4z" fill="#D8C8B0" stroke="#222"/><circle cx="9" cy="13" r="1.6" fill="#FF3030"/><circle cx="15" cy="13" r="1.6" fill="#FF3030"/></svg>',
   },
   role: {
-    single: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="#fff"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="#fff" stroke-width="2"/></svg>',
-    splash: '<svg viewBox="0 0 24 24"><path fill="#fff" d="m12 2 2.5 5.5L20 6l-3 5 5 2-5.5 2.5L18 21l-5-3-1 5-2.5-5.5L4 20l3-5-5-2 5.5-2.5L6 4l5 3z"/></svg>',
-    bounce: '<svg viewBox="0 0 24 24"><path fill="#fff" d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>',
-    multishot: '<svg viewBox="0 0 24 24"><path fill="#fff" d="M4 6l7 6-7 6zM10 6l7 6-7 6zM16 6l6 6-6 6z"/></svg>',
-    aura: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="#fff"/></svg>',
+    single: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="2"/></svg>',
+    splash: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="m12 2 2.5 5.5L20 6l-3 5 5 2-5.5 2.5L18 21l-5-3-1 5-2.5-5.5L4 20l3-5-5-2 5.5-2.5L6 4l5 3z"/></svg>',
+    bounce: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>',
+    multishot: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 6l7 6-7 6zM10 6l7 6-7 6zM16 6l6 6-6 6z"/></svg>',
+    aura: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>',
   },
   // ---------- 글자 대신 그림 (checklist K-2-5) ----------
   // 재화·보상·미션·등급을 한글 이름이나 ✓ 글자 대신 그림으로. 창고(assets/kenney-lib-index.json) 49팩은 전부 3D 라 2D 아이콘이 한 장도 없어
   // 이미 쓰던 인라인 SVG 방식을 넓혔다(밖에서 받은 그림 0장 = 라이선스 표기 의무 0). 색은 부르는 쪽이 넘긴다.
   heart: '<svg class="i" viewBox="0 0 24 24"><path fill="#E8443A" stroke="#7A1020" stroke-width="1.6" d="M12 21S3 15.4 3 9.8C3 6.6 5.4 4.5 8 4.5c1.8 0 3.2 1 4 2.3.8-1.3 2.2-2.3 4-2.3 2.6 0 5 2.1 5 5.3C21 15.4 12 21 12 21z"/></svg>',
-  gift: '<svg class="i" viewBox="0 0 24 24"><path fill="#C0392B" d="M4 12h16v9H4z"/><path fill="#E85A4F" d="M3 7.5h18V12H3z"/><path fill="#FFC93C" d="M10.3 7.5h3.4V21h-3.4z"/><path fill="#FFC93C" stroke="#B8860B" stroke-width="1.1" d="M12 7.5C9.6 7.5 7.5 6.7 7.5 5.2S9 2.6 12 6c3-3.4 4.5-2.3 4.5-.8S14.4 7.5 12 7.5z"/></svg>',
+  gift: '<svg class="i" viewBox="0 0 24 24"><path fill="#C0392B" d="M4 12h16v9H4z"/><path fill="#EE2747" d="M3 7.5h18V12H3z"/><path fill="#FFC93C" d="M10.3 7.5h3.4V21h-3.4z"/><path fill="#FFC93C" stroke="#B8860B" stroke-width="1.1" d="M12 7.5C9.6 7.5 7.5 6.7 7.5 5.2S9 2.6 12 6c3-3.4 4.5-2.3 4.5-.8S14.4 7.5 12 7.5z"/></svg>',
   scroll: '<svg class="i" viewBox="0 0 24 24"><path fill="#F3E7CC" stroke="#8E6B3A" stroke-width="1.6" d="M6 3h11v16a2 2 0 0 0 2 2H8a2 2 0 0 1-2-2V3z"/><path stroke="#8E6B3A" stroke-width="1.6" stroke-linecap="round" d="M9 7.5h5M9 11h5M9 14.5h3"/></svg>',
   check: '<svg class="i" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" d="M4 13l5.5 5.5L20 5.5"/></svg>',
   arrowUp: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 4l8 13H4z"/></svg>',
@@ -77,6 +77,22 @@ const SVG = {
   },
 };
 NGN.SVG = SVG;
+
+// ---------- [?] 도움말 (checklist K-2-15) ----------
+// 사장님: "텍스트 꾸역꾸역에 엉망진창 쓰레기 같은데 이걸 통과시켰다고?"
+// 화면에 늘 떠 있던 긴 설명을 전부 여기로 옮겼다. 게임 화면은 설명서가 아니다 — 궁금할 때만 누른다.
+// 판단 기준은 하나: 「이 문장이 없으면 조카가 못 하나?」 못 하면 화면에, 아니면 여기에.
+const HELP = {
+  save: ['저장 코드', ['별·기록·티켓·뽑은 것을 긴 글자 하나로 만들어요.', '폰이 바뀌거나 저장이 지워져도 그 글자만 있으면 그대로 살아나요.', '[내보내기] 로 만들어서 나에게 보내는 톡에 붙여 두세요.']],
+  a2hs: ['홈 화면에 추가', ['아이폰은 웹을 7일 안 열면 저장을 스스로 지워요.', '홈 화면에 추가해서 앱처럼 열면 안 지워집니다.', '[방법] 을 누르면 하는 법이 나와요.']],
+  affinity: ['상성이 뭔가요', ['타워마다 잘 드는 상대가 따로 있어요.', '적은 웨이브마다 방패 색이 바뀌는데, 그 방패에 센 타워를 세우면 같은 타워로 두세 배를 냅니다.', '위 바퀴에서 방패마다 ▲ 잘 드는 공격과 ▼ 안 통하는 공격을 보세요.']],
+  tree: ['강화가 뭔가요', ['스테이지를 깨면 별을 받아요. 그 별로 칸을 하나씩 찍습니다.', '앞 칸부터 순서대로 찍을 수 있고, 잘못 찍었으면 [전부 되돌리기] 로 별을 다 돌려받아요.', '강화는 모든 판에 늘 적용됩니다.']],
+  season: ['시즌이 뭔가요', ['매달 1일에 점수만 0 이 되고 별·타워·강화는 그대로 남아요.', '점수는 이번 달에 새로 딴 별·오늘의 판 성적·무한 기록 갱신·일일 미션으로 쌓입니다.', '친구 코드를 주고받으면 순위표에 나란히 서요.']],
+  daily: ['일일이 뭔가요', ['미션은 하루 세 개, 한국 시간 자정에 새로 나와요. 안 쌓이고, 못 해도 벌칙이 없어요.', '셋 다 하면 보너스 티켓을 더 받습니다.', '출석은 로비에 들어오면 저절로 찍혀요. 이레를 돌면 다시 1일째부터.']],
+  enemies: ['적 읽는 법', ['체력·속도·보상은 「보통 적의 몇 배인가」 예요. ×2 면 두 배라는 뜻이에요.', '「새면 생명 −N」 은 그 적이 성에 닿았을 때 잃는 생명이에요.', '발밑 색 고리는 그 웨이브에 붙은 성질이고, 방패 색은 방어 타입이에요.']],
+  credit: ['만든 것들', ['P의 디펜스', '밸런스 표는 YouTD 2 (MIT)', '그림·모델은 Kenney (CC0)', '저장 압축은 lz-string (MIT)', '글꼴은 검은고딕·Jua (SIL OFL 1.1)']],
+};
+NGN.HELP = HELP;
 
 NGN.UI = class UI {
   constructor(data, cb) {
@@ -95,6 +111,7 @@ NGN.UI = class UI {
     $('gateGacha').addEventListener('click', () => this.showUpgrade());   // 뽑기는 강화 탭 안에 이미 있다
     $('gateSeason').addEventListener('click', () => this.showRecords());
     $('missionClose').addEventListener('click', () => this.showMenu());
+    this.bindHelp();   // [?] 도움말 — 문서 하나에 위임(K-2-15)
     $('menuSettings').addEventListener('click', () => this.showSettings());
     // 로비 탭 바(J-11 ②)
     $('lobbyTabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const t = b.dataset.tab; if (t === 'battle') this.showMenu(); else if (t === 'tower') cb.onCodex(); else if (t === 'grow') this.showUpgrade(); else if (t === 'rank') this.showRecords(); });
@@ -122,6 +139,7 @@ NGN.UI = class UI {
     $('endCode').addEventListener('click', () => this.showEndCode());
     // 전투: ▶ 는 「미리 부르기」(카운트다운 중 누르면 바로 시작 + 보너스 골드 — main.js callWave), 웨이브 중에는 배속(1→2→3×)
     $('waveBtn').addEventListener('click', () => { if (this.game && this.game.wave) cb.onSpeed(); else cb.onWaveStart(); });
+    $('speedBtn') && $('speedBtn').addEventListener('click', () => cb.onSpeed());   // 배속은 위 정보줄에서(K: 타워 카드를 가리지 않게)
     $('rotateBtn').addEventListener('click', () => cb.onRotate());
     $('btnMenu').addEventListener('click', () => cb.onQuit());
     // 일시정지: [⏸] → 오버레이. [계속]/[나가기(기존 onQuit — confirm 을 취소하면 일시정지가 그대로 남는다)]
@@ -135,7 +153,7 @@ NGN.UI = class UI {
     $('endMenu').addEventListener('click', () => { cb.onLeave(); this.showMenu(); });
     $('endRecords').addEventListener('click', () => { cb.onLeave(); this.showRecords('daily'); });
   }
-  hideAll() { for (const id of ['menu', 'worldScreen', 'upgradeScreen', 'mapScreen', 'recordScreen', 'settingScreen', 'codexScreen', 'missionScreen', 'endScreen', 'game', 'diffModal', 'codeModal']) $(id).hidden = true; }
+  hideAll() { for (const id of ['menu', 'worldScreen', 'upgradeScreen', 'mapScreen', 'recordScreen', 'settingScreen', 'codexScreen', 'missionScreen', 'helpModal', 'endScreen', 'game', 'diffModal', 'codeModal']) $(id).hidden = true; }
   // ---------- 로비 탭 바(J-11 ②) ----------
   showTabs(active) {
     document.body.classList.add('has-tabs'); $('lobbyTabs').hidden = false;
@@ -231,9 +249,8 @@ NGN.UI = class UI {
       const d = i + 1, done = A.day >= d, today = A.day === d;
       return `<div class="astamp ${done ? 'done' : ''} ${today ? 'today' : ''}"><b>${d}일째</b><span class="tk">${SVG.ticket}${rw}장</span>${done ? `<span class="chk">${SVG.check}</span>` : ''}</div>`;
     }).join('');
-    return `<div class="sec-head">${SVG.check} 출석 <small>지금 ${A.streak}일째 · 이레를 돌면 다시 1일째부터</small></div>
-      <div class="panel cx-wheel"><div class="astamps">${cells}</div></div>
-      <div class="panel cx-note small">로비에 들어오면 그날 도장이 저절로 찍혀요. <b>못 온 날의 벌칙은 없어요</b> — 보너스 칸을 다시 걸어갈 뿐이에요.</div>`;
+    return `<div class="sec-head">${SVG.check} 출석 <small>${A.streak}일째</small></div>
+      <div class="panel cx-wheel"><div class="astamps">${cells}</div></div>`;
   }
 
   // ---------- 전용 페이지 「일일」 = 오늘의 미션 + 출석 (checklist K-2-9·11) ----------
@@ -249,7 +266,7 @@ NGN.UI = class UI {
   renderMissions() {
     const m = this.meta, M = m.missions(), R = m.missionRules();
     const dk = this.cb.dailyClock ? this.cb.dailyClock() : null;
-    $('missionSub').textContent = dk ? `${dk.label} · 자정에 새로 · 밀리지 않아요` : '날짜를 정하는 중…';
+    $('missionSub').textContent = dk ? dk.label : '…';
     if (!M) { $('missionBody').innerHTML = `<div class="panel cx-note">오늘 날짜를 정하는 중이에요.</div>${this.attendHtml()}`; return; }
     const list = M.list, n = list.length;
     const doneN = list.filter((x) => x.done).length;
@@ -276,7 +293,7 @@ NGN.UI = class UI {
         <span class="mrw">${SVG.gift}<b>${R.allClearBonus}</b></span>
         <span class="mbody"><b class="nm">셋 다 하면 보너스</b><span class="bar"><span class="fill" style="width:${bonusPct}%"></span><span class="pct">${doneN}/${n}</span></span></span>
         <span class="mbtn ok">${M.bonusClaimed || allClaimed ? `${SVG.check} 받음` : '자동'}</span></div>` : '';
-    $('missionBody').innerHTML = `<div class="sec-head">${SVG.scroll} 오늘의 미션 <small>하루 ${n}개 · 셋 다 하면 보너스</small></div>
+    $('missionBody').innerHTML = `<div class="sec-head">${SVG.scroll} 오늘의 미션 <button class="hlp light" data-help="daily">?</button></div>
       <div class="panel mprog"><span class="track"><span class="fill" style="width:${pctAll}%"></span></span><span class="stops">${stops}</span></div>${rows}${bonus}
       ${this.attendHtml()}`;
   }
@@ -307,19 +324,29 @@ NGN.UI = class UI {
     this.showTabs('battle');
     this.cb.onMenu(true);
   }
-  // 점 i(0부터)의 위치. 세로로 내려가며 좌우로 굽이친다(viewBox 360×1900)
-  nodePos(i) { return { x: 180 + Math.sin(i * 1.05) * 105, y: 90 + i * 92 }; }
+  // 점 i(0부터)의 위치. 세로로 내려가며 좌우로 굽이친다.
+  // 🛑 간격(STEP)은 반드시 노드 한 칸의 실제 높이(동그라미 58 + 별 3줄 36 + 이름 19 ≈ 109px)보다 커야 한다.
+  //    예전엔 지도 높이를 화면 폭에 비례시켜(aspect-ratio 360/1900) 360px 폰에서 간격이 92px 로 쪼그라들었고,
+  //    그 결과 20판 전부에서 이름표가 다음 동그라미 밑에 17px 씩 깔렸다(2026-09-08 수정).
+  static get STEP() { return 126; }
+  worldHeight(n) { return 60 + n * UI.STEP; }
+  nodePos(i) { return { x: 180 + Math.sin(i * 1.05) * 105, y: 60 + i * UI.STEP }; }
   buildWorld() {
     const host = $('world'); host.innerHTML = '';
     const stages = this.meta.stageList(); const next = this.meta.nextStage();
+    const H = this.worldHeight(stages.length); host.style.height = H + 'px';
     const pts = stages.map((_, i) => this.nodePos(i));
     // 길: 점들을 잇는 부드러운 곡선(위 → 아래). 밑에 넓은 흙길, 위에 점선
     let d = `M${pts[0].x},${pts[0].y}`;
     for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; const my = (a.y + b.y) / 2; d += ` C${a.x},${my} ${b.x},${my} ${b.x},${b.y}`; }
-    const bands = [['#5E9E42', 0], ['#8FBF6A', 0.18], ['#E9F1F6', 0.24], ['#E0C287', 0.30], ['#5E9E42', 0.36], ['#3B5E3A', 0.48], ['#2F3A48', 0.62], ['#4A3038', 0.80], ['#8A2E10', 1]];
-    host.innerHTML = `<svg class="road" viewBox="0 0 360 1900" preserveAspectRatio="none">
-      <defs><linearGradient id="worldBg" x1="0" y1="0" x2="0" y2="1">${bands.map(([c, o]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient></defs>
-      <rect x="0" y="0" width="360" height="1900" fill="url(#worldBg)" opacity=".55"/>
+    // 배경 색 띠 = 숲→눈→사막→불. 🛑 두 번째 값은 「비율」이 아니라 「몇 번째 판 자리」다.
+    //    예전엔 비율(0.24 …)로 박아 뒀는데 그 값들은 옛 간격 92px 에 손으로 맞춘 것이라,
+    //    간격을 126px 로 넓히자 눈밭 색이 「5. 눈 골짜기」에서 밀려났다(2026-09-08). 이제 판 자리를 따라간다.
+    const bands = [['#5E9E42', 0], ['#8FBF6A', 2.7], ['#E9F1F6', 4], ['#E0C287', 5.2], ['#5E9E42', 6.5], ['#3B5E3A', 8.9], ['#2F3A48', 11.8], ['#4A3038', 15.5], ['#8A2E10', 19.7]];
+    const bandOff = (i) => Math.max(0, Math.min(1, this.nodePos(i).y / H));
+    host.innerHTML = `<svg class="road" viewBox="0 0 360 ${H}" preserveAspectRatio="none">
+      <defs><linearGradient id="worldBg" x1="0" y1="0" x2="0" y2="1">${bands.map(([c, i]) => `<stop offset="${bandOff(i).toFixed(4)}" stop-color="${c}"/>`).join('')}</linearGradient></defs>
+      <rect x="0" y="0" width="360" height="${H}" fill="url(#worldBg)" opacity=".55"/>
       <path d="${d}" fill="none" stroke="#7E5F35" stroke-width="30" stroke-linecap="round" opacity=".9"/>
       <path d="${d}" fill="none" stroke="#C49A63" stroke-width="20" stroke-linecap="round"/>
       <path d="${d}" fill="none" stroke="#FFF7E6" stroke-width="3" stroke-dasharray="8 12" stroke-linecap="round" opacity=".8"/>
@@ -330,7 +357,7 @@ NGN.UI = class UI {
       const p = pts[i]; const cleared = this.meta.clearedAny(s.id);
       const state = cleared ? 'cleared' : (next && next.id === s.id) ? 'next' : 'locked';
       const b = document.createElement('button'); b.className = `node ${state}`; b.dataset.id = s.id;
-      b.style.left = (p.x / 360 * 100) + '%'; b.style.top = (p.y / 1900 * 100) + '%';
+      b.style.left = (p.x / 360 * 100) + '%'; b.style.top = (p.y / H * 100) + '%';
       const circ = state === 'locked' ? SVG.lock : state === 'next' ? SVG.play : String(s.id);
       // 별은 난이도별로 세 줄(은·금·붉은) — 세 종류가 다 보여야 어려움을 할 이유가 생긴다(I-3)
       const stars = diffs.map((d) => `<span class="srow">${NGN.starsRow(d, this.meta.starsFor(s.id, d))}</span>`).join('');
@@ -359,13 +386,15 @@ NGN.UI = class UI {
   }
 
   // ---------- 강화 나무 ----------
+  // 화면에서만 짧게 (checklist K-2-15) — 「모든 타워」는 강화의 전제라 칸마다 되풀이할 말이 아니다
+  shortUnit(u) { return String(u).replace(/모든 타워 /g, '').replace(/타워 시작 단계/g, '시작 단계').trim(); }
   showUpgrade() { this.hideAll(); $('upgradeScreen').hidden = false; this.renderGrowGacha(); this.renderTree(); this.showTabs('grow'); this.cb.onMenu(true); }
   // 강화 탭 위의 뽑기 카드(J-11 ②): 티켓 수 · 천장까지 · 프리미엄 팩
   renderGrowGacha() {
     const m = this.meta, G = this.data.gacha, s = m.state;
     const toLeg = G.pity.pityLegendary - s.sinceLegendary;
     const owned = m.unlockedFamilies().length, all = this.data.families.length;
-    $('growGacha').innerHTML = `<span class="grow"><b>뽑기</b> — 새 타워 계열을 얻는 곳<small>타워 ${owned}/${all}계열 · 전설 확정까지 ${toLeg}번${s.premiumPulls ? ` · <b style="color:#1D5FA0">프리미엄 팩 ${s.premiumPulls}회</b>` : ''}</small></span><button class="btn gold">${SVG.ticket} ${s.tickets}장 뽑기</button>`;
+    $('growGacha').innerHTML = `<span class="grow"><b>뽑기</b><small>타워 ${owned}/${all}${s.premiumPulls ? ` · 프리미엄 ${s.premiumPulls}` : ''}</small></span><button class="btn gold">${SVG.ticket} ${s.tickets}장 뽑기</button>`;
   }
   renderTree() {
     const m = this.meta, T = this.data.stages.upgradeTree;
@@ -379,7 +408,7 @@ NGN.UI = class UI {
         return `<button class="step ${cls}" data-k="${k}" data-i="${i}" ${i === lv && can ? '' : 'disabled'}>${SVG.star(i < lv || cls === 'can')}<span>${c}</span></button>`;
       }).join('');
       const eff = m.treeEffectText(k);
-      row.innerHTML = `<div class="top">${SVG.tree[k] || ''}<b>${esc(br.name)}</b><span class="sub" style="color:#6B5A48">${lv}/${br.costs.length}</span><span class="eff">${eff ? `${esc(br.unit)} ${eff}` : `칸마다 ${esc(br.unit)} ${this.perStepText(br.perStep)}`}</span></div><div class="steps">${steps}</div>`;
+      row.innerHTML = `<div class="top">${SVG.tree[k] || ''}<b>${esc(br.name)}</b><span class="sub" style="color:#6B5A48">${lv}/${br.costs.length}</span><span class="eff">${eff ? `${esc(this.shortUnit(br.unit))} ${eff}` : `${esc(this.shortUnit(br.unit))} ${this.perStepText(br.perStep)}`}</span></div><div class="steps">${steps}</div>`;
       host.appendChild(row);
     }
     host.querySelectorAll('.step.can').forEach((b) => b.addEventListener('click', () => {
@@ -387,7 +416,7 @@ NGN.UI = class UI {
     }));
     $('treeReset').disabled = !m.treeSpent();
   }
-  perStepText(ps) { return Object.keys(ps).map((k) => (k === 'allDmg' || k === 'rangeMul') ? `+${Math.round(ps[k] * 100)}%` : k === 'baseTier' ? '한 단 위에서 시작' : `+${ps[k]}`).join(' '); }
+  perStepText(ps) { return Object.keys(ps).map((k) => (k === 'allDmg' || k === 'rangeMul') ? `+${Math.round(ps[k] * 100)}%` : k === 'baseTier' ? '+1단' : `+${ps[k]}`).join(' '); }
 
   // ---------- 무한 모드 지도 선택 ----------
   showMapScreen() { this.hideAll(); $('mapScreen').hidden = false; this.buildMapGrid(); this.showTabs('battle'); this.cb.onMenu(true); }
@@ -420,20 +449,53 @@ NGN.UI = class UI {
   }
   // ---------- 순위표(records.js) / 설정 ----------
   showRecords(tab) { if (!this.records) this.records = new NGN.RecordsUI(this.meta, this.data, this); this.records.show(tab); this.cb.onMenu(true); }
+  // ---------- 도움말 창 (checklist K-2-15) ----------
+  showHelp(key) {
+    const h = HELP[key]; if (!h) return;
+    const m = $('helpModal'); m.hidden = false;
+    const isCredit = key === 'credit';
+    m.innerHTML = `<div class="panel modal"><h3>${esc(h[0])}</h3>
+      ${h[1].map((p) => `<p class="${isCredit ? 'credit' : ''}">${esc(p)}</p>`).join('')}
+      <div class="row"><button class="btn gray" id="helpClose">닫기</button></div></div>`;
+    const close = () => { m.hidden = true; };
+    $('helpClose').addEventListener('click', close);
+    m.addEventListener('click', (e) => { if (e.target === m) close(); }, { once: true });
+  }
+  // 화면 어디서나 [?] 를 누르면 열린다. 화면을 다시 그릴 때마다 다시 걸 필요가 없게 문서 하나에 위임한다
+  bindHelp() {
+    if (this._helpBound) return; this._helpBound = 1;
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-help]');
+      if (b) { e.stopPropagation(); this.showHelp(b.dataset.help); }
+    }, true);
+  }
+
+  // ---------- 설정 (checklist K-2-15) ----------
+  // 🔴 전에는 라벨 옆에 설명이 세 줄로 흘러 [방법] 버튼과 엉키고 줄 높이가 제각각이었다(사장님 실기기 캡처).
+  //    켜짐/켜짐/켜짐 글자 버튼이 세로로 서 있었고, 조카가 볼 이유가 없는 저작권 두 줄이 첫 화면에 있었다.
+  //    → 라벨은 한 줄 고정 · 켜고 끄기는 스위치 · 긴 설명과 저작권은 [?] 뒤로.
   showSettings() {
     this.hideAll(); $('settingScreen').hidden = false; this.hideTabs();
     const s = this.meta.state.settings || {}; const m = this.meta;
+    const sw = (k, on) => `<button class="sw ${on ? 'on' : ''}" data-k="${k}" role="switch" aria-checked="${on}" aria-label="${k}"><span class="knob"></span></button>`;
+    // 3칸 선택: 켜고 끄기가 아니라 셋 중 하나를 고르는 것(화면 흔들림 = 끄기/절반/기본)
+    const seg = (k, cur, opts) => `<span class="seg" role="radiogroup">${opts.map(([v, label]) =>
+      `<button class="${cur === v ? 'on' : ''}" data-k="${k}:${v}" role="radio" aria-checked="${cur === v}">${esc(label)}</button>`).join('')}</span>`;
     $('settingList').innerHTML = `
       <div class="row"><span class="grow">이름 <span class="sub" style="color:#6B5A48">${m.hasName() ? esc(m.state.name) : '아직 없음'}</span></span><button class="btn blue" data-k="name">바꾸기</button></div>
-      <div class="row"><span class="grow">그림자</span><button class="btn ${s.shadows === false ? 'gray' : 'green'}" data-k="shadows">${s.shadows === false ? '꺼짐' : '켜짐'}</button></div>
-      <div class="row"><span class="grow">소리</span><button class="btn ${s.sound === false ? 'gray' : 'green'}" data-k="sound">${s.sound === false ? '꺼짐' : '켜짐'}</button></div>
-      <div class="row"><span class="grow">진동(뽑기)</span><button class="btn ${s.vibrate === false ? 'gray' : 'green'}" data-k="vibrate">${s.vibrate === false ? '꺼짐' : '켜짐'}</button></div>
-      <div class="row"><span class="grow"><b>저장 코드</b><br><span class="sub" style="color:#6B5A48">별·기록·티켓·뽑은 것 전부를 긴 글자 하나로. 폰이 바뀌거나 저장이 지워져도 이걸로 살아나요.</span></span></div>
+      <div class="row"><span class="grow">그림자</span>${sw('shadows', s.shadows !== false)}</div>
+      <div class="row"><span class="grow">소리</span>${sw('sound', s.sound !== false)}</div>
+      <div class="row"><span class="grow">진동</span>${sw('vibrate', s.vibrate !== false)}</div>
+      <div class="row"><span class="grow">화면 흔들림</span>${seg('shake', s.shake === 'off' ? 'off' : s.shake === 'half' ? 'half' : 'full', [['off', '끄기'], ['half', '절반'], ['full', '기본']])}</div>
+      <!-- 🛑 한 줄에 라벨 + [?] + 버튼 둘을 우겨넣었더니 라벨이 「저장 ...」으로 잘렸다(2026-09-07 실기기 확인).
+           라벨은 제 줄에, 버튼은 아랫줄에 — 라벨이 온전히 보이는 것이 먼저다 -->
+      <div class="row"><span class="grow">저장 코드</span><button class="hlp" data-help="save">?</button></div>
       <div class="row"><button class="btn green" data-k="export" style="flex:1">내보내기</button><button class="btn blue" data-k="import" style="flex:1">가져오기</button></div>
-      <div class="row"><span class="grow">홈 화면에 추가 <span class="sub" style="color:#6B5A48">아이폰은 7일 안 들어오면 저장이 지워져요 — 홈 화면 앱은 안 지워져요</span></span><button class="btn gray" data-k="a2hs">방법</button></div>
+      <div class="row"><span class="grow">홈 화면에 추가</span><button class="hlp" data-help="a2hs">?</button><button class="btn gray" data-k="a2hs">방법</button></div>
       <div class="row"><span class="grow">기록 지우기</span><button class="btn red" data-k="reset">지우기</button></div>
-      <div class="row"><span class="grow sub" style="color:#6B5A48">P의 디펜스 · 밸런스는 YouTD 2(MIT), 그래픽은 Kenney(CC0), 압축은 lz-string(MIT)</span></div>`;
-    $('settingList').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => this.onSettingLocal(b.dataset.k)));
+      <div class="row"><span class="grow">만든 것들</span><button class="hlp" data-help="credit">?</button></div>`;
+    $('settingList').querySelectorAll('button[data-k]').forEach((b) => b.addEventListener('click', () => this.onSettingLocal(b.dataset.k)));
+
   }
   async onSettingLocal(k) {
     const m = this.meta;
@@ -486,12 +548,19 @@ NGN.UI = class UI {
     this.refreshTowerBar();
     if (this.popInst) this.renderPop();
   }
-  // ▶ 버튼: 쉬는 중엔 재생 표시(+ 카운트다운 중이면 「미리 부르기」 보너스 칩 "+N"), 웨이브 중엔 빨리감기 표시 + 배속 칩(1× 는 안 보인다)
+  // ▶ 버튼(아래 오른쪽) = 「웨이브 시작 · 미리 부르기」 전용. 배속은 위 정보줄로 옮겼다.
+  // 🔴 전에는 웨이브가 시작되면 이 버튼이 배속으로 바뀌었는데, 자리가 세 번째 타워 카드 바로 옆이라
+  //    카드를 고르려던 손가락이 배속을 눌렀다(사장님 지적 2026-09-07). 이제 웨이브 중엔 이 버튼을 숨긴다 —
+  //    숨기면 카드 줄이 그만큼 넓어져 고르기도 쉬워진다.
   renderWaveBtn() {
     const running = !!(this.game && this.game.wave), n = this.speed || 1;
     const bonus = !running && this.cdSec !== null && this.cdBonus > 0 ? `<span class="bonus">${SVG.coin}+${this.cdBonus}</span>` : '';
-    $('waveBtn').innerHTML = (running ? '<svg viewBox="0 0 24 24"><path fill="#fff" d="M4 5v14l8-7zM13 5v14l8-7z"/></svg>' : '<svg viewBox="0 0 24 24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>') + (n > 1 || running ? `<span class="spd">${n}×</span>` : '') + bonus;
-    $('waveBtn').title = running ? '배속' : this.cdSec !== null ? '미리 부르기 — 빨리 부를수록 골드 보너스' : '웨이브 시작';
+    $('waveBtn').hidden = running;
+    $('waveBtn').innerHTML = '<svg viewBox="0 0 24 24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>' + bonus;
+    $('waveBtn').title = this.cdSec !== null ? '미리 부르기 — 빨리 부를수록 골드 보너스' : '웨이브 시작';
+    // 배속은 웨이브 중에만 위 정보줄에 나온다(쉬는 중엔 배속이 의미가 없다)
+    const sp = $('speedBtn');
+    if (sp) { sp.hidden = !running; sp.textContent = n + '×'; sp.classList.toggle('fast', n > 1); }
   }
   setSpeedLabel(n) { this.speed = n; this.renderWaveBtn(); }
   // 카운트다운 줄(①·⑥): sec = 남은 초(null 이면 숨김), wv = 다음 웨이브(적 아이콘·보스 칩·성질 칩), bonus = 지금 미리 부르면 받을 골드.
@@ -667,7 +736,7 @@ NGN.UI = class UI {
     const s = g.effectiveStats(inst), d = inst.def;
     const next = g.byFamily[d.family][d.tier], upCost = g.costToUpgrade(inst), refund = g.refundFor(inst);
     const wv = g.wave ? g.wave.def : g.waveAt(g.stats.reachedWave + 1); const m = wv && s.attackType ? this.mul(s.attackType, wv.defense) : null;
-    const affTxt = m === null || m === 1 ? '' : ` · 다음 웨이브 <b style="color:${m > 1 ? '#2E7D32' : '#9E2B22'}">×${m}</b>`;
+    const affTxt = m === null || m === 1 ? '' : ` · 다음 웨이브 <b style="color:${m > 1 ? '#046D41' : '#871023'}">×${m}</b>`;
     const lvl = d.aura || (s.expToNext === null && s.expForThis === 0) ? '' : (() => { const max = s.expToNext === null; const pct = max ? 100 : Math.round((s.exp - s.expForThis) / (s.expToNext - s.expForThis) * 100); return `<div class="lvl"><b>Lv.${s.level}</b><span class="xp"><span style="width:${pct}%"></span></span><span>${max ? '최고' : `${Math.floor(s.exp)}/${s.expToNext}`}</span></div>`; })();
     const B = g.branchDef(inst.branch);
     const branchChip = B ? ` <span class="spc" style="background:${esc(B.color)}">${esc(B.name)}</span>` : '';
@@ -742,41 +811,71 @@ NGN.UI = class UI {
     if (!this.meta.hasName()) { const n = await NGN.askName(this.meta, '기록 코드에 실릴 이름이에요. 8자까지. 설정에서 바꿀 수 있어요.'); if (!n) return; }
     NGN.showCode('내 기록 코드', this.meta.recordCode(this.endRec), '길게 눌러 복사해 단톡방에 올리세요. 친구가 [순위표 → 친구 코드 넣기]에 붙이면 그 친구 순위표에 내가 나란히 떠요.', (t) => this.toast(t));
   }
+  // ---------- 결과 화면 (checklist K-2-16) ----------
+  // 🔴 사장님: "이 버튼 혹은 텍스트 박스 디자인 너무 구리고, 내용도 이상해. 별 없음? 수식은 왜 나와.
+  //    이게 대체 무슨 말이야. 정리도 안 되고."
+  //    전에는 판 이름·난이도·성적·보상·누적이 문장으로 한 덩어리에 쏟아졌고, 티켓 사유에 계산식(웨이브÷3+1)까지 나왔다.
+  // 이제 위계를 셋으로 세운다: ⑴얼마나 갔나(칩) → ⑵무엇을 받았나(칩) → ⑶다음에 뭘 할까(버튼).
+  //    진 화면은 「실패 통보」가 아니라 「다음엔 어떻게」를 보여 준다 — 다음 별을 어떻게 받는지 한 줄.
+  rchip(text, cls = '') { return `<span class="rchip ${cls}">${text}</span>`; }
+  rrow(chips) { const c = chips.filter(Boolean); return c.length ? `<div class="rrow">${c.join('')}</div>` : ''; }
+  // 받은 것 줄: 별과 티켓을 아이콘 + 숫자로. 사유 목록은 없앴다(거기에 계산식이 있었다)
+  rewardRow(gained, starIcon, tickets, extra) {
+    const t = tickets && tickets.lines && tickets.lines.length ? tickets.lines.reduce((a, l) => a + l.n, 0) : 0;
+    return this.rrow([
+      gained > 0 ? this.rchip(`${starIcon} +${gained}`, 'gold') : '',
+      t > 0 ? this.rchip(`${SVG.ticket} +${t}`, 'gold') : '',
+      extra || '',
+    ]);
+  }
+
   // 스테이지 결과: 별이 하나씩 튀어나온다(난이도 색). 신기록·티켓·해금. [다음 스테이지 ▶] / [다시] / [월드맵]
   showStageEnd(stage, diff, result, settle, isLast) {
     this.hideAll(); $('endScreen').hidden = false; $('pop').hidden = true; $('hint').hidden = true;
     const D = this.meta.diff(diff);
     const st = $('endStars'); st.hidden = false;
     st.innerHTML = [1, 2, 3].map((k) => NGN.starOf(diff, true).replace('class="i "', `class="${k <= settle.stars ? 'on' : ''}" style="animation-delay:${0.25 + k * 0.35}s"`)).join('');
+    $('endTitle').textContent = result.cleared ? (isLast ? '모두 클리어!' : `스테이지 ${stage.id} 클리어!`) : `웨이브 ${result.fellAt}에서 무너졌다`;
+    const P = settle.progress;
+    // ⑴ 얼마나 갔나
+    const grade = this.rrow([
+      this.rchip(esc(stage.name)),
+      this.rchip(esc(D.name), 'diff'),
+      result.cleared ? this.rchip(`${SVG.heart} ${result.lives}/${result.startLives}`)
+                     : this.rchip(`웨이브 ${P ? P.wave : result.wave}/${stage.waves}`),
+      result.cleared ? this.rchip(`${SVG.coin} ${Math.round(result.spent).toLocaleString()}`) : '',
+      P && !P.firstTry && P.best && !result.cleared ? this.rchip('최고 기록', 'best') : '',
+      P && !P.firstTry && result.cleared && !P.prevCleared ? this.rchip('첫 클리어', 'best') : '',
+    ]);
+    // ⑵ 다음엔 어떻게 — 진 화면에도 「다음 목표」가 있어야 한다(「별 없음」이라고 통보하지 않는다)
     const nextTier = result.cleared ? this.meta.starTiers(stage, result.startLives).find((t) => t.star === settle.stars + 1) : null;
-    $('endTitle').textContent = result.cleared ? (isLast ? '모든 스테이지 클리어!' : `스테이지 ${stage.id} 클리어!`) : `스테이지 ${stage.id} — 웨이브 ${result.fellAt}에서 무너졌다`;
-    // 진전 눈금(2026-09-06 2차 밸런스 설계): "지난번 12웨이브 → 이번 15웨이브, 최고 기록!" — 반복하는 조카에게 "나아가고 있다"를 보여 준다
-    const P = settle.progress; let prog = '';
-    if (P && !P.firstTry) {
-      if (result.cleared) prog = P.prevCleared ? '' : `<span class="newBest">지난번 ${P.prevWave}웨이브 → 이번 클리어!</span><br>`;
-      else prog = P.best ? `<span class="newBest">지난번 ${P.prevWave}웨이브 → 이번 ${P.wave}웨이브 · 최고 기록!</span><br>` : `<span style="color:#6B5A48">지난번 ${P.prevWave}웨이브 · 이번 ${P.wave}웨이브</span><br>`;
-    }
-    $('endBody').innerHTML = `<b>${esc(stage.name)}</b> · <span class="spc" style="background:${NGN.DIFF_COLOR[diff]};color:#fff;text-shadow:none">${esc(D.name)}</span><br>`
-      + (result.cleared ? `남은 생명 ${result.lives}/${result.startLives} · 쓴 골드 ${Math.round(result.spent).toLocaleString()}${settle.stars < 3 && nextTier ? ` <span style="color:#6B5A48">(${nextTier.lives} 이상 남기면 ★${nextTier.star})</span>` : ''}<br>` : `웨이브 <b>${P ? P.wave : result.wave}</b>/${stage.waves} 막음 · 별 없음<br>`)
-      + prog
-      + (settle.gained > 0 ? `<span class="newBest">${settle.newRecord ? '신기록! ' : ''}${NGN.starOf(diff)} +${settle.gained} ${esc(D.star)}</span><br>` : (result.cleared && settle.prevStars >= settle.stars && settle.prevStars > 0 ? `<span style="color:#6B5A48">이미 ${esc(D.star)} ${settle.prevStars}개 — 더 잘 깨면 차액을 받는다</span><br>` : ''))
-      + (settle.unlocked ? `<b style="color:#2E7D32">새 타워 계열 해금: ${esc(NGN.FAMILY_NAMES[settle.unlocked])}</b><br>` : '')
-      + (result.cleared && diff === 'normal' && settle.prevStars === 0 ? `<b style="color:#9E2B22">이 스테이지의 어려움(붉은별)이 열렸다!</b><br>` : '')
-      + (isLast && result.cleared ? `<b style="color:#B8860B">축하합니다! 20개 스테이지를 모두 깼다.</b><br>다른 난이도의 별과 무한 모드가 남아 있어요.<br>` : '')
-      + (result.cleared && stage.id === this.data.stages.infiniteUnlockStage && settle.firstClear ? `<b style="color:#1D5FA0">무한 모드가 열렸다!</b><br>` : '');
-    $('ticketLines').innerHTML = this.ticketHtml(settle.tickets);
+    const goal = !result.cleared ? `<div class="rgoal">${NGN.starOf(diff, false)} 끝까지 막으면 ${esc(D.star)}</div>`
+      : nextTier ? `<div class="rgoal">${NGN.starOf(diff, false)} ${SVG.heart} ${nextTier.lives} 이상 남기면 ★${nextTier.star}</div>` : '';
+    // ⑶ 받은 것 + 새로 열린 것
+    const opened = [
+      settle.unlocked ? this.rchip(`새 타워 ${esc(NGN.FAMILY_NAMES[settle.unlocked])}`, 'open') : '',
+      result.cleared && diff === 'normal' && settle.prevStars === 0 ? this.rchip('어려움 열림', 'open') : '',
+      result.cleared && stage.id === this.data.stages.infiniteUnlockStage && settle.firstClear ? this.rchip('무한 모드 열림', 'open') : '',
+    ].filter(Boolean).join('');
+    $('endBody').innerHTML = grade + goal;
+    $('ticketLines').innerHTML = this.rewardRow(settle.gained, NGN.starOf(diff), settle.tickets, opened);
     const hasNext = result.cleared && !isLast;
-    this.showBtns([hasNext ? 'endNext' : '', 'endRetry', 'endMenu'].filter(Boolean)); // 최대 3개: 다음 있으면 [다음][다시][로비], 없으면 [다시][로비][기록 코드]
+    this.showBtns([hasNext ? 'endNext' : '', 'endRetry', 'endMenu'].filter(Boolean)); // 최대 3개
     this.setEndCode(settle.rec, !hasNext);
   }
   // 무한 모드 결과: 웨이브 N, 지도 기록. [뽑기] / [다시] / [메뉴]
   showInfiniteEnd(result, best, tickets, mapName, rec) {
     this.hideAll(); $('endScreen').hidden = false; $('pop').hidden = true; $('hint').hidden = true;
     $('endStars').hidden = true;
-    $('ticketLines').innerHTML = this.ticketHtml(tickets);
-    $('endTitle').textContent = result.stopped ? `웨이브 ${result.wave}까지 막았다` : `웨이브 ${result.wave}까지 막고, ${result.fellAt}에서 무너졌다`;
-    const at30 = result.livesAt30 !== null && result.livesAt30 !== undefined ? `<br>30웨이브 때 — 남은 생명 ${result.livesAt30} · 쓴 골드 ${Math.round(result.spentAt30).toLocaleString()} <span style="color:#6B5A48">(순위표 철벽·알뜰 부문)</span>` : '';
-    $('endBody').innerHTML = `<b>${esc(mapName)}</b> · 무한 모드<br>${result.wave > this.game.waves.length ? '30웨이브를 넘어 무한 구간까지 갔다!<br>' : ''}남은 생명 ${result.lives} · 남은 골드 ${Math.floor(result.gold)} · 쓴 골드 ${Math.round(result.spent).toLocaleString()}${at30}<br>${result.newBest ? '<b style="color:#B8860B">새 기록!</b> ' : ''}이 지도 최고: 웨이브 ${best.wave}`;
+    $('endTitle').textContent = `웨이브 ${result.wave}까지`;
+    $('endBody').innerHTML = this.rrow([
+      this.rchip(esc(mapName)),
+      this.rchip('무한'),
+      this.rchip(`${SVG.heart} ${result.lives}`),
+      this.rchip(`${SVG.coin} ${Math.round(result.spent).toLocaleString()}`),
+      result.newBest ? this.rchip('새 기록', 'best') : '',
+    ]) + `<div class="rgoal">${NGN.SVG.trophy} 이 지도 최고 ${best.wave}</div>`;
+    $('ticketLines').innerHTML = this.rewardRow(0, '', tickets, '');
     this.showBtns(['endRetry', 'endMenu']); // [다시][로비][기록 코드]
     this.setEndCode(rec);
   }
@@ -784,9 +883,14 @@ NGN.UI = class UI {
   showDailyEnd(dk, result, settle) {
     this.hideAll(); $('endScreen').hidden = false; $('pop').hidden = true; $('hint').hidden = true;
     $('endStars').hidden = true;
-    $('ticketLines').innerHTML = this.ticketHtml(settle);
-    $('endTitle').textContent = result.cleared ? `오늘의 판 클리어!` : `오늘의 판 — 웨이브 ${result.wave}까지 막았다`;
-    $('endBody').innerHTML = `<b>${esc(dk.label)}</b> · 강화 없이 같은 조건<br>${result.cleared ? `남은 생명 ${result.lives} · 쓴 골드 ${Math.round(result.spent).toLocaleString()}` : `웨이브 ${result.fellAt}에서 무너졌다`}<br><span style="color:#6B5A48">내일 새 판이 열려요. 기록 코드를 단톡방에 올려 겨루세요.</span>`;
+    $('endTitle').textContent = result.cleared ? '오늘의 판 클리어!' : `웨이브 ${result.fellAt}에서 무너졌다`;
+    $('endBody').innerHTML = this.rrow([
+      this.rchip(esc(dk.label)),
+      this.rchip('오늘의 판'),
+      result.cleared ? this.rchip(`${SVG.heart} ${result.lives}`) : this.rchip(`웨이브 ${result.wave}`),
+      result.cleared ? this.rchip(`${SVG.coin} ${Math.round(result.spent).toLocaleString()}`) : '',
+    ]) + '<div class="rgoal">하루 한 번 · 내일 새 판</div>';
+    $('ticketLines').innerHTML = this.rewardRow(0, '', settle, '');
     this.showBtns(['endRecords', 'endMenu']); // [순위][로비][기록 코드]
     this.setEndCode(settle.rec);
   }

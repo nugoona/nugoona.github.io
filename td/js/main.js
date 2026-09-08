@@ -82,6 +82,12 @@ NGN.serverNow = async function serverNow() {
   const meta = new NGN.Meta(data.gacha, data.stages, data.families, data.lobby); // lobby = 일일 미션·출석·시즌 규칙(J-11)
   if (meta.state.settings.shadows === false) { world.renderer.shadowMap.enabled = false; world.sun.castShadow = false; }
   if (NGN.sound) NGN.sound.on = meta.state.settings.sound !== false; // 효과음(fx.js NGN.Sound): 설정에서 끈 사람은 끈 채로
+  // 화면 흔들림 세기(M-4-7). 강연자(Eiserloh) 본인이 자기 게임에 끄기 옵션을 넣어야 했다 — 어지러워하는 사람이 있다.
+  // 설정에 저장되는 값: undefined/'full' = 1(기본) · 'half' = 0.5(절반) · 'off' = 0(끄기).
+  // 🛑 지금 설정 화면의 스위치는 2단(켜기/끄기)뿐이라 3단 위젯은 화면 담당 몫이다. 3D 쪽은 **값만 읽는다** —
+  //    화면이 'half'/'off' 를 넣어 주면 그 순간부터 그대로 동작한다(applyShake 가 유일한 통로).
+  const applyShake = () => { const v = meta.state.settings.shake; world.shakeScale = v === 'off' ? 0 : v === 'half' ? 0.5 : 1; };
+  applyShake();
 
   let game = null, speed = Number(params.get('speed') || 1), acc = 0, last = performance.now(), ended = false, curMap = NGN.map, menuSpin = true;
   let mode = null, curStage = null, curDiff = 'normal', curDaily = null; // mode: 'stage' | 'infinite' | 'daily'
@@ -185,8 +191,15 @@ NGN.serverNow = async function serverNow() {
     onUnequip(inst, uid) { if (game.unequip(inst, uid)) { ui.refreshHud(); ui.cb.onSelect(inst.slotId, inst, game.effectiveStats(inst).range); } },
     onSetting(k) {
       const s = meta.state.settings;
-      if (k === 'shadows') { s.shadows = s.shadows === false; world.renderer.shadowMap.enabled = s.shadows; world.sun.castShadow = s.shadows; world.root.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
+      // 🛑 그림자를 끄는 주인은 **이 설정뿐이다.** 자동 품질은 더 이상 그림자를 끄지 않는다(2026-09-07 2판) —
+      //    무거우면 그림자를 「고정」으로 바꿔 값을 1/3 로 줄일 뿐이다. 다시 켤 때는 한 번 구워 줘야 화면에 나타난다
+      if (k === 'shadows') { s.shadows = s.shadows === false; world.renderer.shadowMap.enabled = s.shadows; world.sun.castShadow = s.shadows; world.root.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); if (s.shadows && world.markShadowDirty) world.markShadowDirty(); }
       else if (k === 'vibrate') s.vibrate = s.vibrate === false;
+      // 흔들림(3단): 설정 화면의 3칸에서 「shake:off」처럼 고른 값이 실려 온다.
+      // 🛑 끌 수 있어야 한다 — 화면이 흔들리면 어지러움을 느끼는 사람이 있다("some people were getting really nauseous").
+      //    조카 둘 중 하나가 그러면 게임을 아예 못 한다. 기본값은 「기본」(undefined).
+      else if (k.startsWith('shake:')) { const v = k.slice(6); s.shake = v === 'full' ? undefined : v; applyShake(); }
+      else if (k === 'shake') { s.shake = s.shake === 'off' ? undefined : s.shake === 'half' ? 'off' : 'half'; applyShake(); } // 옛 순환식(화면 위젯 없이도 돌게)
       else if (k === 'sound') { s.sound = s.sound === false; if (NGN.sound) { NGN.sound.on = s.sound; if (s.sound) { NGN.sound.wake(); NGN.sound.play('ui'); } } }
       else if (k === 'reset') { if (confirm('별·기록·티켓·뽑은 것을 전부 지울까요?')) { localStorage.removeItem('ngn-td-meta'); localStorage.removeItem('ngn-td-best'); location.reload(); return; } }
       meta.save(); ui.showSettings();

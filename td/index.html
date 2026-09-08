@@ -44,7 +44,7 @@
      흐름(design.md 12장): 메뉴 → 월드맵(점 20개) → 전투 → 결과(별) → 월드맵. 무한 모드는 따로(스테이지 10 뒤). 덱 편성 없음. */
   :root {
     --cream: #FFF7E6; --cream2: #F3E7CC; --brown: #6B4A2B; --brown2: #4A3320; --ink: #2B1D12; --ink2: #6B5A48;
-    --gold: #FFC93C; --gold2: #B8860B; --blue: #3AA0F0; --blue2: #1D5FA0; --green: #58C24A; --green2: #2E7D32; --red: #E85A4F; --red2: #9E2B22;
+    --gold: #FFC93C; --gold2: #B48000; --blue: #1C9FD7; --blue2: #146587; --green: #16BB77; --green2: #046D41; --red: #EE2747; --red2: #871023;
     --stroke: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000;
     /* 글꼴 두 벌 (K-2-6): 굵고 각진 제목체 / 둥근 본문체. 시스템 한글(맑은 고딕 등)이 마지막 그물이라 어떤 글자도 빈칸이 되지 않는다 */
     --f-title: 'BlackHanSans', 'Jua', 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif;
@@ -88,6 +88,17 @@
   .btn.tiny, .mission .mbtn, .btn.brn, .modal .row .btn, .panel.list .btn, .row.confirm .btn,
   .world-head .btn.gold, .grow-gacha .btn, .a2hs .btn, .gbtn, .rbtn { font-family: var(--f-body); }
   #stage { position: fixed; inset: 0; }
+  /* ---------- 화면 마무리(2026-09-08, 사장님 "그래픽이 너무 구려") ----------
+     ⑴ 색보정: 3D 화면이 날것 그대로 나가고 있었다 — 허옇고 평평했다. 대비·채도를 살짝 올리고 아주 조금 어둡게.
+     ⑵ 가장자리 어둡게(비네트): 눈이 화면 가운데(게임판)로 모인다. 출시된 게임이 거의 다 하는 것.
+     🔑 왜 CSS 로 하나 — 후처리(빛번짐)는 품질 4단에서만 켜진다. 그러면 좋은 폰에서만 보인다.
+        이건 브라우저가 화면을 합칠 때 같이 처리해서 **모든 폰·모든 품질 단계에서** 똑같이 나온다.
+        WebGL 화면 버퍼를 하나 더 만들지 않으므로 폰 메모리도 안 먹는다.
+     🛑 UI(버튼·글자)에는 걸지 않는다 — 게임 화면(캔버스)에만 건다. UI 색은 이미 맞춰 둔 것이다. */
+  :root { --grade: contrast(1.10) saturate(1.14) brightness(0.97); }
+  #stage canvas { filter: var(--grade); }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: radial-gradient(ellipse 74% 58% at 50% 45%, rgba(0,0,0,0) 34%, rgba(10,20,14,.26) 68%, rgba(6,13,9,.52) 88%, rgba(4,10,7,.66) 100%); }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   svg.i { width: 1em; height: 1em; vertical-align: -0.15em; fill: currentColor; }
   .num { font-weight: 400; color: #fff; text-shadow: var(--stroke); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
@@ -109,7 +120,8 @@
   .btn.green { border-image-source: url(assets/ui/btn-green.png); --sh: var(--green2); box-shadow: 0 5px 0 var(--green2); }
   .btn.red { border-image-source: url(assets/ui/btn-red.png); --sh: var(--red2); box-shadow: 0 5px 0 var(--red2); }
   .btn.gold { border-image-source: url(assets/ui/btn-gold.png); --sh: var(--gold2); color: #3a2a00; text-shadow: none; box-shadow: 0 5px 0 var(--gold2); }
-  .btn.gray { border-image-source: url(assets/ui/btn-gray.png); --sh: #5C666D; box-shadow: 0 5px 0 #5C666D; }
+  /* 회색은 Kenney 원본이 거의 흰색(밝기 218~255)이라 흰 글자가 안 읽힌다 — 노랑과 같이 어두운 글자를 쓴다 */
+  .btn.gray { border-image-source: url(assets/ui/btn-gray.png); --sh: #666880; color: #39424A; text-shadow: none; box-shadow: 0 5px 0 #666880; }
   .btn:disabled { filter: grayscale(1) brightness(.75); cursor: default; }
   .rbtn { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 60px; background: none; border: 0; padding: 0; cursor: pointer; color: #fff; font: inherit; font-size: 13px; text-shadow: var(--stroke); position: relative; }
   .rbtn .circ { width: 52px; height: 52px; border-radius: 50%; background: var(--cream); border: 3px solid var(--brown); box-shadow: 0 3px 0 var(--brown2), 0 5px 10px rgba(0,0,0,.3); display: flex; align-items: center; justify-content: center; color: var(--brown); font-size: 26px; transition: transform .05s; }
@@ -151,7 +163,8 @@
   .world-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; background: linear-gradient(rgba(18,28,40,.96), rgba(18,28,40,.7)); }
   .world-head .spacer { flex: 1; }
   .world-head .btn.gold { min-height: 46px; font-size: 15px; padding: 4px 16px; }
-  .world { position: relative; width: 100%; max-width: 480px; margin: 0 auto 30px; aspect-ratio: 360 / 1900; }
+    /* 높이는 buildWorld() 가 판 수 × 126px 로 직접 정한다 — 폭에 비례시키면 좁은 폰에서 칸이 겹친다 */
+  .world { position: relative; width: 100%; max-width: 480px; margin: 0 auto 30px; flex: 0 0 auto; }
   .world svg.road { position: absolute; inset: 0; width: 100%; height: 100%; }
   .node { position: absolute; transform: translate(-50%, -50%); width: 78px; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0; font: inherit; color: #fff; text-shadow: var(--stroke); cursor: pointer; }
   .node .circ { width: 58px; height: 58px; border-radius: 50%; background: var(--cream); border: 3px solid var(--brown); box-shadow: 0 4px 0 var(--brown2), 0 6px 12px rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--ink); text-shadow: none; transition: transform .05s; }
@@ -174,8 +187,10 @@
      (2026-09-07 실측). 오른쪽에 붙이되 줄은 접히게 둔다 — flex 칸은 min-width:0 이라야 실제로 접힌다. */
   .branch .top .eff { flex: 1 1 auto; min-width: 0; margin-left: auto; color: var(--green2); font-size: 15px; white-space: normal; text-align: right; line-height: 1.3; }
   .branch .unit { font-size: 13px; color: var(--ink2); margin-top: 4px; }
-  .branch .steps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; } /* 공격 10칸은 폰 폭을 넘쳐 두 줄로 */
-  .step { flex: 1 0 44px; min-height: 46px; border-radius: 10px; border: 3px solid var(--brown); background: var(--cream2); display: flex; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; padding: 0; transition: transform .05s; }
+  /* 🛑 flex:1 이면 마지막 줄에 혼자 남은 칸이 폭을 다 먹는다(53px 옆에 297px — 2026-09-07 실기기 확인).
+     격자로 칸 크기를 고정하고 왼쪽부터 채운다. 빈자리는 그냥 비워 둔다 */
+  .branch .steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; margin-top: 8px; } /* 공격 10칸은 폰 폭을 넘쳐 두 줄로 */
+  .step { min-height: 46px; border-radius: 10px; border: 3px solid var(--brown); background: var(--cream2); display: flex; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; padding: 0; transition: transform .05s; }
   .step svg { width: 16px; height: 16px; }
   .step.done { background: var(--gold); border-color: var(--gold2); }
   .step.can { background: var(--green); border-color: var(--green2); color: #fff; text-shadow: var(--stroke); }
@@ -191,7 +206,9 @@
   .panel.list { padding: 12px 16px; font-size: 15px; line-height: 1.7; }
   .panel.list .row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed rgba(107,74,43,.3); }
   .panel.list .row:last-child { border-bottom: 0; }
-  .panel.list .row .grow { flex: 1; }
+  /* 🛑 라벨은 한 줄 고정 (checklist K-2-15). 버튼이 여럿인 줄에서 라벨이 눌려 「저장 코 / 드」로 깨졌다(2026-09-07 실측) */
+  .panel.list .row > .grow { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .panel.list .row .btn { flex: 0 0 auto; }
   .panel.list .btn { min-height: 40px; font-size: 15px; padding: 4px 12px; }
   .card { position: relative; background: var(--cream); border: 3px solid var(--brown); border-radius: 14px; box-shadow: 0 4px 0 var(--brown2); padding: 8px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; font: inherit; color: var(--ink); min-height: 96px; }
   .card .art { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 20px; border: 3px solid rgba(0,0,0,.25); box-shadow: inset 0 -4px 0 rgba(0,0,0,.2); }
@@ -210,6 +227,9 @@
   #hud > * { pointer-events: auto; }
   .ibtn { width: 40px; height: 40px; border-radius: 50%; background: rgba(20,26,34,.55); border: 2px solid rgba(255,255,255,.55); color: #fff; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; flex: 0 0 auto; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
   .ibtn svg { width: 22px; height: 22px; }
+  /* 배속(위 정보줄) — 지금 몇 배인지 숫자로. 1× 가 아니면 금색으로 도드라진다 */
+  #speedBtn { font: inherit; font-family: var(--f-title); font-weight: 400; font-size: 15px; color: #fff; }
+  #speedBtn.fast { background: var(--gold); border-color: #fff; color: #3a2a00; }
   .ibtn:active { transform: translateY(2px); }
   #waveBar { flex: 1; min-width: 0; margin-top: 2px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
   #waveBar .track { width: 100%; height: 22px; border-radius: 12px; background: rgba(20,26,34,.6); border: 2px solid rgba(255,255,255,.5); position: relative; overflow: hidden; }
@@ -360,6 +380,17 @@
   #endScreen { position: fixed; inset: 0; z-index: 25; background: rgba(10,16,24,.88); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 12px; color: #fff; animation: fadeIn .3s; }
   #endScreen h1 { margin: 0; font-size: 30px; text-shadow: var(--stroke); }
   #endScreen .panel { padding: 16px 20px; font-size: 15px; line-height: 1.5; min-width: 260px; max-width: 360px; }
+  /* 결과 화면 (checklist K-2-16): 문장 한 덩어리 대신 칩으로. 위계는 ⑴얼마나 갔나 → ⑵무엇을 받았나 → ⑶다음에 뭘 할까.
+     🛑 결과 패널은 크림 바탕이라 칩도 크림 위에서 읽히는 색으로 짠다 */
+  .rrow { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 4px 0; }
+  .rchip { display: inline-flex; align-items: center; gap: 4px; background: rgba(107,74,43,.1); border: 2px solid rgba(107,74,43,.3); border-radius: 999px; padding: 4px 12px; font-size: 15px; color: var(--ink); white-space: nowrap; }
+  .rchip svg { width: 16px; height: 16px; }
+  .rchip.gold { background: #FFF3C4; border-color: var(--gold2); color: #5a3d00; }
+  .rchip.best { background: rgba(22,187,119,.2); border-color: var(--green2); color: var(--green2); }
+  .rchip.open { background: rgba(28,159,215,.16); border-color: var(--blue2); color: var(--blue2); }
+  /* 다음 목표 한 줄 — 진 화면에서 「별 없음」이라고 통보하는 대신 「어떻게 하면 받나」를 보여 준다 */
+  .rgoal { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--ink2); }
+  .rgoal svg { width: 18px; height: 18px; }
   #ticketLines { text-align: left; font-size: 15px; }
   #endScreen .btn { min-width: 140px; }
   #endBtns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
@@ -524,7 +555,8 @@
      조카가 처음 켰을 때 자기가 몇 번째 판에 있는지 안 보였다 → 흐름 요소로 바꿔 제목 아래에 한 줄로 눕힌다.
      이제 배너가 떠 있어도 아래가 밀릴 뿐 아무것도 가리지 않는다. */
   .a2hs { display: flex; align-items: center; gap: 8px; padding: 4px 8px; margin-bottom: 8px; font-size: 13px; border-radius: 999px; flex: 0 0 auto; }
-  .a2hs .grow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 한 줄로 묶으면 360px 폰에서 33px 넘쳐 「…」로 잘렸다. 두 줄로 흐르게 두면 판이 5px 커질 뿐이고 잘림이 없다 */
+  .a2hs .grow { flex: 1; min-width: 0; white-space: normal; line-height: 1.25; }
   .a2hs .btn.tiny { min-height: 28px; font-size: 13px; padding: 0 8px; }
   #endCode { min-height: 50px; font-size: 15px; }
   .clock { color: #E8A23A; font-size: 13px; white-space: nowrap; }
@@ -640,7 +672,7 @@
   .astamp .tk svg { width: 20px; height: 20px; }
   .astamp.done { background: var(--gold); border-color: var(--gold2); color: #3a2a00; }
   .astamp.done b { color: #3a2a00; }
-  .astamp.today { box-shadow: 0 0 0 3px rgba(88,194,74,.8), 0 3px 0 var(--brown2); }
+  .astamp.today { box-shadow: 0 0 0 3px rgba(22,187,119,.8), 0 3px 0 var(--brown2); }
   .astamp .chk { position: absolute; top: var(--sp1); right: var(--sp1); color: var(--green2); }
   .astamp .chk svg { width: 16px; height: 16px; }
   /* ---------- 도감(J-11 ③) ---------- */
@@ -663,7 +695,7 @@
   .cx-row:last-child { border-bottom: 0; }
   .cx-row .grow { flex: 1; min-width: 0; font-size: 13px; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
   .cx-row .dn { min-width: 64px; }
-  .cx-row .up { background: rgba(88,194,74,.2); color: var(--green2); border-radius: 6px; padding: 0 4px; white-space: nowrap; }
+  .cx-row .up { background: rgba(22,187,119,.2); color: var(--green2); border-radius: 6px; padding: 0 4px; white-space: nowrap; }
   .spc.gray { background: #5C666D; }
   .cx-sec { margin-top: 12px; }
   .cx-sec .rhead { color: #fff; border-bottom-color: rgba(255,255,255,.3); text-shadow: var(--stroke); }
@@ -683,22 +715,63 @@
   .cx-card.locked { filter: grayscale(.85) brightness(.85); }
   .cx-detail .cx-affline { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; font-size: 13px; }
   .cx-affline span { border-radius: 8px; padding: 4px 8px; background: rgba(0,0,0,.06); white-space: nowrap; }
-  .cx-affline .up { background: rgba(88,194,74,.25); } .cx-affline .down { background: rgba(232,90,79,.22); }
+  .cx-affline .up { background: rgba(22,187,119,.25); } .cx-affline .down { background: rgba(238,39,71,.22); }
   .cx-how { font-size: 15px; text-align: center; }
   .cx-enemy { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed rgba(107,74,43,.25); }
   .cx-enemy:last-child { border-bottom: 0; }
   .cx-enemy .ico svg { width: 40px; height: 40px; }
   .cx-enemy .grow { flex: 1; min-width: 0; line-height: 1.4; }
   .cx-enemy .sub, .cx-enemy .nums { font-size: 13px; color: var(--ink2); }
+  /* 적 수치: 「체력 ×1 · 속도 ×1 · 보상 ×1 · 새면 생명 −1」 한 문장이던 것을 칩 넷으로 쪼갰다(K-2-15).
+     같은 정보인데 읽을 덩어리가 작아지고, 설명 문장은 [?] 로 옮겨 화면에서 사라졌다 */
+  .cx-enemy .echips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .cx-enemy .echips span { background: rgba(107,74,43,.12); border-radius: 999px; padding: 1px 8px; font-size: 13px; color: var(--ink2); white-space: nowrap; }
+  /* 아이템 24종은 등급마다 접어 둔다(K-2-15) — 다 펼쳐 놓으면 설명이 여덟 줄이다. 궁금한 등급만 연다 */
+  .cx-fold > summary { cursor: pointer; list-style: none; font-size: 15px; color: var(--ink); padding: 4px 0; display: flex; align-items: center; gap: 4px; }
+  .cx-fold > summary::-webkit-details-marker { display: none; }
+  .cx-fold > summary::after { content: " ▾"; margin-left: auto; color: var(--ink2); }
+  .cx-fold[open] > summary::after { content: " ▴"; }
+  .cx-fold[open] > summary { border-bottom: 2px solid rgba(107,74,43,.35); margin-bottom: 4px; }
+  .rhead .hlp { margin-left: 6px; vertical-align: -4px; }
+  .screen-head .hlp { margin-left: 4px; }
+  .sec-head .hlp { margin-left: 4px; }
+  /* ---------- 스위치와 [?] 도움말 (checklist K-2-15) ----------
+     사장님: "텍스트 꾸역꾸역에 엉망진창 쓰레기 같은데 이걸 통과시켰다고?"
+     ⑴ 켜짐/꺼짐을 글자 버튼 셋으로 세워 두던 것 → 한눈에 보이는 스위치.
+        🛑 색만으로 알리지 않는다(WCAG 1.4.1) — 손잡이가 좌우로 옮겨 가는 것이 진짜 신호다.
+     ⑵ 라벨 옆에서 세 줄로 흐르던 설명 → [?] 뒤로. 그래야 라벨이 한 줄로 고정되고 줄 높이가 고르다. */
+  .sw { width: 56px; height: 32px; flex: 0 0 auto; border-radius: 999px; border: 3px solid #5C666D; background: #9AA3AA; position: relative; padding: 0; cursor: pointer; transition: background .15s, border-color .15s; }
+  .sw .knob { position: absolute; top: 1px; left: 1px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); transition: transform .15s; }
+  .sw.on { background: var(--green); border-color: var(--green2); }
+  .sw.on .knob { transform: translateX(24px); }
+  /* 3칸 선택 — 켜고 끄기(스위치)가 아니라 셋 중 하나를 고르는 자리(화면 흔들림 = 끄기/절반/기본).
+     🛑 색만으로 알리지 않는다(WCAG 1.4.1): 고른 칸은 색이 바뀌는 동시에 안쪽에 흰 테두리가 생긴다 */
+  .seg { display: inline-flex; flex: 0 0 auto; border: 3px solid var(--brown); border-radius: 12px; overflow: hidden; box-shadow: 0 3px 0 var(--brown2); }
+  .seg button { font: inherit; font-family: var(--f-body); font-size: 13px; min-height: 38px; padding: 0 10px; border: 0; border-left: 2px solid var(--brown); background: var(--cream2); color: var(--ink2); cursor: pointer; }
+  .seg button:first-child { border-left: 0; }
+  .seg button.on { background: var(--green); color: #fff; text-shadow: var(--stroke); box-shadow: inset 0 0 0 2px rgba(255,255,255,.85); }
+  .seg button:active { transform: translateY(1px); }
+  .hlp { width: 26px; height: 26px; flex: 0 0 auto; border-radius: 50%; border: 2px solid var(--brown); background: var(--cream2); color: var(--brown2); font: inherit; font-size: 15px; line-height: 1; padding: 0; cursor: pointer; }
+  .hlp:active { transform: translateY(2px); }
+  .hlp.light { border-color: rgba(255,255,255,.5); background: rgba(255,255,255,.14); color: #fff; }
+  /* 도움말 창: 궁금해서 연 사람만 보는 곳이라 여기서는 길게 써도 된다 */
+  #helpModal .modal p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink); }
+  #helpModal .modal .credit { font-size: 13px; color: var(--ink2); line-height: 1.45; border-top: 2px dashed rgba(107,74,43,.3); padding-top: 8px; }
   /* ---------- 상성을 그림으로 (checklist K-2-7) — 6×6 숫자 표 앞에 「약점 바퀴」를 둔다. 표는 그대로 뒤에 남는다.
      방패 넷을 3×3 칸의 十자 자리에 놓고(가운데는 도는 화살표), 방패마다 「잘 드는 공격 ▲」과 「안 먹히는 공격 ▼」을 붙인다.
      🛑 값·관계는 codex.js 가 data/affinity.json 을 읽어 만든다 — 여기(그림)에도, 거기(코드)에도 숫자를 적지 않는다 ---------- */
   .cx-wheel { padding: 10px 10px 12px; margin-top: 10px; }
-  .wheel { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
-  .wnode { border-radius: 12px; border: 3px solid var(--brown); background: var(--cream2); padding: 4px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; box-shadow: 0 3px 0 var(--brown2); }
+  /* 가운데 칸(도는 화살표)은 좁아도 되고, 좌우 방패 칸은 「에너지 ×0.6」 칩이 들어갈 만큼 넓어야 한다.
+     1fr 셋으로 나누면 360px 폭에서 칩이 칸 밖으로 삐져나갔다(2026-09-07 실측) */
+  .wheel { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; margin-top: 8px; }
+  .wheel .wmid { min-width: 40px; }
+  .wnode { border-radius: 12px; border: 3px solid var(--brown); background: var(--cream2); padding: 4px 2px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; box-shadow: 0 3px 0 var(--brown2); }
   .wnode .sh { width: 42px; height: 42px; display: block; filter: drop-shadow(0 2px 0 rgba(0,0,0,.25)); }
   .wnode .dn { font-size: 18px; line-height: 1.1; white-space: nowrap; }
-  .wnode .wa { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; line-height: 1.55; border-radius: 999px; padding: 0 8px; color: #fff; text-shadow: var(--stroke); white-space: nowrap; max-width: 100%; }
+  /* 🛑 max-width 로 박스만 줄이면 글자가 박스 밖으로 흘러 카드를 넘는다 — 눈에는 삐져나온 것으로 보이는데
+     자동 검사는 「박스는 카드 안」이라 통과시킨다(2026-09-07 실기기 확인). 좁은 좌우 카드(약 128px)에
+     「에너지 ×0.6」이 들어가도록 여백과 사이를 줄인다. 여백 통일(K-2-10)로 8px 이 되면서 다시 넘쳤던 자리다. */
+  .wnode .wa { display: inline-flex; align-items: center; justify-content: center; gap: 2px; font-size: 13px; line-height: 1.5; border-radius: 999px; padding: 0 5px; color: #fff; text-shadow: var(--stroke); white-space: nowrap; max-width: 100%; min-width: 0; }
   .wnode .wa.hi { background: var(--green2); }
   .wnode .wa.lo { background: var(--red2); }
   .wnode .wa svg { width: 10px; height: 10px; flex: 0 0 auto; }
@@ -742,6 +815,7 @@
   <div class="tip" id="loadTip"></div>
 </div>
 <div id="stage"></div>
+<div id="vignette"></div>
 
 <!-- 로비(checklist J-11 ②) = 옛 메인 메뉴를 승격. 배경은 3D 지도(다음 스테이지)가 천천히 돈다. 하단 탭 넷(#lobbyTabs)이 화면을 모은다:
      [전투] 이 화면 — [▶ 스테이지 N](월드맵) · [무한] · [오늘의 판] · 출석 도장 · 오늘의 미션 / [타워] 도감 / [강화] 강화 나무 + 뽑기 / [순위] 시즌 + 순위표. 설정은 상단 오른쪽 톱니 -->
@@ -793,6 +867,9 @@
 <div class="modalWrap" id="diffModal" hidden><div class="panel modal"><h3 id="diffTitle"></h3><div class="difflist" id="diffList"></div><div class="row"><button class="btn gray" id="diffClose">닫기</button></div></div></div>
 <!-- 코드 보기/넣기·이름 묻기(records.js 가 채운다) -->
 <div class="modalWrap" id="codeModal" hidden></div>
+<!-- 도움말 (checklist K-2-15, 2026-09-07 사장님 "텍스트 꾸역꾸역에 엉망진창"):
+     화면에 늘 떠 있던 긴 설명을 전부 여기로 옮겼다. 게임 화면은 설명서가 아니다 — 궁금할 때만 [?] 를 누른다. -->
+<div class="modalWrap" id="helpModal" hidden></div>
 
 <!-- 로비 탭 바(J-11 ②): 로비류 화면(로비·월드맵·도감·강화·순위·설정·지도 고르기)에서만 보인다. 빨간 점 = 새 알림(받을 미션 보상·새 계열·티켓·시즌 결과) -->
 <nav id="lobbyTabs" hidden>
@@ -804,7 +881,7 @@
 
 <!-- 도감(J-11 ③): 상성표 6×6 · 타워 30계열 · 적 6종+성질 9종+방어 6 · 아이템 24종. 전투 화면의 학습 요소를 여기로 옮겼다 -->
 <section id="codexScreen" class="overlay scroll" hidden>
-  <div class="screen-head"><h2>도감 <span class="sub">상성 · 타워 · 적 · 아이템</span></h2></div>
+  <div class="screen-head"><h2>도감</h2></div>
   <div class="tabs" id="codexTabs"><button data-sub="affinity" class="on">상성표</button><button data-sub="towers">타워</button><button data-sub="enemies">적</button><button data-sub="items">아이템</button></div>
   <div id="codexBody"></div>
 </section>
@@ -817,10 +894,10 @@
 
 <!-- 강화 나무: 별을 쓰는 곳. 되돌리기 무료 -->
 <section id="upgradeScreen" class="overlay scroll" hidden>
-  <div class="screen-head"><h2>강화</h2><span class="spacer" style="flex:1"></span><span class="pill" id="upgradeStars"></span></div>
+  <!-- 안내 세 줄은 [?] 뒤로 옮겼다(checklist K-2-15) — 게임 화면은 설명서가 아니다 -->
+  <div class="screen-head"><h2>강화</h2><button class="hlp light" data-help="tree">?</button><span class="spacer" style="flex:1"></span><span class="pill" id="upgradeStars"></span></div>
   <!-- 뽑기(J-11 ②): 강화 탭 안에. 티켓이 있으면 탭에 빨간 점 -->
   <div class="panel grow-gacha" id="growGacha"></div>
-  <p class="sub" style="margin:0 0 10px">별은 스테이지를 깨면 받는다. 남은 별로 앞 칸부터 찍고, 잘못 찍었으면 아래 [전부 되돌리기] — 별은 전부 돌아온다.</p>
   <div class="tree" id="tree"></div>
   <button class="btn red" id="treeReset">전부 되돌리기</button>
 </section>
@@ -855,6 +932,9 @@
       <!-- 카운트다운 줄(웨이브 사이에만): "다음 8초" + 다음 웨이브 적 아이콘 + 보스/성질 칩. 웨이브 중엔 사라진다 -->
       <div class="cd" id="countdown" hidden><span class="sec dk" id="cdSec"></span><span class="cdfoes dk" id="cdFoes"></span></div>
     </div>
+    <!-- 배속: 전에는 화면 오른쪽 아래 큰 버튼이 웨이브 중에 배속으로 바뀌었는데, 그게 세 번째 타워 카드 바로 옆이라
+         카드를 고르려다 배속을 누르게 됐다(사장님 지적 2026-09-07). 손가락이 안 닿는 위쪽으로 옮긴다 -->
+    <button class="ibtn" id="speedBtn" title="배속" hidden>1×</button>
     <button class="ibtn" id="pauseBtn" title="일시정지"><svg viewBox="0 0 24 24"><path fill="#fff" d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
     <div id="hudRight">
       <span class="mpill" id="lifePill"><svg class="i" viewBox="0 0 24 24"><path fill="#E8443A" d="M12 21s-7.5-4.6-9.5-9.3C1 8 3.4 4.5 7 4.5c2 0 3.6 1.1 5 2.8 1.4-1.7 3-2.8 5-2.8 3.6 0 6 3.5 4.5 7.2C19.5 16.4 12 21 12 21z"/></svg><span class="num" id="lives">20</span></span>
@@ -891,7 +971,7 @@
     <button id="endRetry" class="btn blue">다시</button>
     <button id="endRecords" class="btn blue">순위</button>
     <button id="endMenu" class="btn gray">로비</button>
-    <button id="endCode" class="btn gold" hidden>기록 코드 — 단톡방에 올리기</button>
+    <button id="endCode" class="btn gold" hidden>기록 코드</button>
   </div>
 </section>
 
@@ -919,11 +999,11 @@
 <!-- 부팅: 스크립트를 하나씩 받으며 로딩 막대를 채운다(0~30%). 그 뒤 데이터·모델은 main.js 가 NGN_LOADING 으로 이어 채운다.
      파일 위치는 window.__NGN_PATHS__(나눔 빌드가 넣는다)로 바꾼다. 번들(단일 HTML)은 __NGN_INLINE__ 을 세워 이 목록을 안 받고 뒤에 인라인된 것을 쓴다.
      SCRIPTS 는 유효한 JSON 배열이어야 한다 — game/build.js·bundle.js 가 이 줄을 읽는다 -->
-<script>window.__NGN_VERSION__ = "907053a327"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
+<script>window.__NGN_VERSION__ = "e1c9a883cc"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
 <script>
 (function () {
   const P = Object.assign({ sim: '../sim/', vendor: 'vendor/', data: '../data/', assets: 'assets/' }, window.__NGN_PATHS__ || {});
-  const SCRIPTS = ["vendor/three.r128.min.js", "vendor/GLTFLoader.r128.js", "vendor/SimplexNoise.js", "vendor/LightningStrike.js", "vendor/lz-string.1.5.0.min.js", "sim/map.js", "sim/mapgen.js", "sim/engine.js", "sim/ai.js", "sim/build-waves.js", "js/data.js", "js/world.js", "js/fx.js", "js/models.js", "js/render.js", "js/ui.js", "js/meta.js", "js/records.js", "js/codex.js", "js/gacha.js", "js/main.js"];
+  const SCRIPTS = ["vendor/three.r128.min.js", "vendor/GLTFLoader.r128.js", "vendor/SimplexNoise.js", "vendor/LightningStrike.js", "vendor/postprocessing.r128.js", "vendor/lz-string.1.5.0.min.js", "sim/map.js", "sim/mapgen.js", "sim/engine.js", "sim/ai.js", "sim/build-waves.js", "js/data.js", "js/world.js", "js/fx.js", "js/models.js", "js/render.js", "js/ui.js", "js/meta.js", "js/records.js", "js/codex.js", "js/gacha.js", "js/main.js"];
   const TIPS = ["공중 적에겐 <b>대공</b>이 되는 타워를 — 카드의 화살표를 보세요", "타워를 <b>길게 누르면</b> 설명과 3단 모습이 나와요", "3단 승급은 <b>화력</b>과 <b>광역</b> 중 하나 — 정답은 없어요", "별은 <b>강화</b>에 쓰고, 잘못 찍었으면 전부 되돌리기(무료)", "어려움은 적 체력이 <b>2배</b> — 붉은 별은 따로 셉니다", "<b>홈 화면에 추가</b>하면 인터넷 없이도 열려요", "떨어진 <b>아이템</b>은 타워를 눌러 끼우세요 — 판이 끝나면 사라져요", "<b>기록 코드</b>를 단톡방에 올리면 친구 순위표에 나란히 떠요", "적 발밑 <b>색 고리</b>가 성질 — 갑옷·질주·재생·분열…", "<b>오늘의 판</b>은 하루 한 번, 모두 같은 지도·같은 조건", "로비 [타워] 탭의 <b>상성표</b> — 어느 공격이 어느 방어에 센지 한눈에", "<b>일일 미션</b> 셋을 다 하면 티켓 보너스 — 못 한 날 벌칙은 없어요", "매달 1일 <b>시즌 점수</b>만 0 — 별·타워·강화는 그대로"];
   const fill = document.getElementById('loadFill'), pct = document.getElementById('loadPct'), what = document.getElementById('loadWhat'), tip = document.getElementById('loadTip'), box = document.getElementById('loading');
   box.style.backgroundImage = `url(${P.assets}loading.jpg)`;

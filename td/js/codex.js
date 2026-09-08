@@ -84,31 +84,33 @@ NGN.CodexUI = class CodexUI {
     const K = NGN.DEFENSE_KO, AK = this.data.affinity.한국어 || NGN.ATTACK_KO, S = NGN.SVG, T = W.T;
     // 十자 자리(위·왼·오른·아래)에 넣는다. 다섯 칸 이상이면 앞의 넷만 바퀴에 놓고 나머지는 아래 줄에
     const [n0, n1, n2, n3] = W.nodes;
-    const mid = `<div class="wmid">${S.turn}${W.mids.length ? `<span>옆 칸부터<br>×${W.mids.join(' · ×')} 로<br>약해진다</span>` : ''}</div>`;
+    const mid = `<div class="wmid">${S.turn}</div>`;   // 「옆 칸부터 ×1.2…」 세 줄은 지웠다 — 바퀴가 이미 보여 준다(K-2-15)
     const cell = (n) => (n ? this.wheelNode(n) : '<i></i>');
     const grid = `<div class="wheel"><i></i>${cell(n0)}<i></i>${cell(n3)}${mid}${cell(n1)}<i></i>${cell(n2)}<i></i></div>`;
     const extra = W.nodes.slice(4).map((n) => this.wheelNode(n)).join('');
     // 예외 방패 카드: 무난한 방패(어느 공격이든 그대로) · 까다로운 방패(한 공격만 제값)
     const cards = [
-      ...W.flatDef.map((d) => `<div class="wcard"><span class="sh">${S.shield(hexC(NGN.DEFENSE_COLOR[d]))}</span><span><b>${escC(K[d] || d)}</b>어느 공격이든 ×${T[W.atk[0]][d]}</span></div>`),
+      ...W.flatDef.map((d) => `<div class="wcard"><span class="sh">${S.shield(hexC(NGN.DEFENSE_COLOR[d]))}</span><span><b>${escC(K[d] || d)}</b>모두 ×${T[W.atk[0]][d]}</span></div>`),
       ...W.hardDef.map((d) => {
         const vs = W.atk.map((a) => ({ a, v: T[a][d] })).sort((p, q) => q.v - p.v);
         const ok = vs.filter((x) => W.eq(x.v, vs[0].v)).map((x) => escC(AK[x.a] || x.a)).join('·');
-        return `<div class="wcard"><span class="sh">${S.shield(hexC(NGN.DEFENSE_COLOR[d]))}</span><span><b>${escC(K[d] || d)}</b>${ok} 말고는 ×${vs[vs.length - 1].v} — 거의 안 통한다</span></div>`;
+        return `<div class="wcard"><span class="sh">${S.shield(hexC(NGN.DEFENSE_COLOR[d]))}</span><span><b>${escC(K[d] || d)}</b>${ok}만 통함<br>나머지 ×${vs[vs.length - 1].v}</span></div>`;
       }),
     ].join('');
     // 예외 공격 줄: 무난한 공격(어디든 같다) · 두루 센 공격
     const lines = [
-      ...W.flatAtk.map((a) => `<div class="wrow"><span class="ak">${escC(AK[a] || a)}</span><span>어느 방패든 ×${T[a][W.def[0]]} — 세지도 약하지도 않아 어디에나 쓸 수 있다</span></div>`),
+      ...W.flatAtk.map((a) => `<div class="wrow"><span class="ak">${escC(AK[a] || a)}</span><span>어느 방패든 ×${T[a][W.def[0]]}</span></div>`),
       ...W.wideAtk.map((a) => {
         const vs = W.def.map((d) => ({ d, v: T[a][d] })).sort((p, q) => q.v - p.v);
         const top = vs.filter((x) => W.eq(x.v, vs[0].v)).map((x) => escC(K[x.d] || x.d));
         const bad = vs.filter((x) => W.eq(x.v, vs[vs.length - 1].v)).map((x) => escC(K[x.d] || x.d));
-        return `<div class="wrow"><span class="ak">${escC(AK[a] || a)}</span><span>${top.join('·')} 에 ×${vs[0].v} 로 두루 세다. 다만 ${bad.join('·')} 에는 ×${vs[vs.length - 1].v}</span></div>`;
+        return `<div class="wrow"><span class="ak">${escC(AK[a] || a)}</span><span>${bad.join('·')} 빼고 ×${vs[0].v}</span></div>`;
       }),
     ].join('');
+    // 🛑 제목 옆 부제도, 바퀴 한가운데 세 줄도 지웠다(checklist K-2-15).
+    //    그림이 설명하면 글은 필요 없다 — 글이 필요하면 그림이 실패한 것이다. 궁금하면 [?] 를 누른다.
     return `<div class="panel cx-wheel">
-      <div class="rhead">약점 바퀴 <small>방패마다 잘 드는 공격이 따로 있다</small></div>
+      <div class="rhead">약점 바퀴 <button class="hlp" data-help="affinity">?</button></div>
       ${grid}${extra ? `<div class="wheel">${extra}</div>` : ''}
       ${cards ? `<div class="wexc">${cards}</div>` : ''}
       ${lines ? `<div class="watk">${lines}</div>` : ''}
@@ -126,11 +128,11 @@ NGN.CodexUI = class CodexUI {
     const byAtk = {};
     for (const f of this.meta.unlockedFamilies()) { const t = this.data.byFamily[f][0]; if (t.attackType) (byAtk[t.attackType] ||= []).push(t); }
     const mine = A.attackTypes.filter((a) => byAtk[a]).map((a) => `<div class="cx-row"><span class="ak">${escC(AK[a] || a)}</span><span class="grow">${byAtk[a].map((t) => `<span class="spc" style="background:${hexC(NGN.ELEMENT_COLOR[t.element])}">${escC(t.familyName)}</span>`).join(' ')}</span></div>`).join('');
-    return `<div class="panel cx-note"><b>타워의 공격 타입 × 적의 방어 타입 = 피해 배율.</b> 웨이브마다 적의 방어가 다르니(전투 화면 방패 색) 그 방어에 센 타워를 세우면 같은 타워로 두세 배를 낸다. 초록은 세고 빨강은 약하다.</div>
-      ${this.wheel()}
+    // 🛑 맨 위에 있던 다섯 줄 설명을 통째로 지웠다(checklist K-2-15) — 바로 아래 「약점 바퀴」가 같은 말을 그림으로 한다.
+    return `${this.wheel()}
       <div class="panel cx-table"><table class="aff"><colgroup><col class="first"></colgroup><thead><tr><th class="corner">공격＼방어</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>
-      <div class="panel cx-list"><div class="rhead">내 타워는 어느 공격 타입인가 <small>열린 계열만</small></div>${mine || '<div class="dim">열린 타워가 없어요</div>'}</div>
-      <div class="panel cx-note small">시프·조드가 왜 다른지, 비전이 왜 두루 통하는지는 위 「약점 바퀴」에 값과 함께 나온다 — 여기에 숫자를 다시 적으면 표와 어긋난다(K-2-7).</div>`;
+      <div class="panel cx-list"><div class="rhead">내 타워</div>${mine || '<div class="dim">열린 타워가 없어요</div>'}</div>
+`;   // 맨 아래 안내문도 지웠다 — 바퀴가 이미 값과 함께 보여 준다(K-2-15)
   }
 
   // ---------- 타워 30계열 — 등급별로 묶어서 ----------
@@ -144,6 +146,9 @@ NGN.CodexUI = class CodexUI {
     return '뽑기';
   }
   gradeOf(f) { return NGN.FAMILY_INFO[f].grade || 'basic'; }
+  // 화면에서만 짧게 읽는다 (checklist K-2-15) — 데이터 파일은 건드리지 않는다.
+  // 「보스에게 주는 피해 +15%」 → 「보스 피해 +15%」 처럼 뜻이 그대로인 군더더기만 걷어낸다.
+  shortText(s) { return String(s).replace(/에게 주는 /g, ' ').replace(/모든 타워 /g, '').replace(/  +/g, ' ').trim(); }
   // 등급 배지 (checklist K-2-5): 색만 다르던 글자 칩에 등급마다 다른 모양(돌 → 육각 → 보석 → 수정 → 왕관)을 붙였다.
   // 색맹이거나 글자를 아직 잘 못 읽는 조카도 모양으로 등급을 안다(색만으로 알리지 않는다 — 글자 규칙 3)
   gradeTag(g, ko, color) {
@@ -169,7 +174,7 @@ NGN.CodexUI = class CodexUI {
       }).join('');
       return `<div class="cx-sec"><div class="rhead">${this.gradeTag(g, this.gradeKo[g], this.gradeColor[g])} ${groups[g].length}계열 <small>${groups[g].filter((f) => owned.has(f)).length} 열림</small></div><div class="cx-grid">${cards}</div></div>`;
     }).join('');
-    return `<div class="panel cx-note"><b>타워 ${owned.size}/${total}계열.</b> 누르면 3단 모습·숫자·설명이 나와요. 안 연 타워는 얻는 법이 적혀 있어요.</div>${sections}`;
+    return `${sections}`;
   }
   // 상세: 돌아가는 3D 모형 + 설명 + 3단 표 + 승급 설명 + 갈래 + 이 타워의 상성 한 줄 + 얻는 법
   detail(f) {
@@ -187,7 +192,7 @@ NGN.CodexUI = class CodexUI {
       <div class="tiers">${tiers.map((t) => { const img = this.towerImage ? this.towerImage(t) : null; return `<div class="tier" style="background:${hexC(NGN.ELEMENT_COLOR[t.element])}"><span class="lv">${t.tier}단</span>${img ? `<img src="${img}" alt="">` : ''}<b>${escC(t.name)}</b><br><span class="st">${stat(t)}</span><span class="st">${NGN.SVG.coin} ${t.cost}</span></div>`; }).join('')}</div>
       <p class="up">${escC(t1.upgradeDesc || '')}</p>
       ${t1.aura || !B.length ? '' : `<div class="branches">${B.map((b) => `<span style="background:${escC(b.color)}"><b>3단 ${escC(b.name)}</b><br>${escC(b.설명)}</span>`).join('')}</div>`}
-      <div class="cx-how">${this.meta.isUnlocked(f) ? `<b style="color:#2E7D32">열려 있음</b>${this.meta.famLevel && this.meta.famLevel(f) ? ` · Lv.${this.meta.famLevel(f)} (피해 +${Math.round(this.meta.famLevelDmg(f) * 100)}%)` : ''}` : `${NGN.SVG.lock} 얻는 법: <b>${escC(this.howToGet(f))}</b>`}</div>
+      <div class="cx-how">${this.meta.isUnlocked(f) ? `<b style="color:#046D41">열려 있음</b>${this.meta.famLevel && this.meta.famLevel(f) ? ` · Lv.${this.meta.famLevel(f)} (피해 +${Math.round(this.meta.famLevelDmg(f) * 100)}%)` : ''}` : `${NGN.SVG.lock} 얻는 법: <b>${escC(this.howToGet(f))}</b>`}</div>
       <div class="row"><button class="btn gray" id="codeClose">닫기</button></div></div>`;
     let live = false;
     if (this.preview) { try { live = this.preview.attach($c('cxView'), f, t3.tier, t3.element, Math.min(220, innerWidth - 80)); } catch (e) { live = false; } }
@@ -203,14 +208,14 @@ NGN.CodexUI = class CodexUI {
     const E = this.data.enemies;
     const cards = Object.keys(E).filter((k) => !k.startsWith('_')).map((k) => {
       const e = E[k];
-      return `<div class="cx-enemy"><span class="ico">${NGN.SVG.foe[k] || ''}</span><div class="grow"><b>${escC(e.이름)}</b>${e.flying ? ' <span class="spc gray">공중</span>' : ''}${e.forcedDefense ? ` <span class="spc" style="background:${hexC(NGN.DEFENSE_COLOR[e.forcedDefense])};color:#222;text-shadow:none">${escC(NGN.DEFENSE_KO[e.forcedDefense])} 방어 고정</span>` : ''}<br><span class="sub">${escC(this.koDefense(e.설명 || ''))}</span><br><span class="nums">체력 ×${e.hpMul} · 속도 ×${e.speedMul} · 보상 ×${e.rewardMul} · 새면 생명 −${e.livesCost}</span></div></div>`;
+      return `<div class="cx-enemy"><span class="ico">${NGN.SVG.foe[k] || ''}</span><div class="grow"><b>${escC(e.이름)}</b>${e.flying ? ' <span class="spc gray">공중</span>' : ''}${e.forcedDefense ? ` <span class="spc" style="background:${hexC(NGN.DEFENSE_COLOR[e.forcedDefense])};color:#222;text-shadow:none">${escC(NGN.DEFENSE_KO[e.forcedDefense])}</span>` : ''}<div class="echips"><span>체력 ×${e.hpMul}</span><span>속도 ×${e.speedMul}</span><span>보상 ×${e.rewardMul}</span><span>생명 −${e.livesCost}</span></div></div></div>`;
     }).join('');
     const S = (this.data.specials && this.data.specials.specials) || [];
-    const spec = S.map((s) => `<div class="cx-row"><span class="spc" style="background:${escC(s.color || '#888')}">${escC(s.이름)}</span><span class="grow">${escC(s._설명 || '')} <small>· 체력 ×${s.hpMul}</small></span></div>`).join('');
+    const spec = S.map((s) => `<div class="cx-row"><span class="spc" style="background:${escC(s.color || '#888')}">${escC(s.이름)}</span><span class="grow">체력 ×${s.hpMul}</span></div>`).join('');
     const def = this.data.affinity.defenseTypes.map((d) => `<div class="cx-row"><span class="dsh big" style="background:${hexC(NGN.DEFENSE_COLOR[d])}"></span><b class="dn">${escC(NGN.DEFENSE_KO[d])}</b><span class="grow small">${this.data.affinity.attackTypes.filter((a) => this.data.affinity.table[a][d] > 1.01).map((a) => `<span class="up">${escC((this.data.affinity.한국어 || NGN.ATTACK_KO)[a] || a)} ×${this.data.affinity.table[a][d]}</span>`).join(' ') || '<span class="dim">센 공격 없음 — 전부 ×1</span>'}</span></div>`).join('');
-    return `<div class="panel cx-list"><div class="rhead">적 6종 <small>보스는 5의 배수 웨이브</small></div>${cards}</div>
-      <div class="panel cx-list"><div class="rhead">성질 9종 <small>스테이지 4부터 웨이브에 붙는다 · 적 발밑 색 고리</small></div>${spec || '<div class="dim">없음</div>'}</div>
-      <div class="panel cx-list"><div class="rhead">방어 타입 6 — 무엇이 센가 <small>방패 색 = 그 웨이브의 방어</small></div>${def}</div>`;
+    return `<div class="panel cx-list"><div class="rhead">적 <button class="hlp" data-help="enemies">?</button></div>${cards}</div>
+      <div class="panel cx-list"><div class="rhead">성질</div>${spec || '<div class="dim">없음</div>'}</div>
+      <div class="panel cx-list"><div class="rhead">방패</div>${def}</div>`;
   }
 
   // ---------- 아이템 24종 — 등급별 ----------
@@ -220,7 +225,7 @@ NGN.CodexUI = class CodexUI {
     const nameKo = { common: '흔함', uncommon: '고급', rare: '희귀', unique: '유일' };
     const color = { common: '#9AA7B4', uncommon: '#3FA46A', rare: '#3E7BD6', unique: '#E0A32E' };
     const groups = {}; for (const it of I) (groups[it.등급] ||= []).push(it);
-    const secs = order.filter((g) => groups[g]).map((g) => `<div class="panel cx-list"><div class="rhead">${this.gradeTag(g, (groups[g][0] && groups[g][0].등급이름) || nameKo[g], color[g])} ${groups[g].length}종</div>${groups[g].map((it) => `<div class="cx-row"><b class="dn">${escC(it.이름)}</b><span class="grow">${escC(it.설명 || '')}</span></div>`).join('')}</div>`).join('');
-    return `<div class="panel cx-note"><b>아이템 ${I.length}종.</b> 적을 잡다 보면 떨어진다(${D ? `${D.chance * 100}%·보스는 언제나` : ''}). 타워를 눌러 끼우면 그 타워가 세진다(타워당 ${D ? D.slotsPerTower : 3}칸). 판이 끝나면 사라진다.</div>${secs}`;
+    const secs = order.filter((g) => groups[g]).map((g) => `<details class="panel cx-list cx-fold"><summary>${this.gradeTag(g, (groups[g][0] && groups[g][0].등급이름) || nameKo[g], color[g])} ${groups[g].length}종</summary>${groups[g].map((it) => `<div class="cx-row"><b class="dn">${escC(it.이름)}</b><span class="grow">${escC(this.shortText(it.설명 || ''))}</span></div>`).join('')}</details>`).join('');
+    return `${secs}`;
   }
 };
