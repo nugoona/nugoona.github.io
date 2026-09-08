@@ -97,6 +97,7 @@ NGN.HELP = HELP;
 NGN.UI = class UI {
   constructor(data, cb) {
     this.data = data; this.cb = cb;
+    NGN.ui = this;   // 검증용 손잡이(NGN.world 와 같은 이유). 게임 동작에는 안 쓴다
     this.pickFam = null; this.selectedSlot = null;
     this.mapId = null;
     this.genCount = 12;
@@ -611,14 +612,28 @@ NGN.UI = class UI {
     if (!wv) { d.hidden = true; return; }
     if (!d.hidden) { // 글자 규칙 4(설명은 도감으로): 상성 목록·성질 설명 문장은 뺐다 — 카드의 화살표 배지가 상성을, 도감이 뜻을 알려 준다
       const spMul = wv.special ? wv.special.hpMul : 1;
-      d.innerHTML = `<span><b>${wv.wave > g.waves.length ? '∞ ' : ''}다음 웨이브 ${wv.wave}</b> · ${this.foeIcons(wv)}</span>`
+      d.innerHTML = `<span><b>${wv.wave > g.waves.length ? '∞ ' : ''}다음 웨이브 ${wv.wave}</b> · ${this.foeIcons(wv, 10)}</span>`
         + `<span>${esc(wv.kindKo)} ×${wv.enemies.reduce((a, e) => a + e.count, 0)} · 체력 ${wv.enemies.map((e) => fmt(Math.round(e.hp * g.hpMul * spMul))).join('/')} · ${SVG.shield(hex(NGN.DEFENSE_COLOR[wv.defense]))} ${NGN.DEFENSE_KO[wv.defense]} 방어</span>`;
     }
     this.refreshTowerBar();
   }
-  foeIcons(wv) {
-    const icons = wv.enemies.map((e) => { const n = Math.min(e.count, 6); return SVG.foe[e.kind].repeat(n) + (e.count > n ? `<span class="more">+${e.count - n}</span>` : ''); }).join('');
-    return `<span class="foes">${icons}${SVG.shield(hex(NGN.DEFENSE_COLOR[wv.defense]))}${wv.special ? `<span class="spc" style="background:${esc(wv.special.color || '#888')}">${esc(wv.special.이름)}</span>` : ''}</span>`;
+  // 🔴 2026-09-08: 예전엔 **적 종류마다** 6개씩 그렸다. 두 종류면 12개 + 「+N」 두 개 + 방패라
+  //    360px 폰의 카운트다운 줄(쓸 수 있는 폭 103px)을 넘겨 「+2」와 방패가 잘렸다(실측 128px 필요).
+  //    이제 **전부 합쳐** 상한을 두고 「+N」은 맨 끝에 한 번만 붙인다 — 잘릴 것이 없다.
+  foeIcons(wv, max) {
+    const MAX = max || 4;
+    let left = MAX, shown = 0, total = 0, icons = '';
+    for (const e of wv.enemies) total += e.count;
+    for (const e of wv.enemies) {
+      const n = Math.min(e.count, left);
+      if (n <= 0) break;
+      icons += SVG.foe[e.kind].repeat(n); left -= n; shown += n;
+    }
+    const rest = total - shown;
+    const more = rest > 0 ? `<span class="more">+${rest}</span>` : '';
+    // 🔑 아이콘만 .faces 로 감싼다 — 자리가 모자라면 **아이콘만** 줄어들고
+    //    「+N」·방어 방패·성질 칩은 절대 안 잘린다(그게 정보다).
+    return `<span class="foes"><span class="faces">${icons}</span>${more}${SVG.shield(hex(NGN.DEFENSE_COLOR[wv.defense]))}${wv.special ? `<span class="spc" style="background:${esc(wv.special.color || '#888')}">${esc(wv.special.이름)}</span>` : ''}</span>`;
   }
   // 카드 바: 연 계열 전부(1단 카드만 — 승급은 지어진 타워를 눌러서). 카드 = 타워 3D 그림(한 번 찍어 둔 것) + 값. 이름은 고른 카드 위에 뜬다.
   // 길게 누르거나(0.45초) 위로 밀면 상세가 열린다(사장님: "타워 모델링 및 설명이 있고 선택해야")
@@ -736,7 +751,8 @@ NGN.UI = class UI {
     const s = g.effectiveStats(inst), d = inst.def;
     const next = g.byFamily[d.family][d.tier], upCost = g.costToUpgrade(inst), refund = g.refundFor(inst);
     const wv = g.wave ? g.wave.def : g.waveAt(g.stats.reachedWave + 1); const m = wv && s.attackType ? this.mul(s.attackType, wv.defense) : null;
-    const affTxt = m === null || m === 1 ? '' : ` · 다음 웨이브 <b style="color:${m > 1 ? '#046D41' : '#871023'}">×${m}</b>`;
+    // 「다음 웨이브 ×0.6」은 뜻이 안 통했다(사장님 "뭔 말이야?"). 이 타워가 다음 적에게 몇 %만큼 아프게 하는가다.
+    const affTxt = m === null || m === 1 ? '' : ` · 다음 적 <b style="color:${m > 1 ? '#046D41' : '#871023'}">${Math.round(m * 100)}%</b>`;
     const lvl = d.aura || (s.expToNext === null && s.expForThis === 0) ? '' : (() => { const max = s.expToNext === null; const pct = max ? 100 : Math.round((s.exp - s.expForThis) / (s.expToNext - s.expForThis) * 100); return `<div class="lvl"><b>Lv.${s.level}</b><span class="xp"><span style="width:${pct}%"></span></span><span>${max ? '최고' : `${Math.floor(s.exp)}/${s.expToNext}`}</span></div>`; })();
     const B = g.branchDef(inst.branch);
     const branchChip = B ? ` <span class="spc" style="background:${esc(B.color)}">${esc(B.name)}</span>` : '';
