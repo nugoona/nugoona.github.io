@@ -416,6 +416,44 @@ NGN.serverNow = async function serverNow() {
     q.length = 0;
   }
 
+  // ---------- ▶(웨이브 시작·미리 부르기)를 **적이 나오는 입구**에 붙인다 ----------
+  // 🔴 2026-09-08 사장님 지시: "바로 나오기 버튼은 몬스터 입구에 버튼 옮겨 … 초록색 그지 같은 우하단버튼"
+  //   왜 옳은가: ⑴오른쪽 아래에 두면 **타워 카드와 겹친다**(6px 간격, 카드가 늘면 반쪽으로 붙음 — 여러 번 지적받음)
+  //             ⑵카드줄 위로 올리면 **성(출구)을 가린다** ⑶입구에 두면 「여기서 적이 나온다」는 뜻까지 맞는다.
+  //   🛑 화면 밖으로 나가지 않게 가장자리 안으로 붙잡아 둔다(카메라를 돌리거나 짧은 화면일 때).
+  const waveBtnEl = document.getElementById('waveBtn');
+  function placeWaveBtn() {
+    // 🛑 숨겨져 있어도 자리는 계속 갱신한다 — 안 그러면 다시 나타나는 첫 프레임에 왼쪽 위(0,0)에서 번쩍인다
+    if (!waveBtnEl || !world.camera) return;
+    const box = world.portalBox, W = dom.clientWidth, H = dom.clientHeight;
+    // 입구가 화면에서 차지하는 네모를 구한다 — 상자의 여덟 모서리를 전부 투영해 감싼다
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    if (box) {
+      const p = new THREE.Vector3();
+      for (let i = 0; i < 8; i++) {
+        p.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(world.camera);
+        const sx = (p.x + 1) / 2 * W, sy = (1 - p.y) / 2 * H;
+        if (sx < x0) x0 = sx; if (sx > x1) x1 = sx;
+        if (sy < y0) y0 = sy; if (sy > y1) y1 = sy;
+      }
+    } else if (world.portal) {                       // 상자가 없으면 점 하나로 대신한다
+      const p = world.portal.clone().project(world.camera);
+      x0 = x1 = (p.x + 1) / 2 * W; y0 = y1 = (1 - p.y) / 2 * H;
+    } else return;
+    // 크기: 입구 높이에 맞춘다(너무 작거나 크지 않게 44~72px). 「폭 맞춰서」 = 입구와 나란한 크기로
+    const size = Math.max(44, Math.min(72, Math.round((y1 - y0) * 0.9) || 60));
+    waveBtnEl.style.width = size + 'px'; waveBtnEl.style.height = size + 'px';
+    // 자리: 입구 **오른쪽 옆**, 세로 중심을 입구 중심에 맞춘다
+    let left = x1 + 10;
+    let top = (y0 + y1) / 2 - size / 2;
+    // 오른쪽에 자리가 없으면 왼쪽으로 넘긴다
+    if (left + size > W - 6) left = x0 - 10 - size;
+    const TOP = 62, BOT = H - 118;                   // 위 정보줄 · 아래 카드줄을 피한다
+    left = Math.max(6, Math.min(W - size - 6, left));
+    top = Math.max(TOP, Math.min(BOT - size, top));
+    waveBtnEl.style.left = Math.round(left) + 'px';
+    waveBtnEl.style.top = Math.round(top) + 'px';
+  }
   function frame(t) {
     requestAnimationFrame(frame);
     const dtMs = t - last;
@@ -454,6 +492,7 @@ NGN.serverNow = async function serverNow() {
       }
       // 다음 엔진 틱까지 얼마나 왔나 → 적 위치를 그 비율로 이어 그린다(A1). 웨이브 밖이면 1. 슬로우모 중엔 연출 시간도 같이 느리게
       renderer.update(dt * slowmo, game, game.wave ? acc / NGN.DT : 1);
+      placeWaveBtn();   // ▶ 를 적이 나오는 입구 자리에 붙인다(사장님 지시 2026-09-08)
       if (speed <= 4) flushFloaters();
       if (tutorialStep === 1) { const b = document.querySelector('.tcard'); const r = b.getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top + 18, ''); } // 화살표 끝이 카드 그림에 걸치게(카드 위로 한 줄 더 안 먹게)
       else if (tutorialStep === 2 && ui.previewSlot !== null) { const r = document.getElementById('buildBtn').getBoundingClientRect(); ui.hint(r.left + r.width / 2, r.top - 6, '짓기를 누르세요'); }
