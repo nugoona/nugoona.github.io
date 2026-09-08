@@ -294,9 +294,22 @@
   #bagPill.has { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255,201,60,.5); animation: glowPulse 1s ease-in-out infinite alternate; }
   #nextDetail { position: fixed; top: calc(74px + env(safe-area-inset-top)); left: 52px; right: 92px; z-index: 10; padding: 8px 10px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
   /* 하단 한 줄: [돌리기] [카드…] [▶]. 카드 = 타워 그림 + 값. 이름은 고른 카드 위에만 뜬다(글자 최소) */
-  #bottom { position: fixed; left: 6px; right: 6px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 10; display: flex; gap: 6px; align-items: flex-end; pointer-events: none; }
+  /* 🔴 2026-09-08 (사장님 "이거 타워선택과 겹친다고 몇번얘기해"):
+     되돌리기 · 카드줄 · ▶버튼이 **한 줄**에 있고 사이가 6px 뿐이었다(실측: 카드줄 52~288, 버튼 294~354).
+     카드가 늘어나면 카드줄이 288에서 잘려 **마지막 카드가 반쪽으로 버튼에 딱 붙는다** —
+     보기에 겹치고, 손가락(≈45px)으로 그 카드를 누르려다 ▶ 를 누른다.
+     🔑 같은 줄에 두는 한 계속 부딪힌다 → ▶ 를 **줄에서 빼내 카드줄 위 오른쪽**으로 올린다.
+        카드줄은 화면 폭을 다 쓰게 되고(카드가 더 보인다), 버튼은 절대 안 겹친다. */
+  #bottom { position: fixed; left: 6px; right: 6px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 10; display: flex; gap: 14px; align-items: flex-end; pointer-events: none; }
   #bottom > * { pointer-events: auto; }
-  #towerBar { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; overflow-y: visible; padding: 12px 4px 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  /* 오른쪽 끝 14px 을 흐리게 — 카드가 많아 잘릴 때 「반쪽 카드」가 아니라 자연스럽게 사라진다.
+     🛑 overflow-y 는 visible 이어야 카드 위 이름표·삼각형이 안 잘린다 → mask 는 가로만 건다. */
+  /* 🔑 안쪽 여백을 14px 로 주고 **같은 14px** 을 양끝에서 흐리게 한다.
+     안 밀었을 때는 첫·마지막 카드가 여백 뒤(=흐림 밖)에 있어 멀쩡하고,
+     밀어서 카드가 끝을 넘어가면 그 흐림 위로 지나가며 자연스럽게 사라진다. */
+  #towerBar { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; overflow-y: visible; padding: 12px 14px 0; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
   #towerBar::-webkit-scrollbar { display: none; }
   .tcard { flex: 0 0 60px; height: 70px; position: relative; border-radius: 12px; border: 2px solid rgba(255,255,255,.7); box-shadow: 0 3px 0 rgba(0,0,0,.35), inset 0 -14px 0 rgba(0,0,0,.18); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; cursor: pointer; padding: 0 0 3px; font: inherit; color: #fff; text-shadow: var(--stroke); transition: transform .05s; overflow: visible; }
   .tcard:active { transform: translateY(2px); }
@@ -314,6 +327,9 @@
   .tcard .aff svg { width: 12px; height: 12px; }
   .tcard .aff.up { background: var(--green2); } .tcard .aff.down { background: var(--red2); }
   .tcard .bt { position: absolute; top: -6px; right: -5px; font-size: 13px; background: var(--gold); color: #3a2a00; text-shadow: none; border: 2px solid #fff; border-radius: 999px; padding: 0 5px; line-height: 14px; }
+  /* 🛑 카드줄 **위**로 올려도 봤는데 그러면 성(출구)을 가린다 — 출구는 가리면 안 된다. 같은 줄에 둔다.
+     대신 ⑴사이를 6 → 14px 로 벌리고 ⑵카드줄 오른쪽 끝을 흐리게(mask) 해서
+     잘린 카드가 버튼에 **딱 붙어 보이지 않게** 한다. 잘린 카드가 반쪽으로 버튼에 붙던 것이 지적의 핵심이었다. */
   #waveBtn { width: 60px; height: 60px; border-radius: 50%; padding: 0; min-height: 0; flex: 0 0 auto; font-size: 20px; border-width: 3px; position: relative; }
   #waveBtn svg { width: 34px; height: 34px; }
   #waveBtn.running { background: #6B7C86; border-color: #3E4A52; --sh: #3E4A52; box-shadow: 0 5px 0 #3E4A52; }
@@ -1020,7 +1036,7 @@
 <!-- 부팅: 스크립트를 하나씩 받으며 로딩 막대를 채운다(0~30%). 그 뒤 데이터·모델은 main.js 가 NGN_LOADING 으로 이어 채운다.
      파일 위치는 window.__NGN_PATHS__(나눔 빌드가 넣는다)로 바꾼다. 번들(단일 HTML)은 __NGN_INLINE__ 을 세워 이 목록을 안 받고 뒤에 인라인된 것을 쓴다.
      SCRIPTS 는 유효한 JSON 배열이어야 한다 — game/build.js·bundle.js 가 이 줄을 읽는다 -->
-<script>window.__NGN_VERSION__ = "bf800ea1f6"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
+<script>window.__NGN_VERSION__ = "bf2e344d15"; window.__NGN_PATHS__ = { data: "data/", assets: "assets/", sim: "js/sim/", vendor: "js/vendor/" };</script>
 <script>
 (function () {
   const P = Object.assign({ sim: '../sim/', vendor: 'vendor/', data: '../data/', assets: 'assets/' }, window.__NGN_PATHS__ || {});
