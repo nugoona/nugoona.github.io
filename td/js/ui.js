@@ -230,7 +230,7 @@ NGN.UI = class UI {
     // 「일일」 하나에 출석과 미션이 함께 들어간다 — 둘 다 매일 받는 것이라 한 페이지가 이치에 맞고, 아이콘도 하나로 줄었다
     const M = m.missions();
     const doneN = M ? M.list.filter((x) => x.done).length : 0;
-    put('gateMission', SVG.scroll, '일일', { dot: m.missionUnclaimed() > 0, badge: M ? `미션 ${doneN}/${M.list.length}` : null });
+    put('gateMission', SVG.scroll, '일일', { dot: m.missionUnclaimed() > 0, badge: M ? `${doneN}/${M.list.length}` : null });
     const played = dk && m.dailyPlayed(dk.date);
     put('gateDaily', SVG.calendar, '오늘의 판', { locked: !dk, badge: dk ? (played ? '오늘 완료' : dk.label) : '준비 중' });
     const inf = m.infiniteUnlocked(), b = m.state.best;
